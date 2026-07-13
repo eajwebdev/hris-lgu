@@ -1,0 +1,75 @@
+.card-body.folder-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        grid-gap: 20px;
+    }
+
+    .folder-item{
+        position: relative;
+        text-align: center;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background-color: #fff;
+        transition: transform 0.3s ease-in-out;
+    }
+
+    .folder-items {
+        position: relative;
+        text-align: center;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background-color: #fff;
+        transition: transform 0.3s ease-in-out;
+    }
+
+    .folder-icon {
+        font-size: 48px;
+        color: #f6ca51;
+    }
+
+    .folder-name {
+        display: block;
+        margin-top: 10px;
+        font-size: 18px;
+        color: #333;
+    }
+
+    .folder-options {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        color: #888;
+        cursor: pointer;
+    }
+
+    .no-folders {
+        text-align: center;
+        font-size: 18px;
+        color: #777;
+        margin-top: 20px;
+    }
+
+    .folder-item {
+        position: relative;
+    }
+
+    .folder-items {
+        position: relative;
+    }
+
+    .folder-icon::before {
+        content: '\f07b';
+        font-family: 'FontAwesome';
+        transition: transform 0.6s ease-in-out;
+        display: block;
+    }
+
+    .folder-item:hover .folder-icon::before {
+        content: '\f07c'; 
+    }
+
+    .folder-item:hover .file-icon::before {
+        opacity: 1;
+    }

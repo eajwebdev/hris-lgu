@@ -1,0 +1,31 @@
+/node_modules
+/public/hot
+/public/storage
+/storage/*.key
+/vendor
+.env
+.env.backup
+.phpunit.result.cache
+docker-compose.override.yml
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/.idea
+/.vscode
+
+# Database dumps — too large for GitHub, may contain PII
+*.sql
+/public/dbcpsuhris.sql
+
+# Personal data — never commit. These are uploaded/generated at runtime and
+# contain real employees' photos, e-signatures and records.
+/public/Uploads/Signature/
+/public/Uploads/*.pdf
+/public/Uploads/Screenshot_*.png
+/public/Uploads/signature.png
+/public/Profile/Employee/*
+!/public/Profile/Employee/default.png
+!/public/Profile/Employee/default-male.png
+!/public/Profile/Employee/default-female.png
+/storage/app/public/Leaveapplication/
