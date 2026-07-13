@@ -64,26 +64,48 @@ a:hover { color: var(--accent); }
 *::-webkit-scrollbar-track { background: transparent; }
 
 /* ------------------------------------------------------------- sidebar */
-.main-sidebar {
+/* Widths: expanded rail on desktop, icon-only rail when collapsed, and an
+   off-canvas drawer on phones. AdminLTE's own widths are overridden here so
+   the three states line up with the content wrapper. */
+:root {
+    --sidebar-w: 260px;
+    --sidebar-mini-w: 68px;
+}
+
+.main-sidebar,
+.main-sidebar::before {
+    width: var(--sidebar-w);
     background: var(--surface) !important;
     border-right: 1px solid var(--border);
     box-shadow: none !important;
+    transition: width .25s ease, margin-left .25s ease, transform .25s ease;
 }
 
+body:not(.sidebar-collapse) .content-wrapper,
+body:not(.sidebar-collapse) .main-header,
+body:not(.sidebar-collapse) .main-footer {
+    margin-left: var(--sidebar-w);
+    transition: margin-left .25s ease;
+}
+
+/* --------------------------------------------------------------- brand */
 .main-sidebar .brand-link {
     background: var(--surface) !important;
     border-bottom: 1px solid var(--border);
-    padding: .9rem 1rem;
+    padding: .85rem 1rem;
     display: flex;
     align-items: center;
-    gap: .65rem;
+    gap: .7rem;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
 .main-sidebar .brand-link .brand-image {
     float: none;
     margin: 0;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
     object-fit: contain;
     opacity: 1;
     box-shadow: none;
@@ -93,9 +115,10 @@ a:hover { color: var(--accent); }
 .main-sidebar .brand-text {
     color: var(--foreground) !important;
     font-weight: 700;
-    letter-spacing: -.01em;
-    font-size: .98rem;
+    font-size: 1rem;
     line-height: 1.15;
+    letter-spacing: -.01em;
+    transition: opacity .18s ease;
 }
 .main-sidebar .brand-text small {
     display: block;
@@ -105,67 +128,87 @@ a:hover { color: var(--accent); }
     letter-spacing: .02em;
 }
 
-.main-sidebar .sidebar { padding: .5rem .65rem 1.5rem; }
-.main-sidebar hr,
-.main-sidebar .sidebar-divider {
-    border-color: var(--border);
-    margin: .75rem .25rem;
+/* ---------------------------------------------------------- user panel */
+.main-sidebar .sidebar {
+    padding: .75rem .6rem 2rem;
+    overflow-x: hidden;
 }
+.main-sidebar hr,
+.main-sidebar .sidebar-divider { display: none; }   /* sections replace the rules */
 
-/* User panel → shadcn-ish "account card" */
 .main-sidebar .user-panel {
     background: var(--muted-soft);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: .6rem .7rem;
-    margin: .25rem 0 .5rem !important;
+    padding: .55rem .6rem;
+    margin: 0 0 .35rem !important;
     align-items: center;
+    overflow: hidden;
+    white-space: nowrap;
 }
-.main-sidebar .user-panel .info { margin-top: 0 !important; padding: 0; }
+.main-sidebar .user-panel .image { padding-left: 0; }
+.main-sidebar .user-panel .info {
+    margin-top: 0 !important;
+    padding: 0;
+    min-width: 0;
+    transition: opacity .18s ease;
+}
 .main-sidebar .user-panel .info span:first-child {
+    display: block;
     color: var(--foreground);
     font-weight: 600;
-    font-size: .86rem;
+    font-size: .84rem;
     line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .main-sidebar .user-panel .info .text-muted {
     color: var(--muted) !important;
-    font-size: .74rem !important;
+    font-size: .73rem !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .main-sidebar .user-panel .img-circle1 {
     border: 2px solid var(--surface) !important;
     box-shadow: var(--shadow-xs);
 }
 
-/* Nav items */
+/* ---------------------------------------------------------- nav sections */
 .main-sidebar .nav-sidebar .nav-header {
     color: var(--muted);
-    font-size: .68rem;
+    font-size: .66rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .09em;
+    letter-spacing: .1em;
     padding: 1rem .75rem .35rem;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
 .main-sidebar .nav-sidebar > .nav-item { margin-bottom: 2px; }
 
 .main-sidebar .nav-sidebar .nav-link {
+    position: relative;
     color: #475569 !important;
     border-radius: var(--radius-sm);
-    padding: .5rem .7rem;
-    font-size: .87rem;
+    padding: .55rem .7rem;
+    font-size: .875rem;
     font-weight: 500;
     display: flex;
     align-items: center;
+    white-space: nowrap;
     transition: background-color .15s ease, color .15s ease;
 }
 .main-sidebar .nav-sidebar .nav-link .nav-icon {
+    width: 1.6rem;
+    min-width: 1.6rem;
+    margin-right: .25rem;
+    font-size: 1rem;
+    text-align: center;
     color: #94A3B8;
-    width: 1.3rem;
-    font-size: .95rem;
-    margin-right: .3rem;
     transition: color .15s ease;
 }
+.main-sidebar .nav-sidebar .nav-link p { margin: 0; }
 
 .main-sidebar .nav-sidebar .nav-link:hover {
     background: var(--muted-soft) !important;
@@ -173,6 +216,7 @@ a:hover { color: var(--accent); }
 }
 .main-sidebar .nav-sidebar .nav-link:hover .nav-icon { color: var(--brand); }
 
+/* Active item: tinted pill with an accent bar, not a hard block */
 .main-sidebar .nav-sidebar .nav-link.active,
 .main-sidebar .nav-sidebar .nav-link.active:hover {
     background: var(--brand-soft) !important;
@@ -181,29 +225,133 @@ a:hover { color: var(--accent); }
     box-shadow: none;
 }
 .main-sidebar .nav-sidebar .nav-link.active .nav-icon { color: var(--brand-600) !important; }
+.main-sidebar .nav-sidebar > .nav-item > .nav-link.active::before {
+    content: "";
+    position: absolute;
+    left: -.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    border-radius: 0 3px 3px 0;
+    background: var(--brand);
+}
 
 /* Open treeview parent */
 .main-sidebar .nav-sidebar .menu-open > .nav-link {
     background: var(--muted-soft) !important;
     color: var(--foreground) !important;
 }
+.main-sidebar .nav-sidebar .menu-open > .nav-link .right { transform: rotate(-90deg); }
+.main-sidebar .nav-sidebar .nav-link .right { transition: transform .2s ease; }
 
-/* Nested tree */
+/* Nested items */
 .main-sidebar .nav-treeview {
-    margin: 2px 0 6px .9rem;
-    padding-left: .55rem;
+    margin: 2px 0 6px 1.35rem;
+    padding-left: .5rem;
     border-left: 1px solid var(--border);
 }
 .main-sidebar .nav-treeview .nav-link {
     font-size: .82rem;
-    padding: .4rem .6rem;
+    padding: .42rem .6rem;
 }
+.main-sidebar .nav-treeview .nav-icon { font-size: .5rem; width: 1.1rem; min-width: 1.1rem; }
 
 .main-sidebar .nav-sidebar .badge { border-radius: 999px; font-weight: 600; }
 
-/* Collapsed rail */
+/* ======================================================== collapsed rail */
+.sidebar-collapse .main-sidebar,
+.sidebar-collapse .main-sidebar::before { width: var(--sidebar-mini-w); }
+
+.sidebar-collapse .content-wrapper,
+.sidebar-collapse .main-header,
+.sidebar-collapse .main-footer { margin-left: var(--sidebar-mini-w); }
+
+/* Hide the labels rather than letting them overflow the rail */
 .sidebar-collapse .main-sidebar .brand-text,
-.sidebar-collapse .main-sidebar .user-panel .info { opacity: 0; }
+.sidebar-collapse .main-sidebar .user-panel .info,
+.sidebar-collapse .main-sidebar .nav-header,
+.sidebar-collapse .main-sidebar .nav-sidebar .nav-link p,
+.sidebar-collapse .main-sidebar .nav-treeview { display: none; }
+
+.sidebar-collapse .main-sidebar .brand-link { justify-content: center; padding: .85rem 0; }
+.sidebar-collapse .main-sidebar .sidebar { padding: .75rem .5rem 2rem; }
+
+.sidebar-collapse .main-sidebar .user-panel {
+    justify-content: center;
+    padding: .45rem;
+    background: transparent;
+    border-color: transparent;
+}
+
+.sidebar-collapse .main-sidebar .nav-sidebar .nav-link {
+    justify-content: center;
+    padding: .6rem 0;
+}
+.sidebar-collapse .main-sidebar .nav-sidebar .nav-link .nav-icon {
+    margin-right: 0;
+    width: auto;
+    min-width: 0;
+    font-size: 1.05rem;
+}
+.sidebar-collapse .main-sidebar .nav-sidebar .nav-link .right { display: none; }
+.sidebar-collapse .main-sidebar .nav-sidebar > .nav-item > .nav-link.active::before { display: none; }
+
+/* Keep AdminLTE's hover-expand from fighting the rail */
+.sidebar-collapse .main-sidebar:hover,
+.sidebar-collapse .main-sidebar:hover::before { width: var(--sidebar-mini-w); }
+.sidebar-collapse .main-sidebar:hover .brand-text,
+.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-link p { display: none; }
+
+/* ==================================================== phones: off-canvas */
+.sidebar-backdrop { display: none; }
+
+@media (max-width: 991.98px) {
+    /* The drawer slides over the page; the content never shifts. */
+    .main-sidebar,
+    .main-sidebar::before {
+        width: var(--sidebar-w) !important;
+        transform: translateX(-100%);
+        box-shadow: var(--shadow-lg) !important;
+    }
+
+    body.sidebar-open .main-sidebar,
+    body.sidebar-open .main-sidebar::before { transform: translateX(0); }
+
+    .content-wrapper,
+    .main-header,
+    .main-footer,
+    body:not(.sidebar-collapse) .content-wrapper,
+    body:not(.sidebar-collapse) .main-header,
+    body:not(.sidebar-collapse) .main-footer,
+    .sidebar-collapse .content-wrapper,
+    .sidebar-collapse .main-header,
+    .sidebar-collapse .main-footer { margin-left: 0 !important; }
+
+    /* Labels always show inside the drawer, even in "collapsed" state */
+    .sidebar-collapse .main-sidebar .brand-text,
+    .sidebar-collapse .main-sidebar .user-panel .info,
+    .sidebar-collapse .main-sidebar .nav-header,
+    .sidebar-collapse .main-sidebar .nav-sidebar .nav-link p { display: block; }
+    .sidebar-collapse .main-sidebar .nav-sidebar .nav-link { justify-content: flex-start; padding: .55rem .7rem; }
+    .sidebar-collapse .main-sidebar .nav-sidebar .nav-link .nav-icon { margin-right: .25rem; width: 1.6rem; min-width: 1.6rem; }
+    .sidebar-collapse .main-sidebar .brand-link { justify-content: flex-start; padding: .85rem 1rem; }
+    .sidebar-collapse .main-sidebar .user-panel { justify-content: flex-start; background: var(--muted-soft); border-color: var(--border); padding: .55rem .6rem; }
+
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 1035;
+        background: rgba(15, 23, 42, .45);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .25s ease;
+    }
+    body.sidebar-open .sidebar-backdrop { opacity: 1; pointer-events: auto; }
+
+    .main-sidebar { z-index: 1038; }
+}
 
 /* -------------------------------------------------------------- navbar */
 .main-header.navbar {
@@ -490,3 +638,79 @@ label { font-weight: 600; font-size: .8rem; color: #334155; }
 
 /* AdminLTE text helper used across the app */
 .text-success1 { color: var(--accent-600) !important; }
+
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+    background-color: var(--accent) !important;
+}
+
+/* ==================================================================
+   Responsive
+   A wide element (a data table, the calendar, a PDF preview) must scroll
+   inside its own box. It must never widen the page and push the layout
+   sideways, which is what happened on phones.
+   ================================================================== */
+html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.content-wrapper,
+.content,
+.content-wrapper > .content > .container-fluid { max-width: 100%; }
+
+.card,
+.small-box,
+.info-box { max-width: 100%; }
+
+/* Data tables scroll horizontally within the card */
+.dataTables_wrapper,
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.dataTables_wrapper > .row { margin: 0; }
+
+/* Bootstrap columns are flex items: without this, a wide child (the calendar,
+   a data table) forces the column to its min-content width and drags the whole
+   row past the viewport. */
+.row > [class*="col-"] { min-width: 0; }
+
+/* The calendar keeps a readable width and scrolls inside its own card */
+#calendar { overflow-x: auto; }
+#calendar .fc { min-width: 560px; }
+.fc-view-harness,
+.fc-scroller { overflow-x: auto !important; }
+
+iframe { max-width: 100%; }
+img { max-width: 100%; height: auto; }
+
+@media (max-width: 991.98px) {
+    .content-wrapper { padding-top: 12px !important; }
+    .content-wrapper > .content > .container-fluid { padding-left: .75rem; padding-right: .75rem; }
+
+    .card-body { padding: 1rem; }
+    .card-header { padding: .85rem 1rem; }
+
+    /* Stat tiles stay legible instead of being clipped */
+    .small-box .inner h3 { font-size: 1.6rem; }
+    .small-box .icon { display: none; }
+
+    /* Toolbars wrap instead of overflowing */
+    .dataTables_wrapper .dataTables_filter,
+    .dataTables_wrapper .dataTables_length { float: none; text-align: left; }
+    .dataTables_wrapper .dataTables_filter input { width: 100%; }
+
+    .main-footer { text-align: center; font-size: .75rem !important; }
+    .main-footer .d-none { display: none !important; }
+}
+
+@media (max-width: 575.98px) {
+    .card-title { font-size: .92rem; }
+    .btn { padding: .45rem .75rem; }
+
+    /* Button groups in table rows stack rather than spill */
+    .btn-group-sm > .btn, .btn-sm { font-size: .78rem; }
+
+    .modal-dialog { margin: .5rem; }
+    .modal-body { padding: 1rem; }
+}

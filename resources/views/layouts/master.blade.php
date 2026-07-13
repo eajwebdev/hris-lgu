@@ -31,7 +31,7 @@
     <!-- Custom style -->
     <link rel="stylesheet" href="{{ asset('template/dist/css/style.css') }}">
     <!-- HRIS modern theme (must load after AdminLTE + custom style) -->
-    <link rel="stylesheet" href="{{ asset('css/hris-theme.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/hris-theme.css') }}?v={{ filemtime(public_path('css/hris-theme.css')) }}">
     <!-- QR -->
     <script src="{{ asset('template/dist/js/html2canvas.min.js') }}"></script>
     <script src="{{ asset('template/dist/js/qrcode.min.js') }}"></script>
@@ -75,10 +75,13 @@
     }
     </style>
 </head>
-<body class="hold-transition sidebar-mini layout-fixed sidebar-collapse layout-navbar-fixed text-sm">
+<body class="hold-transition sidebar-mini layout-fixed layout-navbar-fixed text-sm">
     <div class="wrapper">
+        <!-- Dims the page behind the off-canvas sidebar on phones -->
+        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
         <!-- Navbar -->
-        <nav class="main-header navbar navbar-expand navbar-warning">
+        <nav class="main-header navbar navbar-expand navbar-light">
             <!-- Left navbar links -->
             <ul class="navbar-nav">
                 <li class="nav-item">
@@ -130,7 +133,7 @@
         <!-- /.navbar -->
 
         <!-- Main Sidebar Container -->
-        <aside class="main-sidebar sidebar-light-warning elevation-2">
+        <aside class="main-sidebar elevation-0">
             <!-- Brand Logo -->
             <a href="{{ route('dashboard') }}" class="brand-link">
                 <img src="{{ asset('mabinay-logo.png') }}" alt="Municipality of Mabinay Official Seal" class="brand-image">
@@ -184,12 +187,6 @@
             <!-- /.content -->
         </div>
         <!-- /.content-wrapper -->
-        
-        <!-- Control Sidebar -->
-        <aside class="control-sidebar control-sidebar-dark">
-            <!-- Control sidebar content goes here -->
-        </aside>
-        <!-- /.control-sidebar -->
 
         @if($guard == "employee" && auth()->guard($guard)->user()->dpn == 0)
             <div class="modal fade show" id="dpnModal" tabindex="-1" aria-modal="true" role="dialog" style="display: block; background: rgba(0,0,0,0.5);">
@@ -259,6 +256,39 @@
 
 
     </div>
+
+<script>
+// Phones: the sidebar opens as a drawer over the page. Tapping the dimmed
+// backdrop, following a link, or pressing Escape closes it again.
+(function () {
+    var body = document.body;
+    var backdrop = document.getElementById('sidebarBackdrop');
+
+    function closeSidebar() {
+        body.classList.remove('sidebar-open');
+        body.classList.add('sidebar-collapse');
+    }
+
+    if (backdrop) {
+        backdrop.addEventListener('click', closeSidebar);
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && body.classList.contains('sidebar-open')) {
+            closeSidebar();
+        }
+    });
+
+    document.querySelectorAll('.main-sidebar .nav-sidebar .nav-link').forEach(function (link) {
+        link.addEventListener('click', function () {
+            // Treeview parents only expand — they should not close the drawer.
+            if (window.innerWidth < 992 && !this.parentElement.classList.contains('has-treeview')) {
+                closeSidebar();
+            }
+        });
+    });
+})();
+</script>
 
 @include('script.masterScript')
 @include('script.officeScript')

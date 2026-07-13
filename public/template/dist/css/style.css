@@ -71,24 +71,8 @@
     background-color: #DDF0EF !important;
 }
 
-.sidebar .nav-sidebar > .nav-item > .nav-link.active,
-.sidebar-light-primary .nav-sidebar > .nav-item > .nav-link.active {
-    background-color: #3B8682 !important;
-    color: #fff !important;
-    border-right: 5px solid #ffc107; 
-    border-top-left-radius: 10px;
-    border-bottom-left-radius: 10px;
-    padding-top: 5px;
-}
-
-.sidebar .nav-sidebar > .nav-item > .nav-link.active,
-.nav-sidebar > .nav-item > .nav-link:hover {
-    background-color: #3B8682 !important;
-    color: #fff !important;
-    border-right: 5px solid #ffc107; 
-    border-top-left-radius: 10px;
-    border-bottom-left-radius: 10px;
-}
+/* The sidebar skin now lives in css/hris-theme.css. The old teal/amber
+   active pill was declared here with !important and overrode it. */
 
 .navbar-warning{
     background-color: #DDF0EF;
