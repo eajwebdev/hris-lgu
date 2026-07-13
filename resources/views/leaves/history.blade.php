@@ -234,4 +234,7 @@
         display: block !important;
     }
 </style>
+{{-- Credit modals: included here too so credits can be set from this tab --}}
+@include("leaves.modal")
+
 @endsection

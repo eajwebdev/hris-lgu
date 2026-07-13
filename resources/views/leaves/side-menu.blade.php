@@ -28,10 +28,31 @@
 
             <p class="text-muted text-center">{{ $employee->position }}</p>
     
+            @if($guard == "web")
+                {{-- Credit actions live here, in the panel shared by every tab, so
+                     credits can still be set while viewing Status or History. --}}
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted text-uppercase" style="font-size: .7rem; letter-spacing: .08em; font-weight: 700;">
+                        Leave Credits
+                    </span>
+                    <div class="btn-actions">
+                        <a href="#" title="Add leave credits" class="btn-icon btn-icon--accent"
+                           data-toggle="modal" data-target="#leaveModal">
+                            <i class="fas fa-plus"></i>
+                        </a>
+                        <a href="#" title="Deduct leave credits" class="btn-icon btn-icon--brand"
+                           data-toggle="modal" data-target="#leaveModalDeduct">
+                            <i class="fas fa-minus"></i>
+                        </a>
+                        <a href="#" title="Set other leave balances" class="btn-icon btn-icon--info"
+                           data-toggle="modal" data-target="#modalSettingLeave">
+                            <i class="fas fa-sliders"></i>
+                        </a>
+                    </div>
+                </div>
+            @endif
+
             <ul class="list-group list-group-unbordered custom-gap">
-                @if($guard == "web")
-                    <i class="fas fa-cog" data-toggle="modal" data-target="#modalSettingLeave" style="color: rgb(135, 129, 129); margin-left: 100%; margin-bottom: -8px; float: right;"></i>
-                @endif
                 <li class="list-group-item">
                     <b>Vacation Leave</b> <span class="float-right mt-1 badge badge-info" id="b-vl">{{ $employee->vl }}</span>
                 </li>

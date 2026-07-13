@@ -508,4 +508,7 @@
     </div>
 </div>
 </section>
+{{-- Credit modals: included here too so credits can be set from this tab --}}
+@include("leaves.modal")
+
 @endsection
