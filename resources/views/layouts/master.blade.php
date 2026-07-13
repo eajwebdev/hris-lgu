@@ -146,7 +146,7 @@
             <!-- Sidebar -->
             <div class="sidebar">
                 <hr class="sidebar-divider">
-                <!-- Sidebar user panel (optional) -->
+                <!-- Sidebar user panel (optional) --><br>
                 <div class="user-panel mt-4 d-flex">
                     <div class="image">
                         @php

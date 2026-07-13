@@ -608,7 +608,8 @@ class EmployeeController extends Controller
     }    
     
     public function empQr(){
-        $employees = Employee::select('emp_ID', 'fname', 'lname', 'emp_dept')
+        $employees = Employee::select('emp_ID', 'fname', 'lname', 'suffix', 'position', 'emp_dept', 'stat_1')
+            ->where('stat_1', 1)
             ->orderBy('emp_dept')
             ->orderBy('lname')
             ->get();

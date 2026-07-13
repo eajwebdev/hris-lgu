@@ -85,25 +85,29 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <div class='d-flex align-items-center'>
+                                                <div class="btn-actions">
                                                     @if($emp->emp_status == 1)
-                                                    <a href="{{ route('leavesRead', $emp->id) }}" title="Leave Credits" class='btn btn-success btn-xs employee_edit mr-1' style='width: 30px;' value="{{ $emp->id }}">
-                                                        <i class="fas fa-calendar-check"></i>
-                                                    </a>
+                                                        <a href="{{ route('leavesRead', $emp->id) }}" title="Leave Credits"
+                                                           class="btn-icon btn-icon--accent employee_edit" value="{{ $emp->id }}">
+                                                            <i class="fas fa-calendar-check"></i>
+                                                        </a>
                                                     @else
-                                                    <a href="#" title="Leave Credits" class='btn btn-secondary btn-xs employee_edit mr-1' style='width: 30px;' value="{{ $emp->id }}">
-                                                        <i class="fas fa-calendar-check"></i>
-                                                    </a>
+                                                        <span title="Leave credits are unavailable for this employee"
+                                                              class="btn-icon disabled" aria-disabled="true">
+                                                            <i class="fas fa-calendar-check"></i>
+                                                        </span>
                                                     @endif
-                                                    <a href="{{ route('PDS', $emp->id) }}" title="PDS" class='btn btn-info btn-xs employee_edit mr-1' style='width: 30px;' value="{{ $emp->id }}">
-                                                        <i class='fas fa-file-alt'></i>
+
+                                                    <a href="{{ route('PDS', $emp->id) }}" title="Personal Data Sheet"
+                                                       class="btn-icon btn-icon--brand employee_edit" value="{{ $emp->id }}">
+                                                        <i class="fas fa-file-lines"></i>
                                                     </a>
-                                                    <a title="Working Hours" data-toggle="modal" data-target="#officialTime" onclick="OfficialTime('{{ $emp->emp_ID }}')" class='btn btn-primary btn-xs mr-1' style='width: 30px;'>
-                                                        <i class='fas fa-clock'></i>
+
+                                                    <a href="#" title="Working Hours" data-toggle="modal" data-target="#officialTime"
+                                                       onclick="OfficialTime('{{ $emp->emp_ID }}'); return false;"
+                                                       class="btn-icon btn-icon--info">
+                                                        <i class="fas fa-clock"></i>
                                                     </a>
-                                                    {{-- <button type='button' class='btn btn-danger btn-xs employee_delete' style='width: 30px;' value="{{ $emp->id }}">
-                                                        <i class='fas fa-trash'></i>
-                                                    </button> --}}
                                                 </div>
                                             </td>
                                         </tr>

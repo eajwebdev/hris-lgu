@@ -79,19 +79,6 @@
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <div class="input-group">
-                                        <div class="input-group-prepend">
-                                            <span class="input-group-text">
-                                                <i class="fas fa-building"></i>
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
                         <div class="form-group">
                             <div class="form-row">
@@ -165,10 +152,6 @@
                                         <label for="access4" class="form-check-label">DTR</label>
                                     </div>
                                     <div class="form-check">
-                                        <input type="checkbox" name="access[5]" value="1" id="access5" class="form-check-input" @if(isset($accessArray[5]) && $accessArray[5] == '1') checked @endif>
-                                        <label for="access5" class="form-check-label">SPMS</label>
-                                    </div>
-                                    <div class="form-check">
                                         <input type="checkbox" name="access[6]" value="1" id="access6" class="form-check-input" @if(isset($accessArray[6]) && $accessArray[6] == '1') checked @endif>
                                         <label for="access6" class="form-check-label">SETTINGS</label>
                                     </div>
@@ -235,9 +218,6 @@
                                         @if (isset($access[4]) && $access[4] == 1)
                                             @if($access[4] == 1) <span class="badge badge-secondary">DTR</span> @endif
                                         @endif
-                                        @if (isset($access[5]) && $access[5] == 1)
-                                            @if($access[5] == 1) <span class="badge badge-secondary">SPMS</span> @endif
-                                        @endif
                                         @if (isset($access[6]) && $access[6] == 1)
                                             @if($access[6] == 1) <span class="badge badge-secondary">SETTINGS</span> @endif
                                         @endif
@@ -249,12 +229,14 @@
                                         @endif
                                     </td>                                                                        
                                     <td class="text-center">
-                                        <a href="{{ route('uEdit', $user->uid) }}" class="btn btn-info btn-xs">
-                                            <i class="fas fa-exclamation-circle"></i>
-                                        </a>
-                                        <button value="{{ $user->uid }}" class="btn btn-danger btn-xs users-delete">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
+                                        <div class="btn-actions justify-content-center">
+                                            <a href="{{ route('uEdit', $user->uid) }}" title="Edit user" class="btn-icon btn-icon--info">
+                                                <i class="fas fa-pen"></i>
+                                            </a>
+                                            <button value="{{ $user->uid }}" title="Delete user" class="btn-icon btn-icon--danger users-delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 @endforeach

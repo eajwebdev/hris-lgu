@@ -498,6 +498,56 @@ body:not(.sidebar-collapse) .main-footer {
     color: var(--muted);
 }
 
+/* ------------------------------------------------------- row actions
+   Table row actions used to be chunky coloured squares (green / cyan /
+   green). They are now quiet neutral icon buttons that only take on colour
+   on hover, so the eye goes to the data first.
+   ------------------------------------------------------------------ */
+.btn-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    white-space: nowrap;
+}
+
+.btn-actions .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: .82rem;
+    line-height: 1;
+    box-shadow: none !important;
+    transition: background-color .15s ease, color .15s ease, border-color .15s ease, transform .08s ease;
+}
+.btn-actions .btn-icon:hover {
+    transform: translateY(-1px);
+    text-decoration: none;
+}
+.btn-actions .btn-icon:active { transform: translateY(0); }
+.btn-actions .btn-icon i { margin: 0; }
+
+/* Intent colours, applied on hover only */
+.btn-icon--accent:hover { background: var(--accent-soft); border-color: #BBE5CC; color: var(--accent-600); }
+.btn-icon--brand:hover  { background: var(--brand-soft);  border-color: #FBDCB0; color: var(--brand-700); }
+.btn-icon--info:hover   { background: #E0F2FE; border-color: #BAE6FD; color: #0369A1; }
+.btn-icon--danger:hover { background: #FEE2E2; border-color: #FECACA; color: #B91C1C; }
+
+/* Unavailable action (e.g. leave credits for an inactive employee) */
+.btn-actions .btn-icon.disabled,
+.btn-actions .btn-icon[aria-disabled="true"] {
+    background: var(--muted-soft);
+    color: #C2C9D2;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* --------------------------------------------------------------- forms */
 .form-control, .custom-select, .select2-container--bootstrap4 .select2-selection {
     border: 1px solid var(--border-strong);

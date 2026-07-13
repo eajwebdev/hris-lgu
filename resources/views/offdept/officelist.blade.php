@@ -145,12 +145,14 @@
                                         <td>{{ $office->efname }} {{ $office->elname }}</td>
                                         <td>{{ $office->ofname }} {{ $office->olname }}</td>
                                         <td>
-                                            <a href="{{ route('officeEdit', $office->id) }}" class="btn btn-info btn-xs">
-                                                <i class="fas fa-exclamation-circle"></i>
-                                            </a>
-                                            <button value="{{ $office->id }}" class="btn btn-danger btn-xs office-delete">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
+                                            <div class="btn-actions">
+                                                <a href="{{ route('officeEdit', $office->id) }}" title="Edit office" class="btn-icon btn-icon--info">
+                                                    <i class="fas fa-pen"></i>
+                                                </a>
+                                                <button value="{{ $office->id }}" title="Delete office" class="btn-icon btn-icon--danger office-delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach

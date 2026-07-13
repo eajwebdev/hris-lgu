@@ -1,26 +1,118 @@
 <style>
+    /* Employee QR card — a municipal ID card carrying the Mabinay seal.
+       Rendered to PNG by html2canvas, so everything here is plain CSS with
+       same-origin images: no external fonts, no remote assets. */
     .employee-card {
-        background-color: #ffffff;
-        background-image: url('{{ asset('images/qr-bg.png') }}');
-        background-size: cover;
-        background-position: center;
-        border-radius: 15px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        width: 270px;
-        height: 360px;
-        padding: 20px;
+        width: 300px;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #ffffff;
+        border: 1px solid #E5E7EB;
+        box-shadow: 0 18px 40px -12px rgba(15, 23, 42, .25);
+        font-family: "Inter", Arial, sans-serif;
         text-align: center;
-        font-family: 'Arial', sans-serif;
-        font-size: 14px;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        border: 2px solid #e0e0e0;
+        margin: 0 auto;
     }
 
-    .qr-code {
-        padding: 9px 5px 2px 4px; /* top right bottom left */
-        margin-left: 8px;
+    .employee-card__header {
+        background: linear-gradient(135deg, #1E7A45 0%, #10502C 100%);
+        padding: 14px 12px 12px;
+        color: #fff;
+        position: relative;
+    }
+    .employee-card__header::after {
+        content: "";
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #EF9017, #FBBF24, #EF9017);
+    }
+    .employee-card__seal {
+        width: 54px;
+        height: 54px;
+        object-fit: contain;
+        border-radius: 50%;
+        background: #fff;
+        padding: 3px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, .25);
+    }
+    .employee-card__org {
+        margin: 7px 0 0;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .09em;
+        text-transform: uppercase;
+        line-height: 1.3;
+    }
+    .employee-card__sub {
+        margin: 2px 0 0;
+        font-size: 8.5px;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, .78);
     }
 
+    .employee-card__qr {
+        padding: 16px 16px 10px;
+        background: #fff;
+    }
+    .employee-card__qr .qr-code {
+        display: inline-block;
+        padding: 10px;
+        border: 1px solid #E5E7EB;
+        border-radius: 12px;
+        background: #fff;
+        line-height: 0;
+    }
+    .employee-card__qr .qr-code img,
+    .employee-card__qr .qr-code canvas { display: block; }
+
+    .employee-card__scan {
+        margin: 8px 0 0;
+        font-size: 8.5px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: #94A3B8;
+    }
+
+    .employee-card__body {
+        padding: 4px 16px 16px;
+        background: #fff;
+    }
+    .employee-card__name {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        color: #0F172A;
+        line-height: 1.25;
+        letter-spacing: -.01em;
+    }
+    .employee-card__position {
+        margin: 3px 0 10px;
+        font-size: 11px;
+        color: #64748B;
+        line-height: 1.35;
+    }
+    .employee-card__id {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        background: #FEF3E2;
+        color: #B26205;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .06em;
+    }
+
+    .employee-card__footer {
+        padding: 7px 12px;
+        background: #F1F5F9;
+        border-top: 1px solid #E5E7EB;
+        font-size: 8px;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: #94A3B8;
+    }
 </style>
 
 <div class="col-lg-3">
@@ -195,33 +287,48 @@
 </div>
 <!-- Modal -->
 <div class="modal fade" id="qrModal" tabindex="-1" role="dialog" aria-labelledby="qrModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-sm" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 356px;">
         <div class="modal-content">
-            <div class="modal-body text-center">
-                <!-- Download Button -->
-                <a href="#" id="downloadBtn"
-                    class="btn btn-danger rounded-circle d-flex align-items-center justify-content-center"
-                    style="width: 30px; height: 30px; position: absolute; top: 10px; right: 10px; z-index: 999;">
+            <div class="modal-body text-center" style="padding: 18px;">
+                <!-- Download the card as a PNG -->
+                <a href="#" id="downloadBtn" title="Download card"
+                    class="btn-icon btn-icon--brand"
+                    style="position: absolute; top: 12px; right: 12px; z-index: 999;">
                     <i class="fas fa-download"></i>
                 </a>
 
                 <!-- Employee Card with QR Code -->
                 <div class="employee-card-content">
                     <div class="employee-card" id="employeeCard">
-                        <div class="qr-code" id="qrcode">
-                            <!-- QR Code will be generated here -->
+
+                        <div class="employee-card__header">
+                            <img src="{{ asset('mabinay-logo.png') }}" alt="Municipality of Mabinay Official Seal" class="employee-card__seal">
+                            <p class="employee-card__org">Municipality of Mabinay</p>
+                            <p class="employee-card__sub">Human Resource Information System</p>
                         </div>
 
-                        <div class="details mt-3" style="text-align: center; border-radius: 5px; background-color: rgba(97, 91, 91, 0.342); color: #fff; padding-top: 5px; padding-bottom: 5px;">
-                            <h5 style="margin: 0; font-weight: bold; font-size: 1.2rem;">
-                                {{ ucwords(strtoupper(str_replace('Ñ', 'ñ', $employee->fname))) }}
-                                {{ ucwords(strtoupper(str_replace('Ñ', 'ñ', $employee->lname))) }}
-                                {{ ucwords(strtoupper(str_replace('Ñ', 'ñ', $employee->suffix))) }}
-                            </h5>
-                            <p style="margin: 4px 0; font-style: italic;">{{ ($employee->emp_status == 1) ? $employee->position : 'OFFICE STAFF'  }}</p>
-                            {{-- <p style="margin: 0; font-weight: bold;">MAIN CAMPUS</p> --}}
+                        <div class="employee-card__qr">
+                            <div class="qr-code" id="qrcode">
+                                <!-- QR Code is rendered here -->
+                            </div>
+                            <p class="employee-card__scan">Scan to log attendance</p>
                         </div>
-                        
+
+                        <div class="employee-card__body">
+                            <h5 class="employee-card__name">
+                                {{ strtoupper(str_replace('Ñ', 'ñ', $employee->fname)) }}
+                                {{ strtoupper(str_replace('Ñ', 'ñ', $employee->lname)) }}
+                                {{ strtoupper(str_replace('Ñ', 'ñ', $employee->suffix)) }}
+                            </h5>
+                            <p class="employee-card__position">
+                                {{ ($employee->emp_status == 1 && $employee->position) ? $employee->position : 'Office Staff' }}
+                            </p>
+                            <span class="employee-card__id">{{ $employee->emp_ID }}</span>
+                        </div>
+
+                        <div class="employee-card__footer">
+                            Property of LGU Mabinay &middot; Return if found
+                        </div>
                     </div>
                 </div>
             </div>
@@ -235,16 +342,17 @@
     function openQRModal() {
         const qrElements = ['qrcode', 'qrcode1'];
         const token = "{{ $shortEncrypted }}";
-        
+
         qrElements.forEach(elementId => {
             const qrElement = document.getElementById(elementId);
             if (qrElement) {
                 qrElement.innerHTML = "";
                 new QRCode(qrElement, {
                     text: token,
-                    width: 205,
-                    height: 205,
-                    colorDark: "#000000",
+                    width: 196,
+                    height: 196,
+                    // The seal's green, so the code matches the card.
+                    colorDark: "#10502C",
                     colorLight: "#ffffff",
                     correctLevel: QRCode.CorrectLevel.H
                 });
@@ -258,7 +366,8 @@
         const target = document.querySelector('.employee-card-content');
         html2canvas(target, {
             backgroundColor: null,
-            useCORS: true
+            useCORS: true,
+            scale: 3            // print-quality PNG rather than a screen-sized one
         }).then(canvas => {
             const link = document.createElement('a');
             link.download = '{{ $employee->emp_ID }}.png';
