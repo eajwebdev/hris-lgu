@@ -81,9 +81,17 @@
                             </div>
                         </div>                        
                     </form> 
-                    @if(isset($data))     
-                        <iframe src="{{ ($data == null) ? '' : route('logDtrView', ['employeeId' => $data['employeeId'] ?? 0, 'dateFrom' => $data['dateFrom'] ?? null, 'dateTo' => $data['dateTo'] ?? null, 'overtime' => $data['overtime'] ?? null]) }}" width="100%" height="600px"></iframe>
-                    @endif
+                    <div class="pdf-frame">
+                        @if(isset($data) && $data !== null)
+                            <div class="pdf-frame__loader" id="logPdfLoader">
+                                <div class="pdf-frame__spinner"></div>
+                                <div>Generating the log report&hellip;</div>
+                            </div>
+                            <iframe id="logPdfFrame" src="{{ route('logDtrView', ['employeeId' => $data['employeeId'] ?? 0, 'dateFrom' => $data['dateFrom'] ?? null, 'dateTo' => $data['dateTo'] ?? null, 'overtime' => $data['overtime'] ?? null]) }}"></iframe>
+                        @else
+                            <div class="pdf-frame__empty">Choose an employee and a date range, then select Generate.</div>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>
@@ -94,5 +102,23 @@
     window.onpopstate = function () {
         history.go(1);
     };
+
+    (function () {
+        var frame = document.getElementById('logPdfFrame');
+        var loader = document.getElementById('logPdfLoader');
+        if (frame && loader) {
+            frame.addEventListener('load', function () { loader.hidden = true; });
+        }
+
+        document.querySelectorAll('form').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                var btn = form.querySelector('button[type="submit"], button:not([type])');
+                if (!btn || btn.dataset.busy) return;
+                btn.dataset.busy = '1';
+                btn.disabled = true;
+                btn.innerHTML = '<span class="btn-spinner"></span> Generating&hellip;';
+            });
+        });
+    })();
 </script>
 @endsection

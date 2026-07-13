@@ -65,7 +65,7 @@
 
   <!-- Header -->
   <div class="header">
-    <img src="data:image/png;base64,{{ base64_encode(file_get_contents(asset('Uploads/attendance-header.png'))) }}" alt="Logo" style="width: 100%; ">
+    <img src="data:image/png;base64,{{ base64_encode(file_get_contents(pdf_image('Uploads/attendance-header.png'))) }}" alt="Logo" style="width: 100%; ">
     <table>
       <tr>
         <td class="bnone" colspan="6" style="padding: 0; border: none; text-align: left;">

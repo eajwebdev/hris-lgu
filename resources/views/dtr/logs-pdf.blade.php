@@ -17,7 +17,7 @@
     <style>
         body {
             font-family: 'Roboto', sans-serif;
-            background-image: url('{{ asset('Uploads/hris.png') }}') !important;
+            background-image: url('{{ pdf_image('Uploads/pdf/hris.jpg') }}') !important;
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;

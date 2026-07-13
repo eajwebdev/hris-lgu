@@ -115,7 +115,7 @@
         ];
     @endphp
     <header>
-        <img src="{{ asset('Uploads/leave-report-header.png') }}" alt="Header Image" width="100%">
+        <img src="{{ pdf_image('Uploads/leave-report-header.png') }}" alt="Header Image" width="100%">
     </header>
 
     <!-- Fixed Footer -->
@@ -129,7 +129,7 @@
             Mayor</p>
         </div>
         <br>
-        <img src="{{ asset('Uploads/transmittal-footer.png') }}" alt="Header Image" width="100%">
+        <img src="{{ pdf_image('Uploads/transmittal-footer.png') }}" alt="Header Image" width="100%">
     </footer>
 
     <!-- Main Content -->

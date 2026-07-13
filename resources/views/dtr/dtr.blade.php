@@ -85,8 +85,23 @@
                             </div>
                         </div>                        
                     </form>
-                    <iframe 
-                    src="{{ isset($employee, $period, $date) ? route('dtr-pdf', ['employee' => $employee->emp_ID, 'period' => $period, 'date' => $date, 'overtime' => $overtime]) : '' }}" width="100%" height="600px"></iframe>
+                    @php
+                        $dtrPdfUrl = isset($employee, $period, $date)
+                            ? route('dtr-pdf', ['employee' => $employee->emp_ID, 'period' => $period, 'date' => $date, 'overtime' => $overtime])
+                            : null;
+                    @endphp
+
+                    <div class="pdf-frame">
+                        @if($dtrPdfUrl)
+                            <div class="pdf-frame__loader" id="dtrPdfLoader">
+                                <div class="pdf-frame__spinner"></div>
+                                <div>Generating the DTR&hellip;</div>
+                            </div>
+                            <iframe id="dtrPdfFrame" src="{{ $dtrPdfUrl }}"></iframe>
+                        @else
+                            <div class="pdf-frame__empty">Choose an employee and a period, then select Generate.</div>
+                        @endif
+                    </div>
                  </div>
             </div>
         </div>
@@ -97,5 +112,26 @@
     window.onpopstate = function () {
         history.go(1);
     };
+
+    // Hide the spinner once the PDF has actually rendered in the frame.
+    (function () {
+        var frame = document.getElementById('dtrPdfFrame');
+        var loader = document.getElementById('dtrPdfLoader');
+        if (frame && loader) {
+            frame.addEventListener('load', function () { loader.hidden = true; });
+        }
+
+        // The form reloads the page before the PDF is built, so tell the user
+        // the click registered instead of leaving the button looking idle.
+        document.querySelectorAll('form').forEach(function (form) {
+            form.addEventListener('submit', function () {
+                var btn = form.querySelector('button[type="submit"], button:not([type])');
+                if (!btn || btn.dataset.busy) return;
+                btn.dataset.busy = '1';
+                btn.disabled = true;
+                btn.innerHTML = '<span class="btn-spinner"></span> Generating&hellip;';
+            });
+        });
+    })();
 </script>
 @endsection

@@ -105,7 +105,7 @@
 
 <body>
     <div class="column1"> 
-        <img src="{{ asset('Uploads/dtr-header.png') }}" width="110%" class="mt-5" alt="Header Image">
+        <img src="{{ pdf_image('Uploads/dtr-header.png') }}" width="110%" class="mt-5" alt="Header Image">
         <div>
             <span class="font">Name of Employee :</span> <span class="header" style="relative; display: inline-block; width: 73%; text-align: left;">&nbsp; {{ strtoupper(ucwords($employee->lname)) }} {{ strtoupper(ucwords($employee->prefix)) }} {{ strtoupper(ucwords($employee->fname)) }} {{ strtoupper(ucwords($employee->mname)) }}</span>
         </div>
@@ -233,7 +233,7 @@
         </p>
     </div>
     <div class="column2"> 
-        <img src="{{ asset('Uploads/dtr-header.png') }}" width="110%" class="mt-5" alt="Header Image">
+        <img src="{{ pdf_image('Uploads/dtr-header.png') }}" width="110%" class="mt-5" alt="Header Image">
         <div>
             <span class="font">Name of Employee :</span> <span class="header" style="relative; display: inline-block; width: 73%; text-align: left;">&nbsp;  {{ strtoupper(ucwords($employee->lname)) }} {{ strtoupper(ucwords($employee->prefix)) }} {{ strtoupper(ucwords($employee->fname)) }} {{ strtoupper(ucwords($employee->mname)) }}</span>
         </div>

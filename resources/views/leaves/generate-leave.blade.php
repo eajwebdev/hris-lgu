@@ -83,7 +83,7 @@
     </style>
 </head>
 <body style="margin-top: -10px">
-    <img src="{{ asset('Uploads/leave-header.png') }}" style="width: 100%; margin-bottom: 8px;">
+    <img src="{{ pdf_image('Uploads/leave-header.png') }}" style="width: 100%; margin-bottom: 8px;">
 
     {{-- 
     <img src="{{ $leaveApplication->approver_esign }}" class="signature" alt="Floating image" style="position: fixed; top: 83.7%; left: 45%; transform: translate(-50%, -50%); width: 350px; z-index: 9999;"> --}}
@@ -433,7 +433,7 @@
     </div>
     
     <div class="back-page">
-        <img src="{{ asset('Uploads/leave-back-page.jpg') }}" style="width: 120%; margin-left: -10%; margin-top: -10%;">
+        <img src="{{ pdf_image('Uploads/pdf/leave-back-page.jpg') }}" style="width: 120%; margin-left: -10%; margin-top: -10%;">
         <span style="color:rgb(59, 59, 59); font-size: 9.3px; margin-top: -75px; position: absolute; z-index: 999; top: 88%; left: 5%; width: 90%; font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;">
             *For leave of absence for thirty (30) calendar days or more and terminal leave, application shall be accompanied by a <u> clearance from money, property and work-related accountabilities</u> (pursuant to CSC Memorandum Circular No. 2, s. 1985)
         </span>

@@ -264,7 +264,16 @@ return array(
          *
          * @var bool
          */
-        "enable_remote" => true,
+        /**
+         * Kept OFF. Every image inside a PDF is embedded from disk with the
+         * pdf_image() helper. With this enabled, an <img src="http://..."> made
+         * dompdf fetch the file over HTTP from the very server that was busy
+         * rendering the PDF — which deadlocks a single-worker server until the
+         * request times out, and costs a round-trip per image everywhere else.
+         * Leaving it off means a mistake shows up as a missing image rather
+         * than a hung request.
+         */
+        "enable_remote" => false,
 
         /**
          * A ratio applied to the fonts height to be more like browsers' line height

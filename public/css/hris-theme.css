@@ -498,6 +498,74 @@ body:not(.sidebar-collapse) .main-footer {
     color: var(--muted);
 }
 
+/* --------------------------------------------------------- PDF viewer
+   Generating a PDF takes a second or two on the server. Without feedback the
+   page just sits there and looks frozen, so the frame shows a spinner until
+   the document has actually loaded.
+   ------------------------------------------------------------------ */
+.pdf-frame {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--muted-soft);
+    min-height: 600px;
+}
+.pdf-frame iframe {
+    display: block;
+    width: 100%;
+    height: 600px;
+    border: 0;
+    background: #fff;
+}
+.pdf-frame__loader {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .75rem;
+    background: var(--muted-soft);
+    color: var(--muted);
+    font-size: .85rem;
+    z-index: 2;
+    transition: opacity .25s ease;
+}
+.pdf-frame__loader[hidden] { display: none; }
+.pdf-frame__spinner {
+    width: 34px;
+    height: 34px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: pdf-spin .7s linear infinite;
+}
+@keyframes pdf-spin { to { transform: rotate(360deg); } }
+
+.pdf-frame__empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94A3B8;
+    font-size: .85rem;
+}
+
+/* Buttons that kick off a slow report keep the user informed */
+.btn .btn-spinner {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    margin-right: .4rem;
+    border: 2px solid rgba(255, 255, 255, .45);
+    border-top-color: #fff;
+    border-radius: 50%;
+    vertical-align: -2px;
+    animation: pdf-spin .7s linear infinite;
+}
+
 /* ------------------------------------------------------- row actions
    Table row actions used to be chunky coloured squares (green / cyan /
    green). They are now quiet neutral icon buttons that only take on colour
