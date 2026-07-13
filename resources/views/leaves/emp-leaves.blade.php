@@ -19,7 +19,7 @@
                             <div class="row">
                                 <div class="col-12 ">
                                     <div class="card  p-4">
-                                        <h2 class="text-warning font-weight-bold text-center">Input Leave Credit Balance to Start</h2>
+                                        <h2 class="font-weight-bold text-center" style="color: var(--brand-700);">Input Leave Credit Balance to Start</h2>
                                         <p class="text-muted text-center">Please enter employee leave credit balance below to proceed.</p>
                                         <form class="form-horizontal" action="{{ route('leavesCreate') }}" method="POST">
                                             @csrf

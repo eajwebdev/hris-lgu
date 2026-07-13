@@ -8,26 +8,19 @@
     $isHistoryActive = request()->is('leave/history*') || request()->is('leaves/history');
 @endphp
 
-<div class="row">
-    <div class="col-md-4">
-        <a href="{{ $leaveCreditsRoute }}" class="nav-link mb-1 {{ $isLeaveCreditsActive ? 'bg-default' : 'bg-secondary' }}" style="border-radius: 5px;">
-            <i class="pr-2 fas fa-id-card" style="width: 20px; margin-left: 3px;"></i> 
-            <span class="text-light text-bold">{{ ($guard == "web") ? 'LEAVE CREDITS' : 'APPLICATION FORM'}}</span> 
-            <span class="float-right pt-1 badge badge-light">0</span>
-        </a>
-    </div>
-    <div class="col-md-4">
-        <a href="{{ $statusRoute }}" class="nav-link mb-1 {{ $isStatusActive ? 'bg-default' : 'bg-secondary' }}" style="border-radius: 5px;">
-            <i class="pr-2 fas fa-stamp text-light" style="width: 20px; margin-left: 3px;"></i> 
-            <span class="text-light text-bold">STATUS</span> 
-            <span class="float-right pt-1 badge badge-light">0</span>
-        </a>
-    </div>
-    <div class="col-md-4">
-        <a href="{{ $historyRoute }}" class="nav-link mb-1 {{ $isHistoryActive ? 'bg-default' : 'bg-secondary' }}" style="border-radius: 5px;">
-            <i class="pr-2 fas fa-history" style="width: 20px; margin-left: 3px;"></i> 
-            <span class="text-light text-bold">HISTORY</span> 
-            <span class="float-right pt-1 badge badge-light">0</span>
-        </a>
-    </div>
+<div class="page-tabs">
+    <a href="{{ $leaveCreditsRoute }}" class="page-tab {{ $isLeaveCreditsActive ? 'active' : '' }}">
+        <i class="fas fa-id-card"></i>
+        <span>{{ ($guard == "web") ? 'LEAVE CREDITS' : 'APPLICATION FORM' }}</span>
+    </a>
+
+    <a href="{{ $statusRoute }}" class="page-tab {{ $isStatusActive ? 'active' : '' }}">
+        <i class="fas fa-stamp"></i>
+        <span>STATUS</span>
+    </a>
+
+    <a href="{{ $historyRoute }}" class="page-tab {{ $isHistoryActive ? 'active' : '' }}">
+        <i class="fas fa-clock-rotate-left"></i>
+        <span>HISTORY</span>
+    </a>
 </div>
