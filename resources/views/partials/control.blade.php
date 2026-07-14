@@ -94,6 +94,16 @@
             </li>
         @endif
 
+        @if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
+            <li class="nav-item">
+                <a href="{{ route('attendanceMonitor') }}" title="Face Attendance"
+                   class="nav-link {{ request()->is('attendance-admin*') ? 'active' : '' }}">
+                    <i class="nav-icon fas fa-street-view"></i>
+                    <p>Face Attendance</p>
+                </a>
+            </li>
+        @endif
+
         <li class="nav-item">
             <a href="{{ route('eventIndex') }}" title="Events"
                class="nav-link {{ request()->is('event*') ? 'active' : '' }}">

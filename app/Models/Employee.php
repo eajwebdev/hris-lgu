@@ -23,20 +23,44 @@ class Employee extends Authenticatable
         'add_region', 'add_prov', 'add_zcode', 'padd_block', 'padd_street', 'padd_village', 'padd_brgy',
         'padd_city', 'padd_region', 'padd_prov', 'padd_zcode', 'sl', 'vl', 'mat_leave', 'special_pl', 'solo_pl', 
         'study_leave','vawc_leave','rehab_leave','benefits_leave','calamity_leave','adopt_leave','servcred_leave', 'well_leave',
-        'esign', 'dpn', 'stat_1', 'esign', 'strat_function', 'f1', 'f2', 'f3'
+        'esign', 'dpn', 'stat_1', 'esign', 'strat_function', 'f1', 'f2', 'f3',
+        'face_embeddings'
     ];
-    
+
+    // Biometric data is never serialised out with the model. Anything that needs
+    // to report on it goes through FaceEmbeddingService, which returns metadata
+    // rather than vectors.
     protected $hidden = [
         'password',
+        'face_embeddings',
     ];
 
     protected $casts = [
         'role' => 'string',
+        'face_embeddings' => 'array',
     ];
 
     public function leaveApplications()
     {
         return $this->hasMany(LeaveApplication::class, 'empid', 'emp_ID');
+    }
+
+    public function faceVector()
+    {
+        return $this->hasOne(EmployeeFaceVector::class, 'employee_id');
+    }
+
+    public function faceAuditLogs()
+    {
+        return $this->hasMany(FaceAuditLog::class, 'employee_id');
+    }
+
+    /**
+     * Registration metadata for the profile panel — never the vectors themselves.
+     */
+    public function faceSummary(): array
+    {
+        return app(\App\Services\FaceEmbeddingService::class)->summary($this);
     }
 
     protected static function boot()

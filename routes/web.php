@@ -34,6 +34,9 @@ use App\Http\Controllers\JobHiringController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\EteEvaluationController;
 use App\Http\Controllers\InterviewEvaluationController;
+use App\Http\Controllers\FaceRegistrationController;
+use App\Http\Controllers\AttendancePortalController;
+use App\Http\Controllers\AttendanceAdminController;
 
 //login
 Route::get('/hr-admin',[LoginAuthController::class,'getLoginAdmin'])->name('getLoginAdmin');
@@ -47,7 +50,36 @@ Route::get('/verify', [GoogleAuthController::class, 'verifyForm'])->name('verify
 Route::post('/verify', [GoogleAuthController::class, 'verify'])->name('verify.code');
 // Route::get('/convert-esign', [PdsController::class, 'convertEsign'])->name('convertEsign');
 
+/*
+ * Employee attendance portal.
+ *
+ * Public on purpose — the camera is the login. It is safe to expose because the
+ * browser never names an employee: it sends a face (and, in QR mode, a token it
+ * cannot forge) and the server decides whose row moves. Throttled per IP so the
+ * face endpoint cannot be used to grind through descriptors.
+ */
+Route::prefix('attendance')->group(function () {
+    $limit = 'throttle:' . config('attendance.portal.rate_limit', 20) . ',1';
+
+    Route::get('/', [AttendancePortalController::class, 'show'])->name('attendancePortal');
+    Route::post('/qr-check', [AttendancePortalController::class, 'checkQr'])->middleware($limit)->name('attendanceQrCheck');
+    Route::post('/challenge', [AttendancePortalController::class, 'challenge'])->middleware($limit)->name('attendanceChallenge');
+    Route::post('/punch', [AttendancePortalController::class, 'punch'])->middleware($limit)->name('attendancePunch');
+});
+
 Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], function() {
+
+    /*
+     * Attendance administration — the punch monitor and the station list.
+     * Admin/HR only; the punch itself never touches these routes.
+     */
+    Route::prefix('attendance-admin')->middleware('face.registrar')->group(function () {
+        Route::get('/', [AttendanceAdminController::class, 'monitor'])->name('attendanceMonitor');
+        Route::post('/stations', [AttendanceAdminController::class, 'storeStation'])->name('stationStore');
+        Route::post('/stations/{station}/update', [AttendanceAdminController::class, 'updateStation'])->name('stationUpdate');
+        Route::post('/stations/{station}/delete', [AttendanceAdminController::class, 'deleteStation'])->name('stationDelete');
+    });
+
     //Performance
     Route::post('/data-privacy-notice', [MasterController::class, 'dataPrivacyNotice'])->name('dataPrivacyNotice');
     //Performance
@@ -169,6 +201,19 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         Route::get('/emp-qr', [EmployeeController::class, 'empQr'])->name('empQr');
 
         Route::post('/delete/{id}', [EmployeeController::class, 'empDelete'])->name('empDelete');
+
+        /*
+         * Face recognition — Phase 1, enrolment only.
+         *
+         * face.registrar is the access boundary. The profile panel also hides
+         * these controls from anyone who is not Admin/HR, but that is cosmetic:
+         * reaching these URLs by hand, from any other role or guard, returns 403.
+         */
+        Route::prefix('face')->middleware('face.registrar')->group(function () {
+            Route::get('/{employee}', [FaceRegistrationController::class, 'status'])->name('faceStatus');
+            Route::post('/{employee}', [FaceRegistrationController::class, 'store'])->name('faceRegister');
+            Route::delete('/{employee}', [FaceRegistrationController::class, 'destroy'])->name('faceRemove');
+        });
     });
     
     Route::prefix('tardiness')->group(function(){
@@ -260,6 +305,12 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         Route::post('/update-govids', [GovIdController::class, 'update'])->name('update.govids');
         
         //Signature
+        // Face Recognition — its own page in the PDS submenu, next to E-Signature.
+        // Admin/HR only: an employee reaching this URL by hand gets a 403.
+        Route::get('/face-recognition/{id?}', [FaceRegistrationController::class, 'page'])
+            ->middleware('face.registrar')
+            ->name('faceRecognition');
+
         Route::get('/signature/{id?}', [PdsController::class, 'signature'])->name('signature');
         Route::post('/upload-signature/{id?}', [PdsController::class, 'uploadSignature'])->name('uploadSignature');
     });

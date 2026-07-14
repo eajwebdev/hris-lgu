@@ -304,6 +304,9 @@
 @if(request()->is('pds') || request()->is('pds/personal-info') || request()->is('pds/personal-info/*'))
     @include('script.personInfoScript')
 @endif
+@if(request()->is('pds/face-recognition') || request()->is('pds/face-recognition/*'))
+    @include('script.faceRegistrationScript')
+@endif
 @if(request()->is('pds/educ-bg/*') || request()->is('pds/educ-bg'))
     @include('script.educbgScript')
 @endif

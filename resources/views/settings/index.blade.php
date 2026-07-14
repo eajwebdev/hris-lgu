@@ -122,6 +122,118 @@
                         </div>
                     </div>
 
+                    <!-- Attendance stations: where face-portal punches are expected from.
+                         Punches made elsewhere still record; they just carry a distance
+                         flag on the Face Attendance monitor. -->
+                    <div class="settings-group">
+                        <div class="group-header">
+                            Attendance Stations
+                            <a href="{{ route('attendanceMonitor') }}" class="float-right" style="font-size: 12px;">
+                                <i class="fas fa-street-view"></i> Open punch monitor
+                            </a>
+                        </div>
+
+                        <p class="text-muted" style="font-size: 12.5px;">
+                            Employees can clock in from anywhere. Each punch is compared against the
+                            stations below, and anything outside every radius is flagged on the
+                            Face Attendance monitor &mdash; the record settles the question, not a
+                            conversation.
+                        </p>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Latitude</th>
+                                        <th>Longitude</th>
+                                        <th>Radius (m)</th>
+                                        <th class="text-center">Active</th>
+                                        <th style="width: 120px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($stations ?? [] as $station)
+                                        <tr>
+                                            {{-- form attribute keeps the edit form valid HTML: a <form>
+                                                 cannot wrap table cells, so the inputs point at it by id. --}}
+                                            <td>
+                                                <form method="POST" action="{{ route('stationUpdate', $station->id) }}" id="station-edit-{{ $station->id }}">@csrf</form>
+                                                <input form="station-edit-{{ $station->id }}" type="text" name="name" value="{{ $station->name }}" class="form-control form-control-sm" required>
+                                            </td>
+                                            <td><input form="station-edit-{{ $station->id }}" type="number" step="any" name="lat" value="{{ $station->lat }}" class="form-control form-control-sm" required></td>
+                                            <td><input form="station-edit-{{ $station->id }}" type="number" step="any" name="lng" value="{{ $station->lng }}" class="form-control form-control-sm" required></td>
+                                            <td><input form="station-edit-{{ $station->id }}" type="number" name="radius_m" value="{{ $station->radius_m }}" min="20" max="100000" class="form-control form-control-sm" required></td>
+                                            <td class="align-middle text-center">
+                                                <input form="station-edit-{{ $station->id }}" type="hidden" name="active" value="0">
+                                                <input form="station-edit-{{ $station->id }}" type="checkbox" name="active" value="1" {{ $station->active ? 'checked' : '' }}>
+                                            </td>
+                                            <td class="text-nowrap align-middle">
+                                                <button form="station-edit-{{ $station->id }}" type="submit" class="btn btn-xs btn-success" title="Save changes">
+                                                    <i class="fas fa-save"></i>
+                                                </button>
+                                                <form method="POST" action="{{ route('stationDelete', $station->id) }}" class="d-inline"
+                                                      onsubmit="return confirm('Remove station \'{{ $station->name }}\'? Past punches keep their record.');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-xs btn-outline-danger" title="Remove station">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+
+                                    {{-- Add a new station --}}
+                                    <tr>
+                                        <td>
+                                            <form method="POST" action="{{ route('stationStore') }}" id="station-add-form">@csrf</form>
+                                            <input form="station-add-form" type="text" name="name" class="form-control form-control-sm" placeholder="e.g. Municipal Hall" required>
+                                        </td>
+                                        <td><input form="station-add-form" type="number" step="any" name="lat" id="new-station-lat" class="form-control form-control-sm" placeholder="9.7292" required></td>
+                                        <td><input form="station-add-form" type="number" step="any" name="lng" id="new-station-lng" class="form-control form-control-sm" placeholder="122.9080" required></td>
+                                        <td><input form="station-add-form" type="number" name="radius_m" value="150" min="20" max="100000" class="form-control form-control-sm" required></td>
+                                        <td class="align-middle text-center">
+                                            <input form="station-add-form" type="checkbox" name="active" value="1" checked>
+                                        </td>
+                                        <td class="text-nowrap align-middle">
+                                            <button form="station-add-form" type="submit" class="btn btn-xs btn-success" title="Add station">
+                                                <i class="fas fa-plus"></i> Add
+                                            </button>
+                                            <button type="button" class="btn btn-xs btn-outline-secondary" id="use-my-location"
+                                                    title="Fill coordinates from this device's location">
+                                                <i class="fas fa-location-crosshairs"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <script>
+                        // Fill the new-station coordinates from wherever this browser is —
+                        // the natural way to register the building you are standing in.
+                        document.getElementById('use-my-location').addEventListener('click', function () {
+                            var btn = this;
+
+                            if (!navigator.geolocation) {
+                                alert('This browser cannot read a location.');
+                                return;
+                            }
+
+                            btn.disabled = true;
+
+                            navigator.geolocation.getCurrentPosition(function (pos) {
+                                document.getElementById('new-station-lat').value = pos.coords.latitude.toFixed(7);
+                                document.getElementById('new-station-lng').value = pos.coords.longitude.toFixed(7);
+                                btn.disabled = false;
+                            }, function () {
+                                alert('Could not read the location. Enter the coordinates manually.');
+                                btn.disabled = false;
+                            }, { enableHighAccuracy: true, timeout: 10000 });
+                        });
+                    </script>
+
                     <!-- Group 3: Email & Notification Settings -->
                     <div class="settings-group">
                         <div class="group-header">Email & Notification Settings</div>

@@ -545,7 +545,9 @@ class MasterController extends Controller
         $kioskAccess = explode(',', $settings->hr_kiosk);
         $dtrFullAccess = explode(',', $settings->dtr_acct);
 
-        return view('settings.index', compact('guard', 'employees', 'settings', 'kioskAccess', 'dtrFullAccess'));
+        $stations = \App\Models\AttendanceStation::orderBy('name')->get();
+
+        return view('settings.index', compact('guard', 'employees', 'settings', 'kioskAccess', 'dtrFullAccess', 'stations'));
     }
 
     public function dataPrivacyNotice(Request $request)
