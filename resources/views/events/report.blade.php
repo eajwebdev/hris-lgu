@@ -40,7 +40,7 @@
             
                     {{-- Submit Button --}}
                     <div class="col-md-3 col-sm-12">
-                        <button class="btn btn-success btn-sm btn-block" style="margin-top: 21px;">
+                        <button class="btn btn-success btn-sm btn-block">
                             <i class="fas fa-file-pdf"></i> Generate
                         </button>                              
                     </div>

@@ -498,6 +498,118 @@ body:not(.sidebar-collapse) .main-footer {
     color: var(--muted);
 }
 
+/* --------------------------------------------------------- filter bars
+   The search/filter rows (DTR, DTR logs, Tardiness, Event reports) each rolled
+   their own sizes: grey pill labels, controls of three different heights and a
+   Generate button that stretched to whatever column it sat in. They all carry
+   .add-form, so they are unified from one place.
+   ------------------------------------------------------------------ */
+.add-form .form-row {
+    align-items: flex-end;
+    row-gap: .75rem;
+}
+/* Each field is its own column with the control pinned to the bottom, so a
+   stray <br> or select2's injected markup cannot knock a field out of line. */
+.add-form .form-row > [class*="col-"] {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    margin-bottom: 0;
+}
+
+/* The old grey "badge" labels become quiet captions */
+.badge.lbel,
+label.lbel {
+    display: block;
+    padding: 0;
+    margin: 0 0 .3rem;
+    background: transparent !important;
+    color: var(--muted) !important;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    text-align: left;
+    border-radius: 0;
+    white-space: normal;
+}
+.add-form label.lbel + br { display: none; }
+
+/* One control height across selects, dates and text inputs */
+.add-form .form-control,
+.add-form .form-control-sm,
+.add-form .custom-select,
+.add-form select,
+.add-form input[type="text"],
+.add-form input[type="month"],
+.add-form input[type="date"] {
+    height: 38px !important;
+    padding: .35rem .65rem !important;
+    font-size: .85rem !important;
+    line-height: 1.4;
+    border-radius: var(--radius-sm);
+}
+
+/* select2 has its own box; match it to the rest.
+   It renders inline-block, which parked it a few pixels below the plain
+   inputs on the same row — display:block puts it back on the baseline. */
+.add-form .select2-container {
+    width: 100% !important;
+    display: block;
+    margin: 0 !important;
+    line-height: 0;          /* kills the inline-block descender gap */
+}
+/* Select2 ships two themes (--default and --bootstrap4); its single-select box
+   is 31px tall in both. Match it to the 38px inputs without caring which theme
+   is active — the earlier rules targeted --default only and never applied. */
+.add-form .select2-container .select2-selection--single {
+    display: block;
+    height: 38px !important;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-xs);
+}
+.add-form .select2-container .select2-selection--single .select2-selection__rendered {
+    line-height: 36px !important;
+    padding-left: .65rem;
+    color: var(--foreground);
+    font-size: .85rem;
+    font-weight: 500;
+}
+.add-form .select2-container .select2-selection--single .select2-selection__arrow {
+    height: 36px !important;
+    top: 0;
+}
+
+/* The lone checkbox (Overtime) was rendered as a full form-control box */
+.add-form input[type="checkbox"].form-control,
+.add-form input[type="checkbox"].form-control-sm {
+    width: 20px;
+    height: 20px !important;
+    min-height: 0;
+    padding: 0 !important;
+    margin: 0 0 9px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+/* Every Generate button is the same height as the inputs. It fills its column
+   but is capped, so a narrow column cannot push it over its neighbour. */
+.add-form .btn {
+    height: 38px;
+    width: 100%;
+    min-width: 0;
+    max-width: 190px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .45rem;
+    font-size: .85rem !important;
+    padding: 0 1rem !important;
+}
+.add-form .btn-block { width: auto; }
+.add-form .btn i { font-size: .9rem; }
+
 /* ---------------------------------------------------------------- tabs
    Page tabs (Leave Credits / Status / History, DTR / Logs) were flat grey
    and teal blocks left over from the old theme. They now follow the palette:

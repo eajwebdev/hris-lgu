@@ -32,7 +32,7 @@
                                     <label class="badge badge-secondary lbel">TO</label> 
                                     <input type="month" name="month" class="form-control form-control-sm" id="date" value="{{ ($month !== null) ? $month : date('Y-m') }}" required>
                                 </div>
-                                <div class="col-md-1 col-sm-6 d-flex align-items-end">
+                                <div class="col-md-2 col-sm-6 d-flex align-items-end">
                                     <button class="btn btn-success btn-sm btn-block"><i class="fas fa-file-pdf"></i> Generate</button>
                                 </div>
                             </div>
