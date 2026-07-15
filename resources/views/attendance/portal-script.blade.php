@@ -373,8 +373,10 @@
                 descriptor: Array.from(neutral.descriptor),
             });
 
-            // Spaced out, so consecutive frames are genuinely different moments.
-            await sleep(260);
+            // Spaced out, so consecutive frames are genuinely different moments —
+            // but only just enough for that: a longer pause is pure dead time on
+            // every honest punch.
+            await sleep(150);
         }
 
         // The two turns, in the order the server chose.
@@ -415,7 +417,11 @@
      * head may have drifted in the milliseconds between.
      */
     async function captureAt(pose, instruction) {
-        var deadline = performance.now() + 20000;
+        // A genuine head turn lands in a second or two. A shorter deadline than
+        // the old 20s does not rush an honest employee — it just stops a stalled
+        // capture from holding the whole sequence hostage before the retry, which
+        // is what made a failing punch feel like minutes.
+        var deadline = performance.now() + 10000;
 
         while (performance.now() < deadline) {
             var gate = gateOf(await detectCheap());

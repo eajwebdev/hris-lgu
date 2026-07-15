@@ -99,7 +99,10 @@ return [
 
     'liveness' => [
         // Frames the client must supply while facing the camera, before the poses.
-        'min_neutral_frames' => 3,
+        // Two is enough to both confirm identity and measure the frame-to-frame
+        // variation that outs a static photo, and it shaves one full descriptor
+        // pass (plus its inter-frame pause) off every honest punch.
+        'min_neutral_frames' => 2,
 
         // Upper bound on the whole payload, so the endpoint cannot be used to
         // ship megabytes of vectors.
@@ -121,11 +124,21 @@ return [
         // The turned frame must sit closer to the enrolled capture of the pose
         // that was ASKED FOR than to the opposite one, by at least this margin.
         // This is the check a flat photo cannot pass.
-        'pose_margin' => 0.030,
+        //
+        // Kept small on purpose. A flat photo sits almost exactly equidistant
+        // from the left and right enrolled captures no matter how it is waved, so
+        // its margin is ~0 and it fails this at any positive value. The cost of an
+        // over-large margin is the opposite: it rejects a real, moderate head turn
+        // and spends the employee's attempt, which is the main reason an honest
+        // match "won't go through". 0.022 clears a genuine turn while still leaving
+        // a photo nowhere near.
+        'pose_margin' => 0.022,
 
         // ...and it must actually differ from the neutral frames, i.e. the head
-        // genuinely moved rather than the photo being jiggled in place.
-        'min_pose_shift' => 0.070,
+        // genuinely moved rather than the photo being jiggled in place. A photo
+        // held still produces ~0 shift, so this stays a reliable tell well below
+        // the travel of any deliberate turn.
+        'min_pose_shift' => 0.055,
 
         // A turned head legitimately sits further from enrolment than a straight
         // one, so pose frames get a looser identity threshold than neutrals.
@@ -158,8 +171,10 @@ return [
         // Motion blur flattens edges and drags this toward zero; a blurred frame
         // yields a mushy descriptor that degrades every later match, so it is
         // cheaper to refuse the frame than to enrol it. Deliberately low — it is
-        // an obvious-blur catch, not a focus meter.
-        'min_sharpness' => 18,
+        // an obvious-blur catch, not a focus meter. Kept low so a cheap phone
+        // camera is not made to re-capture "hold still" over and over — that
+        // re-capture loop is dead time an employee reads as the portal hanging.
+        'min_sharpness' => 14,
 
         // |yaw| under this counts as looking straight at the camera.
         'front_yaw_max' => 0.20,
