@@ -29,6 +29,12 @@
         hintText:  document.getElementById('hint-text'),
         modeBtn:   document.getElementById('mode-toggle'),
         modeIcon:  document.getElementById('mode-toggle-icon'),
+        mapBtn:    document.getElementById('map-toggle'),
+        mapSheet:  document.getElementById('mapsheet'),
+        mapClose:  document.getElementById('map-close'),
+        mapCanvas: document.getElementById('mapcanvas'),
+        mapDist:   document.getElementById('map-dist'),
+        mapSub:    document.getElementById('map-sub'),
         geohud:    document.getElementById('geohud'),
         geoDist:   document.getElementById('geo-distance'),
         geoCoords: document.getElementById('geo-coords'),
@@ -195,6 +201,12 @@
         return yaw >= T.turn_yaw_min;
     }
 
+    /**
+     * The face tracker. Not a box any more — four rounded corner brackets that
+     * lock onto the detected face, cyan while searching and green when the frame
+     * is good, with a soft glow. Modern and unobtrusive; the aiming reticle in
+     * the CSS handles the "where to stand" guidance.
+     */
     function drawBox(detection, ok) {
         var c = el.overlay, ctx = c.getContext('2d');
 
@@ -207,10 +219,41 @@
 
         if (!detection) return;
 
-        var b = detection.box;
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = ok ? '#22C55E' : '#F97316';
-        ctx.strokeRect(b.x, b.y, b.width, b.height);
+        var b   = detection.box;
+        var col = ok ? '#22C55E' : '#38E0FF';
+        var len = Math.max(16, Math.min(b.width, b.height) * 0.24); // bracket arm
+        var r   = 12;                                               // corner radius
+        var x0  = b.x, y0 = b.y, x1 = b.x + b.width, y1 = b.y + b.height;
+
+        ctx.lineWidth   = 4;
+        ctx.lineCap     = 'round';
+        ctx.lineJoin    = 'round';
+        ctx.strokeStyle = col;
+        ctx.shadowColor = col;
+        ctx.shadowBlur  = 12;
+
+        // top-left
+        ctx.beginPath();
+        ctx.moveTo(x0, y0 + len); ctx.lineTo(x0, y0 + r);
+        ctx.arcTo(x0, y0, x0 + r, y0, r); ctx.lineTo(x0 + len, y0);
+        ctx.stroke();
+        // top-right
+        ctx.beginPath();
+        ctx.moveTo(x1 - len, y0); ctx.lineTo(x1 - r, y0);
+        ctx.arcTo(x1, y0, x1, y0 + r, r); ctx.lineTo(x1, y0 + len);
+        ctx.stroke();
+        // bottom-right
+        ctx.beginPath();
+        ctx.moveTo(x1, y1 - len); ctx.lineTo(x1, y1 - r);
+        ctx.arcTo(x1, y1, x1 - r, y1, r); ctx.lineTo(x1 - len, y1);
+        ctx.stroke();
+        // bottom-left
+        ctx.beginPath();
+        ctx.moveTo(x0 + len, y1); ctx.lineTo(x0 + r, y1);
+        ctx.arcTo(x0, y1, x0, y1 - r, r); ctx.lineTo(x0, y1 - len);
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
     }
 
     // ---------------------------------------------------------------- detectors
@@ -926,6 +969,345 @@
         window.setPortalLocation.apply(null, window.__pendingGeo);
         delete window.__pendingGeo;
     }
+
+    // ---------------------------------------------------------------- station map
+
+    /**
+     * The nearest-station map. Deliberately tile-free: no map service, no CDN,
+     * so it works on the LGU LAN with no internet. Everything is drawn on a
+     * canvas from the same station table the HUD uses.
+     *
+     *   • each station is a set of blinking "wave" rings whose size is its real
+     *     geofence radius, drawn to scale;
+     *   • the employee is a live dot that moves with every GPS fix;
+     *   • an animated dashed route runs from the dot to the nearest station,
+     *     with a marker walking along it — so it reads at a glance which way to
+     *     go, and how far, to be inside a station's range.
+     *
+     * The animation loop runs only while the sheet is open, to spare the battery.
+     */
+    var map = (function () {
+        var canvas = el.mapCanvas;
+        if (!canvas) return { open: function () {}, close: function () {} };
+
+        var ctx    = canvas.getContext('2d');
+        var raf    = null;
+        var open   = false;
+        var dpr    = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+
+        // meters -> pixels, eased toward its target so the "camera" glides as the
+        // employee moves rather than snapping.
+        var view   = null;   // { scale, cx, cy }
+        var target = null;
+        var origin = null;   // projection origin { lat, lng }
+
+        function ease(a, b, t) { return a + (b - a) * t; }
+
+        // Local equirectangular projection to meters around the origin. Fine at
+        // town scale, and it matches the haversine the HUD/server use closely
+        // enough for a courtesy map.
+        function project(lat, lng) {
+            var mPerLat = 111320;
+            var mPerLng = 111320 * Math.cos(origin.lat * Math.PI / 180);
+            return { x: (lng - origin.lng) * mPerLng, y: -(lat - origin.lat) * mPerLat };
+        }
+
+        function toPx(m) {
+            return {
+                x: canvas.clientWidth  / 2 + (m.x - view.cx) * view.scale,
+                y: canvas.clientHeight / 2 + (m.y - view.cy) * view.scale,
+            };
+        }
+
+        function stations() { return CONFIG.stations || []; }
+
+        function roundRect(x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y,     x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x,     y + h, r);
+            ctx.arcTo(x,     y + h, x,     y,     r);
+            ctx.arcTo(x,     y,     x + w, y,     r);
+            ctx.closePath();
+        }
+
+        function resize() {
+            var W = canvas.clientWidth, H = canvas.clientHeight;
+            canvas.width  = Math.round(W * dpr);
+            canvas.height = Math.round(H * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        // Fit every station (with its radius) plus the employee into the canvas.
+        function computeTarget() {
+            var W = canvas.clientWidth, H = canvas.clientHeight;
+            var pts = [];
+
+            stations().forEach(function (s) {
+                var m = project(s.lat, s.lng);
+                var r = s.radius_m || 50;
+                pts.push({ x: m.x - r, y: m.y - r });
+                pts.push({ x: m.x + r, y: m.y + r });
+            });
+
+            if (state.geo) pts.push(project(state.geo.lat, state.geo.lng));
+
+            if (!pts.length) { target = { scale: 0.4, cx: 0, cy: 0 }; return; }
+
+            var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            pts.forEach(function (p) {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+            });
+
+            var spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
+            var fill  = 0.78; // fraction of the canvas the content should occupy
+            var scale = Math.min(W * fill / spanX, H * fill / spanY);
+            scale = Math.max(0.02, Math.min(scale, 2.2)); // no runaway zoom on one point
+
+            target = { scale: scale, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+        }
+
+        function drawGrid(W, H, t) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255,255,255,.045)';
+            ctx.lineWidth = 1;
+            var step = 42, off = (t * 6) % step;
+            for (var x = -off; x < W; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+            for (var y = -off; y < H; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+            ctx.restore();
+        }
+
+        function drawStation(p, rPx, s, isNear, t) {
+            rPx = Math.max(12, rPx);
+            var rgb    = isNear ? '34,197,94' : '148,163,184';
+            var accent = isNear ? '#22C55E'   : '#94A3B8';
+
+            ctx.save();
+
+            // geofence disc + boundary, sized to the real radius
+            var grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rPx);
+            grd.addColorStop(0, 'rgba(' + rgb + ',.18)');
+            grd.addColorStop(1, 'rgba(' + rgb + ',0)');
+            ctx.fillStyle = grd;
+            ctx.beginPath(); ctx.arc(p.x, p.y, rPx, 0, Math.PI * 2); ctx.fill();
+
+            ctx.strokeStyle = 'rgba(' + rgb + ',.5)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath(); ctx.arc(p.x, p.y, rPx, 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([]);
+
+            // blinking wave: rings expanding out to the radius, two offset in phase
+            for (var i = 0; i < 2; i++) {
+                var phase = ((t / 2.6) + i / 2) % 1;
+                ctx.globalAlpha = (1 - phase) * (isNear ? 0.9 : 0.5);
+                ctx.strokeStyle = accent;
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(p.x, p.y, phase * rPx, 0, Math.PI * 2); ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+
+            // core marker
+            ctx.fillStyle = accent;
+            ctx.shadowColor = accent;
+            ctx.shadowBlur = isNear ? 14 : 6;
+            ctx.beginPath(); ctx.arc(p.x, p.y, isNear ? 7 : 5, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#0B1220';
+            ctx.beginPath(); ctx.arc(p.x, p.y, isNear ? 3 : 2, 0, Math.PI * 2); ctx.fill();
+
+            // label
+            ctx.fillStyle = isNear ? '#DCFCE7' : 'rgba(226,232,240,.8)';
+            ctx.font = '600 12px Inter, system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'alphabetic';
+            ctx.shadowColor = 'rgba(0,0,0,.8)';
+            ctx.shadowBlur = 4;
+            ctx.fillText(s.name, p.x, p.y - 13);
+            ctx.restore();
+        }
+
+        function drawRoute(a, b, best, t) {
+            var within = best.distance <= (best.station.radius_m || 50);
+
+            ctx.save();
+            ctx.strokeStyle = within ? 'rgba(34,197,94,.7)' : 'rgba(56,224,255,.7)';
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([8, 8]);
+            ctx.lineDashOffset = -(t * 24) % 16;
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            ctx.setLineDash([]);
+
+            // a marker walking the route, looping from the employee toward the site
+            if (!within) {
+                var tt = (t / 2.2) % 1;
+                var wx = a.x + (b.x - a.x) * tt;
+                var wy = a.y + (b.y - a.y) * tt;
+                ctx.fillStyle = '#38E0FF';
+                ctx.shadowColor = '#38E0FF';
+                ctx.shadowBlur = 12;
+                ctx.beginPath(); ctx.arc(wx, wy, 5, 0, Math.PI * 2); ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            ctx.restore();
+
+            // distance pill at the midpoint
+            var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+            var label = fmtMeters(best.distance);
+            ctx.save();
+            ctx.font = '700 11px Inter, system-ui, sans-serif';
+            var pw = ctx.measureText(label).width + 16;
+            ctx.fillStyle = 'rgba(7,13,24,.88)';
+            ctx.strokeStyle = 'rgba(255,255,255,.12)';
+            ctx.lineWidth = 1;
+            roundRect(mx - pw / 2, my - 11, pw, 22, 11);
+            ctx.fill(); ctx.stroke();
+            ctx.fillStyle = within ? '#86EFAC' : '#E2F5FF';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, mx, my + 1);
+            ctx.restore();
+        }
+
+        function drawUser(p, t) {
+            var pulse = 0.5 + 0.5 * Math.sin(t * 3);
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(56,224,255,' + (0.12 + 0.10 * pulse) + ')';
+            ctx.beginPath(); ctx.arc(p.x, p.y, 16 + 6 * pulse, 0, Math.PI * 2); ctx.fill();
+
+            ctx.strokeStyle = '#38E0FF';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI * 2); ctx.stroke();
+
+            ctx.fillStyle = '#38E0FF';
+            ctx.shadowColor = '#38E0FF';
+            ctx.shadowBlur = 14;
+            ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2); ctx.fill();
+
+            ctx.fillStyle = '#E2F5FF';
+            ctx.font = '700 11px Inter, system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = 'rgba(0,0,0,.8)';
+            ctx.shadowBlur = 4;
+            ctx.fillText('You', p.x, p.y + 26);
+            ctx.restore();
+        }
+
+        function updateFoot(best) {
+            el.mapSheet.classList.remove('is-ok', 'is-far');
+
+            if (!state.geo) {
+                el.mapDist.textContent = 'Locating…';
+                el.mapSub.textContent  = 'Waiting for your GPS position. Make sure location is turned on.';
+                return;
+            }
+            if (!best) {
+                el.mapDist.textContent = 'No station configured';
+                el.mapSub.textContent  = 'There are no attendance stations to show yet.';
+                return;
+            }
+
+            var within = best.distance <= (best.station.radius_m || 50);
+
+            if (within) {
+                el.mapSheet.classList.add('is-ok');
+                el.mapDist.textContent = 'Within range · ' + best.station.name;
+                el.mapSub.textContent  = fmtMeters(best.distance) + ' away — you can clock in here.';
+            } else {
+                el.mapSheet.classList.add('is-far');
+                el.mapDist.textContent = fmtMeters(best.distance) + ' to ' + best.station.name;
+                el.mapSub.textContent  = 'Walk toward the highlighted station to get inside its range.';
+            }
+        }
+
+        function draw(t) {
+            var W = canvas.clientWidth, H = canvas.clientHeight;
+            ctx.clearRect(0, 0, W, H);
+            drawGrid(W, H, t);
+
+            var best   = state.geo ? nearestStation(state.geo.lat, state.geo.lng) : null;
+            var nearPx = null;
+
+            stations().forEach(function (s) {
+                var p      = toPx(project(s.lat, s.lng));
+                var rPx    = (s.radius_m || 50) * view.scale;
+                var isNear = best && best.station === s;
+                drawStation(p, rPx, s, isNear, t);
+                if (isNear) nearPx = p;
+            });
+
+            if (state.geo) {
+                var userPx = toPx(project(state.geo.lat, state.geo.lng));
+                if (nearPx && best) drawRoute(userPx, nearPx, best, t);
+                drawUser(userPx, t);
+            }
+
+            updateFoot(best);
+        }
+
+        function frame(ts) {
+            if (!open) return;
+
+            // origin: the fixed centroid of the stations (so they don't drift as
+            // the employee moves); fall back to the employee, then to zero.
+            if (!origin) {
+                var ss = stations();
+                if (ss.length) {
+                    var la = 0, lo = 0;
+                    ss.forEach(function (s) { la += s.lat; lo += s.lng; });
+                    origin = { lat: la / ss.length, lng: lo / ss.length };
+                } else if (state.geo) {
+                    origin = { lat: state.geo.lat, lng: state.geo.lng };
+                } else {
+                    origin = { lat: 0, lng: 0 };
+                }
+            }
+
+            computeTarget();
+            if (!view) {
+                view = { scale: target.scale, cx: target.cx, cy: target.cy };
+            } else {
+                view.scale = ease(view.scale, target.scale, 0.08);
+                view.cx    = ease(view.cx,    target.cx,    0.08);
+                view.cy    = ease(view.cy,    target.cy,    0.08);
+            }
+
+            draw(ts / 1000);
+            raf = requestAnimationFrame(frame);
+        }
+
+        function openMap() {
+            el.mapSheet.classList.remove('d-none');
+            el.mapSheet.setAttribute('aria-hidden', 'false');
+            open = true;
+            origin = null; view = null; target = null;
+            resize();
+            if (raf) cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(frame);
+        }
+
+        function closeMap() {
+            open = false;
+            el.mapSheet.classList.add('d-none');
+            el.mapSheet.setAttribute('aria-hidden', 'true');
+            if (raf) { cancelAnimationFrame(raf); raf = null; }
+        }
+
+        window.addEventListener('resize', function () { if (open) resize(); });
+        document.addEventListener('keydown', function (e) { if (open && e.key === 'Escape') closeMap(); });
+
+        return { open: openMap, close: closeMap };
+    })();
+
+    el.mapBtn.addEventListener('click', function () { map.open(); });
+    el.mapClose.addEventListener('click', function () { map.close(); });
 
     // ---------------------------------------------------------------- boot
 

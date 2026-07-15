@@ -114,7 +114,10 @@
         }
         .stage--mirror canvas { transform: scaleX(-1); }
 
-        /* Framing guide. Purely an aiming aid — nothing is judged from it. */
+        /* Framing reticle. Purely an aiming aid — nothing is judged from it.
+           A modern animated frame instead of a hard box: a faint guide outline,
+           four glowing corner brackets, and a sweeping scan line that settles
+           into a soft lock the moment the face (or QR) is ready. */
         .guide {
             position: absolute;
             inset: 0;
@@ -123,24 +126,68 @@
             justify-content: center;
             pointer-events: none;
         }
-        .guide__oval {
-            width: 62%;
-            aspect-ratio: 3 / 4;
-            border: 3px dashed rgba(255, 255, 255, .35);
-            border-radius: 50%;
-            transition: border-color .2s ease, box-shadow .2s ease;
+        .reticle { position: relative; display: block; }
+        .reticle--face { width: 62%; aspect-ratio: 3 / 4; }
+        .reticle--qr   { width: 66%; aspect-ratio: 1; }
+
+        /* faint inner guide outline */
+        .reticle::after {
+            content: '';
+            position: absolute;
+            inset: 7%;
+            border: 1.5px solid rgba(255, 255, 255, .16);
+            border-radius: 22px;
+            transition: border-color .3s ease, box-shadow .3s ease;
         }
-        .guide--ok .guide__oval {
+        .reticle--face::after { border-radius: 50%; }
+
+        .reticle__corner {
+            position: absolute;
+            width: 34px;
+            height: 34px;
+            border: 3px solid #DBF4FF;
+            filter: drop-shadow(0 0 6px rgba(56, 224, 255, .7));
+            transition: border-color .25s ease, filter .25s ease;
+        }
+        .reticle__corner--tl { top: -2px; left: -2px;  border-right: 0; border-bottom: 0; border-top-left-radius: 16px; }
+        .reticle__corner--tr { top: -2px; right: -2px; border-left: 0;  border-bottom: 0; border-top-right-radius: 16px; }
+        .reticle__corner--bl { bottom: -2px; left: -2px;  border-right: 0; border-top: 0; border-bottom-left-radius: 16px; }
+        .reticle__corner--br { bottom: -2px; right: -2px; border-left: 0;  border-top: 0; border-bottom-right-radius: 16px; }
+
+        .reticle__scan {
+            position: absolute;
+            left: 6%;
+            right: 6%;
+            top: 6%;
+            height: 2px;
+            border-radius: 2px;
+            background: linear-gradient(90deg, transparent, rgba(56, 224, 255, .95), transparent);
+            box-shadow: 0 0 14px rgba(56, 224, 255, .85);
+            animation: reticle-scan 2.6s cubic-bezier(.45, 0, .55, 1) infinite;
+        }
+        @keyframes reticle-scan {
+            0%   { top: 6%;  opacity: 0; }
+            12%  { opacity: 1; }
+            88%  { opacity: 1; }
+            100% { top: 92%; opacity: 0; }
+        }
+
+        /* Ready: corners turn green and the outline gives one soft pulse; the
+           scan line steps aside. A calm lock, not a hard green box. */
+        .guide--ok .reticle__corner {
             border-color: var(--ok);
-            border-style: solid;
-            box-shadow: 0 0 0 9999px rgba(34, 197, 94, .10);
+            filter: drop-shadow(0 0 9px rgba(34, 197, 94, .9));
         }
-        .guide__box {
-            width: 66%;
-            aspect-ratio: 1;
-            border-radius: 20px;
-            border: 3px solid rgba(255, 255, 255, .55);
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, .45);
+        .guide--ok .reticle__scan { opacity: 0; }
+        .guide--ok .reticle::after {
+            border-color: rgba(34, 197, 94, .55);
+            box-shadow: 0 0 26px rgba(34, 197, 94, .35);
+            animation: reticle-lock .45s ease;
+        }
+        @keyframes reticle-lock {
+            0%   { transform: scale(1); }
+            45%  { transform: scale(1.02); }
+            100% { transform: scale(1); }
         }
 
         /* Sits over the video, above the guide, below the veil. */
@@ -273,9 +320,113 @@
         .camswap:active:not(:disabled) { transform: scale(.94); }
         .camswap:disabled { opacity: .35; cursor: not-allowed; }
 
-        /* When the capture cue banner is up it owns the top strip; the switch
-           steps aside rather than sitting on the text. */
-        .cue:not(.d-none) ~ .camswap { display: none; }
+        /* Nearest-station map — a second round icon button tucked directly under
+           the camera switch. Opens the animated station map so the employee can
+           see which site is closest and which way to walk to be in range. */
+        .mapbtn {
+            position: absolute;
+            top: 68px;   /* camswap top (14) + its height (44) + a 10px gap */
+            right: 14px;
+            z-index: 6;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 1px solid var(--line);
+            background: rgba(11, 18, 32, .78);
+            color: var(--text);
+            font-size: 16px;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+        }
+        .mapbtn::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            border: 2px solid rgba(56, 224, 255, .6);
+            animation: mapbtn-pulse 2.4s ease-out infinite;
+        }
+        @keyframes mapbtn-pulse {
+            0%   { transform: scale(1);   opacity: .7; }
+            70%  { transform: scale(1.35); opacity: 0; }
+            100% { transform: scale(1.35); opacity: 0; }
+        }
+        .mapbtn:active:not(:disabled) { transform: scale(.94); }
+
+        /* When the capture cue banner is up it owns the top strip; the switches
+           step aside rather than sitting on the text. */
+        .cue:not(.d-none) ~ .camswap,
+        .cue:not(.d-none) ~ .mapbtn { display: none; }
+
+        /* ------------------------------------------------------------ map sheet */
+
+        .mapsheet {
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(120% 90% at 50% 0%, #10213B 0%, #0B1220 55%, #070C16 100%);
+            animation: sheet-in .25s ease;
+        }
+        @keyframes sheet-in {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: none; }
+        }
+        .mapsheet__top {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: calc(env(safe-area-inset-top) + 14px) 16px 12px;
+        }
+        .mapsheet__title {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-size: 15px;
+            font-weight: 700;
+        }
+        .mapsheet__title i { color: var(--amber); }
+        .mapsheet__close {
+            margin-left: auto;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, .06);
+            color: var(--text);
+            font-size: 16px;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+        }
+        .mapsheet__close:active { transform: scale(.94); }
+        .mapsheet__stage {
+            position: relative;
+            flex: 1 1 auto;
+            margin: 0 14px;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            background: #070D18;
+            min-height: 0;
+        }
+        .mapsheet__stage canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .mapsheet__foot {
+            padding: 13px 18px calc(env(safe-area-inset-bottom) + 16px);
+        }
+        .mapsheet__dist { font-size: 16px; font-weight: 800; }
+        .mapsheet__sub  { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+        .mapsheet.is-ok  .mapsheet__dist { color: #86EFAC; }
+        .mapsheet.is-far .mapsheet__dist { color: #FCD34D; }
 
         /* ------------------------------------------------------------ geo HUD */
 
@@ -421,8 +572,20 @@
         <canvas id="overlay"></canvas>
 
         <div class="guide" id="guide">
-            <div class="guide__oval" id="guide-oval"></div>
-            <div class="guide__box d-none" id="guide-box"></div>
+            <div class="reticle reticle--face" id="guide-oval">
+                <span class="reticle__corner reticle__corner--tl"></span>
+                <span class="reticle__corner reticle__corner--tr"></span>
+                <span class="reticle__corner reticle__corner--bl"></span>
+                <span class="reticle__corner reticle__corner--br"></span>
+                <span class="reticle__scan"></span>
+            </div>
+            <div class="reticle reticle--qr d-none" id="guide-box">
+                <span class="reticle__corner reticle__corner--tl"></span>
+                <span class="reticle__corner reticle__corner--tr"></span>
+                <span class="reticle__corner reticle__corner--bl"></span>
+                <span class="reticle__corner reticle__corner--br"></span>
+                <span class="reticle__scan"></span>
+            </div>
         </div>
 
         {{-- Shown after a QR scan resolves, so the person sees their name before
@@ -449,6 +612,12 @@
             <i class="fas fa-qrcode" id="mode-toggle-icon"></i>
         </button>
 
+        {{-- Nearest-station map. Sits under the camera switch; opens the animated
+             map so the employee can see the closest site and how far they are. --}}
+        <button type="button" class="mapbtn" id="map-toggle" title="Nearest station map" aria-label="Show nearest station map">
+            <i class="fas fa-map-location-dot"></i>
+        </button>
+
         {{-- Live location: distance to the nearest station + the raw fix. When
              out of range it says so — and says the punch still goes through,
              flagged for HR clarification. --}}
@@ -468,6 +637,29 @@
             <div id="veil-text">Starting camera…</div>
         </div>
     </main>
+
+    {{-- Nearest-station map. A self-contained animated canvas (no tiles, no CDN —
+         it must work on the LGU LAN with no internet): stations are blinking
+         "wave" rings sized to their geofence radius, the employee is a live dot,
+         and an animated route shows which way to walk to be in range. --}}
+    <div class="mapsheet d-none" id="mapsheet" aria-hidden="true">
+        <header class="mapsheet__top">
+            <div class="mapsheet__title">
+                <i class="fas fa-location-crosshairs"></i>
+                <span>Nearest station</span>
+            </div>
+            <button type="button" class="mapsheet__close" id="map-close" aria-label="Close map">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </header>
+        <div class="mapsheet__stage">
+            <canvas id="mapcanvas"></canvas>
+        </div>
+        <footer class="mapsheet__foot">
+            <div class="mapsheet__dist" id="map-dist">Locating…</div>
+            <div class="mapsheet__sub"  id="map-sub">Finding the station closest to you.</div>
+        </footer>
+    </div>
 
     <div class="hint" id="hint">
         <i class="fas fa-circle-notch fa-spin" id="hint-icon"></i>
