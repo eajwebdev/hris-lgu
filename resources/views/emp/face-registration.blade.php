@@ -13,8 +13,8 @@
         'front'    => ['label' => 'Front Face',       'icon' => 'fa-user',        'hint' => 'Look directly at the camera'],
         'left'     => ['label' => 'Left Angle',       'icon' => 'fa-arrow-left',  'hint' => 'Turn your head slightly to the left'],
         'right'    => ['label' => 'Right Angle',      'icon' => 'fa-arrow-right', 'hint' => 'Turn your head slightly to the right'],
-        {{-- Head movement only: the 5-point landmarks the SCRFD detector gives
-             carry no eye contour, so a blink cannot be seen anymore. --}}
+        // Head movement only: the 5-point landmarks the SCRFD detector gives
+        // carry no eye contour, so a blink cannot be seen anymore.
         'movement' => ['label' => 'Natural Movement', 'icon' => 'fa-arrows-alt',  'hint' => 'Slightly move your head'],
     ];
 @endphp
