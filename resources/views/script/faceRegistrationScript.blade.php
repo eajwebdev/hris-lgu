@@ -6,7 +6,7 @@
      embeddings), vendored. No CDN at runtime: this HRIS is reachable on the LGU
      LAN and enrolment has to keep working when the internet does not. --}}
 <script defer src="{{ asset('js/onnx/ort.wasm.min.js') }}"></script>
-<script defer src="{{ asset('js/face-engine/face-engine.js') }}"></script>
+<script defer src="{{ asset('js/face-engine/face-engine.js') }}?v={{ filemtime(public_path('js/face-engine/face-engine.js')) }}"></script>
 
 <style>
     .face-stage {
