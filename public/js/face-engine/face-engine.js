@@ -20,8 +20,10 @@
  *   w600k_mbf.onnx  MobileFaceNet trained with the ArcFace loss on
  *                   WebFace600K. 112×112 aligned crop in, 512 floats out.
  *
- * Execution: WebGPU when the browser has it, WASM (SIMD) otherwise. The wasm
- * binaries sit next to ort.all.min.js under /js/onnx.
+ * Execution: single-threaded SIMD WASM. This runs as a phone kiosk inside an
+ * Android WebView, which has no WebGPU and no cross-origin isolation for
+ * threads, so the wasm-only ORT bundle (ort.wasm.min.js) is what we load — its
+ * binaries sit next to it under /js/onnx.
  *
  * The maths (Umeyama alignment, SCRFD decode, NMS) is exposed on
  * FaceEngine._math and the file is loadable in Node, so the arithmetic is
@@ -288,38 +290,63 @@
     async function createSession(url) {
         var ort = root.ort;
 
-        // WebGPU first — it is dramatically faster where it exists — falling
-        // back to single-threaded SIMD WASM, which every current browser runs.
-        // (Multi-threaded WASM needs cross-origin isolation headers this app
-        // does not serve, so it is not attempted.)
-        try {
-            var s = await ort.InferenceSession.create(url, {
-                executionProviders: ['webgpu'],
-                graphOptimizationLevel: 'all',
-            });
-            state.provider = state.provider || 'webgpu';
-            return s;
-        } catch (e) {
-            var s2 = await ort.InferenceSession.create(url, {
-                executionProviders: ['wasm'],
-                graphOptimizationLevel: 'all',
-            });
-            state.provider = state.provider || 'wasm';
-            return s2;
-        }
+        // WASM only. This is a kiosk on a phone in a WebView — WebGPU is not
+        // there, and the wasm-only ORT bundle we load does not even ship a
+        // WebGPU provider, so there is nothing to fall back from. Keeping the
+        // provider list to one entry also means no failed-provider attempt to
+        // stall on, which is exactly the hang we are engineering out.
+        var session = await ort.InferenceSession.create(url, {
+            executionProviders: ['wasm'],
+            graphOptimizationLevel: 'all',
+        });
+
+        state.provider = 'wasm';
+        return session;
     }
 
     /**
      * Load both models and run one inference each, so the first real frame
      * pays no compile/allocation stall while somebody stands at the camera.
+     *
+     * Wrapped in a watchdog: on a phone a wrong MIME type or a missing loader
+     * file used to leave this pending forever, and the UI just said "Loading
+     * face recognition..." with no way to tell why. A rejection — even a
+     * timeout — is far more useful than a hang, because the caller surfaces it.
      */
     async function init(cfg) {
         if (state.ready) return;
+        if (state._initPromise) return state._initPromise;
 
+        state._initPromise = withTimeout(realInit(cfg), 60000,
+            'Face recognition took too long to load. Check the connection and reload.');
+
+        try {
+            await state._initPromise;
+        } catch (e) {
+            state._initPromise = null;   // let a reload retry cleanly
+            throw e;
+        }
+    }
+
+    async function realInit(cfg) {
         var ort = root.ort;
 
-        ort.env.wasm.wasmPaths = cfg.ortPath;   // where the .wasm binaries live
-        ort.env.wasm.numThreads = 1;            // no COOP/COEP → no threads
+        // Single-threaded on purpose: multi-threaded WASM needs SharedArrayBuffer,
+        // which needs COOP/COEP cross-origin-isolation headers this app does not
+        // serve — and a WebView without them would otherwise stall spawning
+        // workers that can never start.
+        ort.env.wasm.numThreads = 1;
+        ort.env.wasm.proxy = false;
+
+        // Point ORT at each runtime file explicitly. The .mjs loader is served
+        // through a .js alias so a mis-configured host cannot hand it back with
+        // a non-JavaScript MIME type (which a WebView refuses to run as a
+        // module). See public/js/onnx/.htaccess.
+        var base = cfg.ortPath;
+        ort.env.wasm.wasmPaths = {
+            wasm: base + 'ort-wasm-simd-threaded.wasm',
+            mjs:  base + 'ort-wasm-simd-threaded.mjs.js',
+        };
 
         state.det = await createSession(cfg.modelsUrl + '/det_500m.onnx');
         state.rec = await createSession(cfg.modelsUrl + '/w600k_mbf.onnx');
@@ -335,6 +362,15 @@
         await state.rec.run(inputFor(state.recInput, r));
 
         state.ready = true;
+    }
+
+    /** Reject if a promise has not settled within `ms`, so nothing hangs forever. */
+    function withTimeout(promise, ms, message) {
+        return new Promise(function (resolve, reject) {
+            var timer = setTimeout(function () { reject(new Error(message)); }, ms);
+            promise.then(function (v) { clearTimeout(timer); resolve(v); },
+                         function (e) { clearTimeout(timer); reject(e); });
+        });
     }
 
     function inputFor(name, tensor) {

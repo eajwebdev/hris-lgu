@@ -521,7 +521,7 @@ class AttendancePortalTest extends TestCase
             ->assertOk()
             ->assertSee('CLOCK IN')
             ->assertSee('CLOCK OUT')
-            ->assertSee('js/onnx/ort.all.min.js')
+            ->assertSee('js/onnx/ort.wasm.min.js')
             ->assertSee('js/face-engine/face-engine.js')
             ->assertSee('js/jsqr/jsQR.min.js');
     }

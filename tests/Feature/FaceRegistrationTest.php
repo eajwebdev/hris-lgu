@@ -270,7 +270,7 @@ class FaceRegistrationTest extends TestCase
             ->assertOk()
             ->assertSee('FACE RECOGNITION REGISTRATION')
             ->assertSee('Register Face')
-            ->assertSee('js/onnx/ort.all.min.js')
+            ->assertSee('js/onnx/ort.wasm.min.js')
             ->assertSee('js/face-engine/face-engine.js')
             ->getContent();
 

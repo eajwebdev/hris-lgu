@@ -190,6 +190,7 @@
             background: rgba(11, 18, 32, .92);
             font-size: 13px;
             line-height: 1.5;
+            white-space: pre-line; /* honour \n in status/error messages */
             z-index: 5;
         }
 
@@ -542,8 +543,8 @@
 
 {{-- ONNX Runtime Web + the FaceEngine wrapper (SCRFD detection, ArcFace
      embeddings). Vendored, no CDN: the portal must work on the LGU LAN with no
-     internet. The .wasm binaries live next to ort.all.min.js under js/onnx. --}}
-<script src="{{ asset('js/onnx/ort.all.min.js') }}"></script>
+     internet. The .wasm binaries live next to ort.wasm.min.js under js/onnx. --}}
+<script src="{{ asset('js/onnx/ort.wasm.min.js') }}"></script>
 <script src="{{ asset('js/face-engine/face-engine.js') }}"></script>
 <script src="{{ asset('js/jsqr/jsQR.min.js') }}"></script>
 @include('attendance.portal-script')

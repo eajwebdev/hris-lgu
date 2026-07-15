@@ -1,0 +1,24 @@
+# ONNX Runtime Web assets.
+#
+# Two things a default (shared-hosting) Apache gets wrong for this directory,
+# both of which make the face engine hang at "Loading face recognition..." on a
+# phone / WebView:
+#
+#   1. The WASM backend is loaded as an ES module (ort-wasm-*.mjs). A browser
+#      refuses to execute a module served as application/octet-stream, which is
+#      what Apache does for an unknown .mjs extension. Force the JS MIME type.
+#   2. WebAssembly.instantiateStreaming needs application/wasm, or it throws and
+#      falls back to a slower path (and some WebViews fail outright).
+<IfModule mod_mime.c>
+    AddType text/javascript .mjs
+    AddType application/wasm .wasm
+</IfModule>
+
+# The models and runtime are content-addressed by name and never change in
+# place, so let the WebView cache them hard — the 16 MB of weights should be
+# downloaded once, not on every kiosk load.
+<IfModule mod_headers.c>
+    <FilesMatch "\.(wasm|mjs|js|onnx)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>

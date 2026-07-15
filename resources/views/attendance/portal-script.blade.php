@@ -933,8 +933,13 @@
             state.modelsReady = true;
             console.info('FaceEngine ready on ' + FaceEngine.provider);
         }).catch(function (e) {
-            console.error(e);
-            veil('Could not load face recognition. Check your connection and reload.');
+            console.error('FaceEngine init failed', e);
+            // Show the actual reason — on a phone/WebView this is usually the
+            // only way to tell a missing file from a blocked one.
+            veil('Could not load face recognition.\n' + (e && e.message ? e.message : e) +
+                 '\n\nTap to retry.');
+            el.veil.style.cursor = 'pointer';
+            el.veil.onclick = function () { location.reload(); };
         });
 
         try {

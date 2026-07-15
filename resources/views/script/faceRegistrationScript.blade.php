@@ -5,7 +5,7 @@
 {{-- ONNX Runtime Web + the FaceEngine wrapper (SCRFD detection, ArcFace
      embeddings), vendored. No CDN at runtime: this HRIS is reachable on the LGU
      LAN and enrolment has to keep working when the internet does not. --}}
-<script defer src="{{ asset('js/onnx/ort.all.min.js') }}"></script>
+<script defer src="{{ asset('js/onnx/ort.wasm.min.js') }}"></script>
 <script defer src="{{ asset('js/face-engine/face-engine.js') }}"></script>
 
 <style>
@@ -39,6 +39,7 @@
         color: #fff;
         font-size: 13px;
         text-align: center;
+        white-space: pre-line; /* honour \n in status/error messages */
         padding: 16px;
         z-index: 3;
     }
@@ -578,7 +579,17 @@
         try {
             if (!state.modelsReady) {
                 veil('Loading face recognition models…');
-                await ensureModels();
+
+                try {
+                    await ensureModels();
+                } catch (modelErr) {
+                    // A model-load failure is not a camera failure — name it as
+                    // itself, with the reason, so a missing/mis-served ONNX file
+                    // on a phone is diagnosable rather than a blank hang.
+                    console.error('model load failed', modelErr);
+                    return veil('Could not load face recognition.\n' +
+                        (modelErr && modelErr.message ? modelErr.message : modelErr));
+                }
             }
 
             veil('Waiting for camera permission…');
