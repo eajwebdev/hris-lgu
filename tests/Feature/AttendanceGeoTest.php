@@ -101,16 +101,12 @@ class AttendanceGeoTest extends TestCase
     {
         $challenge = $this->postJson(route('attendanceChallenge'))->assertOk()->json('challenge');
 
+        // Frontal-only: a run of straight-ahead frames, no head turns.
         $frames = [];
         $t      = 0;
 
-        for ($i = 0; $i < 3; $i++) {
+        for ($i = 0; $i < 5; $i++) {
             $frames[] = ['stage' => 'neutral', 'pose' => null, 't' => $t, 'descriptor' => $this->frame($person, null, $person + 100 + $i, 0.05)];
-            $t += 400;
-        }
-
-        foreach ($challenge['poses'] as $n => $pose) {
-            $frames[] = ['stage' => 'pose', 'pose' => $pose, 't' => $t, 'descriptor' => $this->frame($person, $pose, $person + 200 + $n, 0.03)];
             $t += 400;
         }
 

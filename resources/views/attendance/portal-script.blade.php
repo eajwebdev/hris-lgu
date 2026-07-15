@@ -346,55 +346,41 @@
     // ---------------------------------------------------------------- liveness run
 
     /**
-     * The guided capture. Straight-ahead frames first, then the two head turns the
-     * server just asked for — in the order it asked for them.
+     * The guided capture — frontal only. The employee faces the camera and holds
+     * still for a beat while a handful of frames are taken a moment apart.
      *
-     * The cue on screen is only guidance. What actually decides the outcome is
-     * whether the turned frames look more like this employee's enrolled left/right
-     * captures than each other's, and that is judged server-side. A photograph can
-     * be waved at the lens all day; it cannot turn its head.
+     * There are no head turns. Liveness is decided server-side from the natural
+     * frame-to-frame drift of a real face: a living person is never perfectly
+     * still, so consecutive descriptors differ, whereas a flat static photo held
+     * to the lens produces very nearly the same vector every time. The cue on
+     * screen is only guidance; the verdict is the server's.
+     *
+     * Honest limit: this defeats a printed or on-screen still photo. It does not
+     * defeat a video/live replay of the employee, which drifts like a real face.
+     * The QR path stays the stronger option where that matters.
      */
     async function runSequence() {
         var t0     = performance.now();
         var frames = [];
 
+        // Still single-use: the nonce is redeemed server-side so a captured
+        // payload cannot be replayed, even though we no longer ask for poses.
         var challenge = await getChallenge();
 
-        // Straight ahead.
-        showCue(null, 'Look straight at the camera');
+        showCue(null, 'Look at the camera and hold still');
 
-        for (var i = 0; i < L.min_neutral_frames; i++) {
-            var neutral = await captureAt('front', 'Look straight at the camera');
+        for (var i = 0; i < L.frames; i++) {
+            var frame = await captureAt('front', 'Look straight at the camera');
 
             frames.push({
                 stage: 'neutral',
                 pose: null,
                 t: Math.round(performance.now() - t0),
-                descriptor: Array.from(neutral.descriptor),
+                descriptor: Array.from(frame.descriptor),
             });
 
-            // Spaced out, so consecutive frames are genuinely different moments —
-            // but only just enough for that: a longer pause is pure dead time on
-            // every honest punch.
-            await sleep(150);
-        }
-
-        // The two turns, in the order the server chose.
-        for (var p = 0; p < challenge.poses.length; p++) {
-            var pose = challenge.poses[p];
-            var say  = pose === 'left' ? 'Turn your head to your LEFT' : 'Turn your head to your RIGHT';
-
-            showCue(pose, say);
-
-            var turned = await captureAt(pose, say);
-
-            frames.push({
-                stage: 'pose',
-                pose: pose,
-                t: Math.round(performance.now() - t0),
-                descriptor: Array.from(turned.descriptor),
-            });
-
+            // Spaced out so consecutive frames are genuinely different moments —
+            // that spread is exactly what the liveness check reads.
             await sleep(180);
         }
 
@@ -503,9 +489,17 @@
         hideCue();
         setHint(message, 'bad');
 
-        // The challenge is spent either way, so a retry starts a fresh one.
-        state.busy = false;
+        // Hold the reason on screen for a moment. Without this, the idle loop
+        // repaints "Ready — tap CLOCK IN" within a frame or two and the employee
+        // never sees why the punch failed — so they tap again into the same
+        // failure, which is what made it look like an endless loop. Keeping busy
+        // set both freezes the hint and disables the button during the pause.
         el.modeBtn.disabled = false;
+
+        setTimeout(function () {
+            // The challenge is spent either way, so a retry starts a fresh one.
+            state.busy = false;
+        }, 1800);
     }
 
     // ---------------------------------------------------------------- screens

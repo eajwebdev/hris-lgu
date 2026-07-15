@@ -13,12 +13,16 @@ use Tests\TestCase;
  * Face descriptors are simulated here, and the simulation matters, so it is worth
  * being explicit about it.
  *
- * A person is a random 128-vector (their identity). Turning the head adds a fixed
- * direction in embedding space — one for left, one for right — shared across
- * people, which is the property that actually holds for face-recognition
- * descriptors and the property the liveness check leans on. A photograph is that
- * same identity vector with *no* pose component, however much it is waved about,
- * and that is exactly why it cannot answer the challenge.
+ * A person is a random 128-vector (their identity). A live capture is that vector
+ * sampled several times with fresh per-frame noise, so consecutive frames drift
+ * apart — which is the property the FRONTAL-ONLY liveness check leans on. A still
+ * photograph is that same identity vector barely changing between frames, and that
+ * flatness is exactly what marks it as not a live face.
+ *
+ * Note the honest limit this suite now encodes: frontal-only liveness catches a
+ * *still* photo, not a photo waved hard enough to fake frame-to-frame variation,
+ * nor a video replay. The head-turn challenge that used to catch those is gone by
+ * design; the QR path is the stronger option where that gap matters.
  */
 class AttendancePortalTest extends TestCase
 {
@@ -118,29 +122,20 @@ class AttendancePortalTest extends TestCase
         return $this->postJson(route('attendanceChallenge'))->assertOk()->json('challenge');
     }
 
-    /** Frames as a living person in front of the camera would produce them. */
-    private function liveFrames(int $person, array $poses, int $spacing = 400): array
+    /** Frames as a living person facing the camera would produce them. */
+    private function liveFrames(int $person, int $spacing = 400): array
     {
         $frames = [];
         $t      = 0;
 
-        for ($i = 0; $i < 3; $i++) {
+        for ($i = 0; $i < 5; $i++) {
             $frames[] = [
                 'stage'      => 'neutral',
                 'pose'       => null,
                 't'          => $t,
+                // Fresh noise each frame, so the run drifts enough to clear the
+                // min_variation floor — the thing that separates a face from a photo.
                 'descriptor' => $this->frame($person, null, $person + 100 + $i, 0.05),
-            ];
-
-            $t += $spacing;
-        }
-
-        foreach ($poses as $n => $pose) {
-            $frames[] = [
-                'stage'      => 'pose',
-                'pose'       => $pose,
-                't'          => $t,
-                'descriptor' => $this->frame($person, $pose, $person + 200 + $n, 0.03),
             ];
 
             $t += $spacing;
@@ -150,33 +145,22 @@ class AttendancePortalTest extends TestCase
     }
 
     /**
-     * Frames as a *photograph* would produce them: the head never turns, because
-     * a photograph has no head to turn. $jitter models someone waving the print
-     * around to fake movement.
+     * Frames as a still *photograph* held to the lens would produce them: the same
+     * face, barely changing frame to frame. That flatness is what the frontal
+     * liveness check reads as "not a live face". A tiny $jitter keeps the frames
+     * from being byte-identical without lifting them over the variation floor.
      */
-    private function photoFrames(int $person, array $poses, float $jitter = 0.004): array
+    private function photoFrames(int $person, float $jitter = 0.003): array
     {
         $frames = [];
         $t      = 0;
 
-        for ($i = 0; $i < 3; $i++) {
+        for ($i = 0; $i < 5; $i++) {
             $frames[] = [
                 'stage'      => 'neutral',
                 'pose'       => null,
                 't'          => $t,
                 'descriptor' => $this->frame($person, null, $person + 300 + $i, $jitter),
-            ];
-
-            $t += 400;
-        }
-
-        foreach ($poses as $n => $pose) {
-            $frames[] = [
-                'stage'      => 'pose',
-                'pose'       => $pose,
-                't'          => $t,
-                // Still facing forward. It is a picture.
-                'descriptor' => $this->frame($person, null, $person + 400 + $n, $jitter),
             ];
 
             $t += 400;
@@ -199,7 +183,7 @@ class AttendancePortalTest extends TestCase
             'mode'   => 'face',
             'action' => $action,
             'nonce'  => $challenge['nonce'],
-            'frames' => $this->liveFrames($person, $challenge['poses']),
+            'frames' => $this->liveFrames($person),
         ], $extra));
     }
 
@@ -219,7 +203,8 @@ class AttendancePortalTest extends TestCase
     // ================================================================ ANTI-SPOOF
 
     /**
-     * The headline requirement: a photograph must not be able to clock anyone in.
+     * The headline requirement: a still photograph must not clock anyone in. Its
+     * frames barely differ, so it fails the frontal variation check.
      */
     public function test_a_still_photo_cannot_clock_in(): void
     {
@@ -231,50 +216,7 @@ class AttendancePortalTest extends TestCase
             'mode'   => 'face',
             'action' => 'in',
             'nonce'  => $challenge['nonce'],
-            'frames' => $this->photoFrames(100, $challenge['poses']),
-        ])->assertStatus(403);
-
-        $this->assertNull($this->todayFor($this->alice));
-    }
-
-    /**
-     * The one a naive liveness check gets wrong.
-     *
-     * Wiggling a print produces perfectly good "movement" — the frames vary, the
-     * face drifts around, a blink-or-move heuristic is satisfied. What it cannot
-     * produce is a descriptor that looks more like Alice's enrolled LEFT capture
-     * than her RIGHT one, because the head in the photo never turned.
-     */
-    public function test_a_photo_waved_around_to_fake_movement_still_cannot_clock_in(): void
-    {
-        $this->enrol($this->alice, 110);
-
-        $challenge = $this->challenge();
-
-        $this->punch([
-            'mode'   => 'face',
-            'action' => 'in',
-            'nonce'  => $challenge['nonce'],
-            // Plenty of frame-to-frame variation — and still no head turn.
-            'frames' => $this->photoFrames(110, $challenge['poses'], 0.05),
-        ])->assertStatus(403);
-
-        $this->assertNull($this->todayFor($this->alice));
-    }
-
-    /** Answering poses the server did not ask for, in an order it did not choose. */
-    public function test_the_wrong_pose_order_is_rejected(): void
-    {
-        $this->enrol($this->alice, 120);
-
-        $challenge = $this->challenge();
-        $reversed  = array_reverse($challenge['poses']);
-
-        $this->punch([
-            'mode'   => 'face',
-            'action' => 'in',
-            'nonce'  => $challenge['nonce'],
-            'frames' => $this->liveFrames(120, $reversed),
+            'frames' => $this->photoFrames(100),
         ])->assertStatus(403);
 
         $this->assertNull($this->todayFor($this->alice));
@@ -286,7 +228,7 @@ class AttendancePortalTest extends TestCase
         $this->enrol($this->alice, 130);
 
         $challenge = $this->challenge();
-        $frames    = $this->liveFrames(130, $challenge['poses']);
+        $frames    = $this->liveFrames(130);
 
         $this->punch(['mode' => 'face', 'action' => 'in', 'nonce' => $challenge['nonce'], 'frames' => $frames])
             ->assertOk();
@@ -306,7 +248,7 @@ class AttendancePortalTest extends TestCase
             'mode'   => 'face',
             'action' => 'in',
             'nonce'  => $challenge['nonce'],
-            'frames' => $this->photoFrames(140, $challenge['poses']),
+            'frames' => $this->photoFrames(140),
         ])->assertStatus(403);
 
         // Same nonce, now with good frames: still refused.
@@ -314,7 +256,7 @@ class AttendancePortalTest extends TestCase
             'mode'   => 'face',
             'action' => 'in',
             'nonce'  => $challenge['nonce'],
-            'frames' => $this->liveFrames(140, $challenge['poses']),
+            'frames' => $this->liveFrames(140),
         ])->assertStatus(419);
     }
 
@@ -326,11 +268,11 @@ class AttendancePortalTest extends TestCase
             'mode'   => 'face',
             'action' => 'in',
             'nonce'  => 'made-up-nonce',
-            'frames' => $this->liveFrames(150, ['left', 'right']),
+            'frames' => $this->liveFrames(150),
         ])->assertStatus(419);
     }
 
-    /** Nobody turns their head twice in 40 milliseconds. */
+    /** All the frames landing in one instant is a payload, not a capture. */
     public function test_frames_submitted_too_quickly_are_rejected(): void
     {
         $this->enrol($this->alice, 160);
@@ -341,17 +283,18 @@ class AttendancePortalTest extends TestCase
             'mode'   => 'face',
             'action' => 'in',
             'nonce'  => $challenge['nonce'],
-            'frames' => $this->liveFrames(160, $challenge['poses'], 10),
+            'frames' => $this->liveFrames(160, 10),
         ])->assertStatus(403);
 
         $this->assertNull($this->todayFor($this->alice));
     }
 
     /**
-     * Faces enrolled on the retired device have no left/right captures, so there
-     * is nothing to check a head turn against. Refusing is the only safe answer.
+     * Faces enrolled on the retired device have only a centroid, no per-pose
+     * captures. Frontal-only liveness needs neither — the identity still verifies
+     * against the stored vector — so these employees can punch without re-enrolling.
      */
-    public function test_a_legacy_enrolment_is_told_to_re_register(): void
+    public function test_a_legacy_enrolment_can_still_clock_in(): void
     {
         $vectors = [$this->frame(170, null, 1, 0.02), $this->frame(170, null, 2, 0.02)];
 
@@ -364,10 +307,10 @@ class AttendancePortalTest extends TestCase
         $this->faces->storeVector($this->alice->id, $this->faces->masterEmbedding($vectors));
 
         $this->livePunch(170)
-            ->assertStatus(403)
-            ->assertJsonPath('message', 'Your face needs to be re-registered. Please see HR.');
+            ->assertOk()
+            ->assertJsonPath('recorded', true);
 
-        $this->assertNull($this->todayFor($this->alice));
+        $this->assertNotNull($this->todayFor($this->alice));
     }
 
     // ================================================================ HAPPY PATH
@@ -514,7 +457,7 @@ class AttendancePortalTest extends TestCase
             'action' => 'in',
             'qr'     => shortEncrypt($this->alice->emp_ID),
             'nonce'  => $challenge['nonce'],
-            'frames' => $this->photoFrames(330, $challenge['poses'], 0.05),
+            'frames' => $this->photoFrames(330),
         ])->assertStatus(403);
 
         $this->assertNull($this->todayFor($this->alice));
@@ -546,7 +489,7 @@ class AttendancePortalTest extends TestCase
         $this->punch([
             'mode'   => 'face',
             'action' => 'in',
-            'frames' => $this->liveFrames(410, ['left', 'right']),
+            'frames' => $this->liveFrames(410),
         ])->assertStatus(422);
     }
 
@@ -555,7 +498,7 @@ class AttendancePortalTest extends TestCase
         $this->enrol($this->alice, 420);
 
         $challenge = $this->challenge();
-        $frames    = $this->liveFrames(420, $challenge['poses']);
+        $frames    = $this->liveFrames(420);
 
         $frames[0]['descriptor'] = array_slice($frames[0]['descriptor'], 0, 64);
 

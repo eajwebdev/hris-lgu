@@ -92,48 +92,37 @@ class LivenessVerifier
     // ---------------------------------------------------------------- verdict
 
     /**
-     * Does this sequence of frames come from the living employee it claims to?
+     * Does this sequence of frontal frames come from the living employee it
+     * claims to?
      *
-     * Returns null when satisfied, or a human-readable reason when not. The
-     * reasons are deliberately vague on screen — telling an attacker *which*
-     * check they tripped tells them what to fix.
+     * Frontal-only: no head turns. Liveness rests entirely on the natural drift
+     * between frames of a real face (see checkNeutrals). Returns null when
+     * satisfied, or a human-readable reason when not. The reasons are deliberately
+     * vague on screen — telling an attacker *which* check they tripped tells them
+     * what to fix.
      */
-    public function check(Employee $employee, array $frames, array $poses): ?string
+    public function check(Employee $employee, array $frames): ?string
     {
         $config = (array) config('face.liveness');
 
-        $enrolled = $this->enrolledPoses($employee);
-
-        if (! $enrolled) {
-            // Faces enrolled on the retired device have no left/right captures,
-            // so there is nothing to check a head turn against. Refusing is the
-            // only safe answer, and re-registration is the fix.
-            return 'Your face needs to be re-registered. Please see HR.';
-        }
-
+        // Every frame is a straight-ahead 'neutral' now; tolerate a stray 'pose'
+        // tag from an older client by simply treating whatever arrived as the set
+        // to judge.
         $neutral = array_values(array_filter($frames, fn ($f) => $f['stage'] === 'neutral'));
-        $turned  = array_values(array_filter($frames, fn ($f) => $f['stage'] === 'pose'));
+
+        if (! $neutral) {
+            $neutral = array_values($frames);
+        }
 
         if (count($neutral) < (int) $config['min_neutral_frames']) {
             return 'Face check incomplete. Please try again.';
         }
 
-        // The poses must be the ones that were asked for, in the order they were
-        // asked for. Answering "left, right" to a "right, left" challenge is a
-        // replay of a previous attempt.
-        if (array_column($turned, 'pose') !== $poses) {
-            return 'Face check incomplete. Please try again.';
-        }
-
-        if ($reason = $this->checkTiming($frames, $config)) {
+        if ($reason = $this->checkTiming($neutral, $config)) {
             return $reason;
         }
 
-        if ($reason = $this->checkNeutrals($employee, $neutral, $config)) {
-            return $reason;
-        }
-
-        return $this->checkPoses($neutral, $turned, $enrolled, $config);
+        return $this->checkNeutrals($employee, $neutral, $config);
     }
 
     /**
@@ -191,63 +180,7 @@ class LivenessVerifier
         return null;
     }
 
-    /**
-     * The heart of it: each turned frame must look more like the enrolled capture
-     * of the pose we ASKED for than like the opposite one — and must genuinely
-     * differ from the straight-ahead frames.
-     *
-     * A photo of a face looking at the camera sits roughly equidistant from that
-     * employee's left and right captures no matter how it is waved about, so it
-     * cannot clear the margin. Tilting the print does not turn the head in it.
-     */
-    private function checkPoses(array $neutral, array $turned, array $enrolled, array $config): ?string
-    {
-        $centre = $this->faces->masterEmbedding(array_column($neutral, 'descriptor'));
-
-        foreach ($turned as $frame) {
-            $pose     = $frame['pose'];
-            $opposite = $pose === 'left' ? 'right' : 'left';
-
-            $toAsked    = $this->distance($frame['descriptor'], $enrolled[$pose]);
-            $toOpposite = $this->distance($frame['descriptor'], $enrolled[$opposite]);
-
-            // Still has to be the right person, just judged more loosely: a turned
-            // head legitimately sits further from enrolment than a straight one.
-            if ($toAsked > (float) $config['pose_distance']) {
-                return 'Face not recognised. Please try again.';
-            }
-
-            if ($toAsked > $toOpposite - (float) $config['pose_margin']) {
-                return 'Please follow the head movements shown on screen.';
-            }
-
-            if ($centre && $this->distance($frame['descriptor'], $centre) < (float) $config['min_pose_shift']) {
-                // The frame is indistinguishable from looking straight ahead, so
-                // whatever is in front of the camera did not turn.
-                return 'Please follow the head movements shown on screen.';
-            }
-        }
-
-        return null;
-    }
-
     // ---------------------------------------------------------------- helpers
-
-    /** The employee's enrolled left/right captures, or null if they have none. */
-    private function enrolledPoses(Employee $employee): ?array
-    {
-        $face = $this->faces->describe($employee->face_embeddings);
-
-        $poses = [];
-
-        foreach ($face['captures'] as $capture) {
-            if (in_array($capture['type'], ['left', 'right'], true)) {
-                $poses[$capture['type']] = $this->faces->normalize($capture['embedding']);
-            }
-        }
-
-        return isset($poses['left'], $poses['right']) ? $poses : null;
-    }
 
     /**
      * Both sides are normalised here rather than at the call sites. Normalising

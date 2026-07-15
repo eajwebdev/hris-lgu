@@ -78,71 +78,57 @@ return [
     |--------------------------------------------------------------------------
     |
     | A photograph passes every ordinary face check: it is a real face, correctly
-    | lit, the right size, looking at the lens. What a photograph cannot do is
-    | turn its head on demand.
+    | lit, the right size, looking at the lens. What a still photograph cannot do
+    | is move like a living face.
     |
-    | So the server issues a random, single-use challenge naming BOTH head turns
-    | in a random order, and verifies each returned frame against that employee's
-    | *enrolled* left and right captures. Demanding both poses matters: with only
-    | one, an attacker holding a single left-profile photo could simply keep
-    | asking for challenges until "left" came up.
+    | This build is FRONTAL ONLY — no head turns are asked for. The employee faces
+    | the camera and holds still while several frames are taken a moment apart, and
+    | the server proves liveness from the natural frame-to-frame drift of a real
+    | face: a living person is never perfectly still, so their descriptors vary,
+    | whereas a flat static photo held to the lens yields nearly the same vector
+    | every time (see 'min_variation'). The single-use challenge nonce is still
+    | issued and redeemed, so a captured payload cannot be replayed.
     |
     | None of this is enforced in the browser. The browser is untrusted — it only
-    | guides the person through the poses. Every check below runs on the server,
-    | against descriptors it can compare to what HR enrolled.
+    | gathers frames. Every check below runs on the server, against descriptors it
+    | can compare to what HR enrolled.
     |
-    | Honest limit: this defeats printed photos and static images. It does not
-    | defeat a video of the employee replayed on a phone screen, which can turn
-    | its head. Catching that needs a model that looks at pixels.
+    | Honest limit: frontal-only liveness defeats a printed or on-screen STILL
+    | photo. It does NOT defeat a video / live replay of the employee, which drifts
+    | like a real face. Where that matters, the QR path (encrypted token + 1:1 face
+    | verify) is the stronger option. Catching a replay attack would need a model
+    | that looks at pixels, which is not part of this system.
     |
     */
 
     'liveness' => [
-        // Frames the client must supply while facing the camera, before the poses.
-        // Two is enough to both confirm identity and measure the frame-to-frame
-        // variation that outs a static photo, and it shaves one full descriptor
-        // pass (plus its inter-frame pause) off every honest punch.
-        'min_neutral_frames' => 2,
+        // Frontal frames the client gathers while the employee faces the camera.
+        // More frames give the variation test below more to read and average the
+        // identity match over a steadier signal; five keeps the whole capture
+        // inside a second or two.
+        'min_neutral_frames' => 5,
 
         // Upper bound on the whole payload, so the endpoint cannot be used to
         // ship megabytes of vectors.
         'max_frames' => 12,
 
-        // A real person takes time to turn their head twice. Anything faster than
-        // this was not performed by a human in front of the lens.
-        'min_duration_ms' => 900,
+        // The frames must span at least this long — a spread of moments, not one
+        // instant cloned. No head turn to perform now, so this is short; it only
+        // rules out a payload whose frames all carry the same timestamp.
+        'min_duration_ms' => 500,
         'max_duration_ms' => 40000,
 
         // Seconds a challenge stays usable. Single-use regardless.
         'challenge_ttl' => 90,
 
-        // Consecutive frames of a live face never come out identical; a photo
-        // held in front of a tripod very nearly does. This is the floor on the
-        // largest pairwise distance among the neutral frames.
+        // The heart of the frontal anti-spoof. Consecutive frames of a live face
+        // never come out identical — the head drifts, the eyes move, sensor noise
+        // differs. A still photo held to the lens very nearly does. This is the
+        // floor on the largest pairwise distance among the frames: below it, the
+        // capture is treated as a static image and refused. Low enough that a
+        // living person clears it without trying, high enough that a flat photo
+        // (pairwise spread ~0.01–0.03) does not.
         'min_variation' => 0.045,
-
-        // The turned frame must sit closer to the enrolled capture of the pose
-        // that was ASKED FOR than to the opposite one, by at least this margin.
-        // This is the check a flat photo cannot pass.
-        //
-        // Kept small on purpose. A flat photo sits almost exactly equidistant
-        // from the left and right enrolled captures no matter how it is waved, so
-        // its margin is ~0 and it fails this at any positive value. The cost of an
-        // over-large margin is the opposite: it rejects a real, moderate head turn
-        // and spends the employee's attempt, which is the main reason an honest
-        // match "won't go through". 0.022 clears a genuine turn while still leaving
-        // a photo nowhere near.
-        'pose_margin' => 0.022,
-
-        // ...and it must actually differ from the neutral frames, i.e. the head
-        // genuinely moved rather than the photo being jiggled in place. A photo
-        // held still produces ~0 shift, so this stays a reliable tell well below
-        // the travel of any deliberate turn.
-        'min_pose_shift' => 0.055,
-
-        // A turned head legitimately sits further from enrolment than a straight
-        // one, so pose frames get a looser identity threshold than neutrals.
-        'pose_distance' => 0.78,
     ],
 
     /*

@@ -453,10 +453,10 @@
         ],
         'resetAfter' => (int) config('attendance.portal.reset_after', 5),
         'thresholds' => config('face.client'),
-        // Only how many frames to gather. Every threshold that decides whether the
-        // face is alive stays on the server, where it cannot be edited.
+        // Only how many frontal frames to gather. Every threshold that decides
+        // whether the face is alive stays on the server, where it cannot be edited.
         'liveness'   => [
-            'min_neutral_frames' => (int) config('face.liveness.min_neutral_frames', 3),
+            'frames' => (int) config('face.liveness.min_neutral_frames', 5),
         ],
     ];
 @endphp

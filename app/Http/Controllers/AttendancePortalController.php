@@ -102,7 +102,9 @@ class AttendancePortalController extends Controller
             'mode'                 => ['required', Rule::in(['face', 'qr'])],
             'action'               => ['required', Rule::in(['in', 'out'])],
             'nonce'                => ['required', 'string', 'max:64'],
-            'frames'               => ['required', 'array', 'min:4', 'max:' . $maxFrames],
+            'frames'               => ['required', 'array', 'min:3', 'max:' . $maxFrames],
+            // Frontal-only capture: every frame is a straight-ahead 'neutral'. The
+            // 'pose' union is kept so an older client mid-rollout still validates.
             'frames.*.stage'       => ['required', Rule::in(['neutral', 'pose'])],
             'frames.*.pose'        => ['nullable', Rule::in(['left', 'right'])],
             'frames.*.t'           => ['required', 'numeric'],
@@ -174,9 +176,9 @@ class AttendancePortalController extends Controller
             $distance = $match['distance'];
         }
 
-        // Only now, with an identity in hand, ask the question a photograph cannot
-        // answer: did this face turn its head the way we asked?
-        $refusal = $this->liveness->check($employee, $frames, $challenge['poses']);
+        // Only now, with an identity in hand, ask the question a still photo cannot
+        // answer: does this face drift frame-to-frame the way a living one does?
+        $refusal = $this->liveness->check($employee, $frames);
 
         if ($refusal !== null) {
             Log::warning('Portal liveness check failed.', [
