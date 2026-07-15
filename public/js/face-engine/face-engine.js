@@ -4,10 +4,12 @@
  * This is the module that replaced face-api.js. Everything the two capture UIs
  * (attendance portal, HR enrolment) need from a face stack comes through here:
  *
- *   FaceEngine.init(cfg)      — load both ONNX sessions and warm them up
+ *   FaceEngine.init(cfg)      — load the ONNX sessions and warm them up
  *   FaceEngine.detect(src, o) — SCRFD-500M: boxes + scores + 5 landmarks
  *   FaceEngine.embed(src, d)  — align on the landmarks, run ArcFace, get a
  *                               512-float L2-normalised embedding
+ *   FaceEngine.antispoof(src,d) — MiniFASNet: probability the face is a live
+ *                               person and not a printed photo or a screen
  *   FaceEngine.yawOf(lm)      — signed head-turn ratio from the 5 landmarks
  *
  * Models (vendored under /models/arcface, no CDN — this HRIS must work on the
@@ -53,6 +55,12 @@
     var REC_SIZE = 112;
     var STRIDES  = [8, 16, 32];  // SCRFD feature-pyramid strides, 2 anchors each
     var ANCHORS  = 2;
+
+    // MiniFASNet anti-spoof: a face crop expanded by this factor around the
+    // detection box, letterboxed to this square, RGB / 255. Its two-class output
+    // is [live, spoof]; index 0 is the probability the face is a real person.
+    var SPOOF_SIZE = 128;
+    var SPOOF_INC  = 1.5;
 
     // ------------------------------------------------------------- pure math
 
@@ -247,13 +255,16 @@
         ready: false,
         det: null,       // detection session
         rec: null,       // recognition session
+        spoof: null,     // anti-spoof session (may be absent)
         detInput: null,  // input tensor name of the detection graph
         recInput: null,
+        spoofInput: null,
         provider: null,  // 'webgpu' | 'wasm', for the console line
     };
 
     var work = null, workCtx = null;   // detector input canvas
     var crop = null, cropCtx = null;   // 112×112 aligned face crop
+    var anti = null, antiCtx = null;   // 128×128 anti-spoof crop
 
     function canvases() {
         if (!work) {
@@ -262,6 +273,9 @@
             crop = document.createElement('canvas');
             crop.width = crop.height = REC_SIZE;
             cropCtx = crop.getContext('2d', { willReadFrequently: true });
+            anti = document.createElement('canvas');
+            anti.width = anti.height = SPOOF_SIZE;
+            antiCtx = anti.getContext('2d', { willReadFrequently: true });
         }
     }
 
@@ -354,12 +368,28 @@
         state.detInput = state.det.inputNames[0];
         state.recInput = state.rec.inputNames[0];
 
+        // Anti-spoof is optional: if the model is absent or fails to load, the
+        // rest of the engine still works and antispoof() simply reports "unknown"
+        // rather than taking the whole kiosk down.
+        try {
+            state.spoof = await createSession(cfg.modelsUrl + '/antispoof.onnx');
+            state.spoofInput = state.spoof.inputNames[0];
+        } catch (e) {
+            state.spoof = null;
+            console.warn('anti-spoof model unavailable', e);
+        }
+
         // Warmup on zeros.
         var d = new ort.Tensor('float32', new Float32Array(3 * 320 * 320), [1, 3, 320, 320]);
         await state.det.run(inputFor(state.detInput, d));
 
         var r = new ort.Tensor('float32', new Float32Array(3 * REC_SIZE * REC_SIZE), [1, 3, REC_SIZE, REC_SIZE]);
         await state.rec.run(inputFor(state.recInput, r));
+
+        if (state.spoof) {
+            var a = new ort.Tensor('float32', new Float32Array(3 * SPOOF_SIZE * SPOOF_SIZE), [1, 3, SPOOF_SIZE, SPOOF_SIZE]);
+            await state.spoof.run(inputFor(state.spoofInput, a));
+        }
 
         state.ready = true;
     }
@@ -466,6 +496,79 @@
     }
 
     /**
+     * Probability, in [0, 1], that the face in the frame is a live person rather
+     * than a printed photo or an image on a screen. Returns null when the model
+     * is not loaded (so the caller can decide whether to fail open or closed).
+     *
+     * The crop is deliberately looser than the recognition one: MiniFASNet is
+     * trained on the face box expanded by 1.5×, so it sees the border between the
+     * face and whatever is behind it — the edge of a piece of paper, the bezel of
+     * a phone — which is a large part of how it tells a real face from a picture
+     * of one. Aligning tightly the way ArcFace wants would throw that signal away.
+     *
+     * Enforcement note: this runs in the browser because the pixels only exist in
+     * the browser — no image is sent to the server. In the locked-down kiosk
+     * WebView that is a real defence; on an open browser a tampered client could
+     * bypass it, exactly as it could feed a crafted descriptor. It raises the bar
+     * against the actual threat here — someone holding up a photo or a phone.
+     */
+    async function antispoof(source, detection) {
+        var ort = root.ort;
+
+        if (!state.spoof) return null;
+
+        canvases();
+
+        var s = srcSize(source);
+        var b = detection.box;
+
+        var cx = b.x + b.width / 2;
+        var cy = b.y + b.height / 2;
+        var nw = b.width * SPOOF_INC;
+        var nh = b.height * SPOOF_INC;
+
+        var sx = cx - nw / 2, sy = cy - nh / 2;
+
+        // Clamp the expanded box to the frame, then letterbox that clamped crop
+        // into the square, aspect preserved and centred — exactly the crop the
+        // model was trained on (increased_crop → resize-with-padding).
+        var cropX = Math.max(0, sx), cropY = Math.max(0, sy);
+        var cropR = Math.min(s.w, sx + nw), cropB = Math.min(s.h, sy + nh);
+        var cropW = cropR - cropX, cropH = cropB - cropY;
+
+        if (cropW <= 0 || cropH <= 0) return null;
+
+        var ratio = SPOOF_SIZE / Math.max(cropW, cropH);
+        var dw = Math.round(cropW * ratio), dh = Math.round(cropH * ratio);
+        var dx = Math.round((SPOOF_SIZE - dw) / 2), dy = Math.round((SPOOF_SIZE - dh) / 2);
+
+        antiCtx.fillStyle = '#000';
+        antiCtx.fillRect(0, 0, SPOOF_SIZE, SPOOF_SIZE);
+        antiCtx.drawImage(source, cropX, cropY, cropW, cropH, dx, dy, dw, dh);
+
+        var px = antiCtx.getImageData(0, 0, SPOOF_SIZE, SPOOF_SIZE).data;
+        var area = SPOOF_SIZE * SPOOF_SIZE;
+        var data = new Float32Array(3 * area);
+
+        // RGB planes, divided by 255 — MiniFASNet uses no mean/std normalisation.
+        for (var i = 0; i < area; i++) {
+            data[i]            = px[i * 4]     / 255;
+            data[area + i]     = px[i * 4 + 1] / 255;
+            data[2 * area + i] = px[i * 4 + 2] / 255;
+        }
+
+        var tensor = new ort.Tensor('float32', data, [1, 3, SPOOF_SIZE, SPOOF_SIZE]);
+        var results = await state.spoof.run(inputFor(state.spoofInput, tensor));
+        var logits = results[state.spoof.outputNames[0]].data;
+
+        // Two-class softmax; index 0 is "live". (Verified against the model.)
+        var m = Math.max(logits[0], logits[1]);
+        var e0 = Math.exp(logits[0] - m), e1 = Math.exp(logits[1] - m);
+
+        return e0 / (e0 + e1);
+    }
+
+    /**
      * Signed head-turn ratio from the five landmarks: how far the nose tip sits
      * from the eye midpoint, in units of interocular distance. ~0 facing the
      * camera; negative when the subject turns toward their own left (matching
@@ -487,6 +590,7 @@
         init: init,
         detect: detect,
         embed: embed,
+        antispoof: antispoof,
         yawOf: yawOf,
         get ready() { return state.ready; },
         get provider() { return state.provider; },

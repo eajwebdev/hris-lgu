@@ -521,6 +521,11 @@
         'liveness'   => [
             'frames' => (int) config('face.liveness.min_neutral_frames', 5),
         ],
+        // The browser gates locally on this; the server enforces it again.
+        'antispoof'  => [
+            'enabled'  => (bool) config('face.antispoof.enabled', true),
+            'minReal'  => (float) config('face.antispoof.min_real', 0.5),
+        ],
     ];
 @endphp
 <script id="portal-config" type="application/json">@json($portalConfig)</script>

@@ -358,6 +358,7 @@
     async function runSequence() {
         var t0     = performance.now();
         var frames = [];
+        var reals  = [];   // per-frame anti-spoof "live" probabilities
 
         // Still single-use: the nonce is redeemed server-side so a captured
         // payload cannot be replayed, even though we no longer ask for poses.
@@ -375,6 +376,8 @@
                 descriptor: Array.from(frame.descriptor),
             });
 
+            if (typeof frame.real === 'number') reals.push(frame.real);
+
             // Spaced out so consecutive frames are genuinely different moments —
             // that spread is exactly what the liveness check reads.
             await sleep(180);
@@ -382,7 +385,14 @@
 
         hideCue();
 
-        return { nonce: challenge.nonce, frames: frames };
+        // Average the live-probability across the frames. Averaging rather than
+        // taking the worst frame keeps one unlucky blurry frame from failing a
+        // real person, while a photo stays low across all of them.
+        var liveness = reals.length
+            ? reals.reduce(function (a, b) { return a + b; }, 0) / reals.length
+            : null;
+
+        return { nonce: challenge.nonce, frames: frames, liveness: liveness };
     }
 
     async function getChallenge() {
@@ -431,6 +441,9 @@
 
             if (full && poseHolds(full.landmarks, pose)) {
                 full.descriptor = await FaceEngine.embed(el.video, full);
+                // Same frame, judged by the anti-spoof model. null when the model
+                // is not loaded, in which case the check simply does not apply.
+                full.real = await FaceEngine.antispoof(el.video, full);
                 return full;
             }
 
@@ -457,6 +470,15 @@
         try {
             var run = await runSequence();
 
+            // Anti-spoof gate, client side. Blocked here means the punch is never
+            // even sent — a photo or a phone screen stops at the kiosk. Skipped
+            // only when the model produced no score at all (not loaded).
+            if (CONFIG.antispoof && CONFIG.antispoof.enabled &&
+                typeof run.liveness === 'number' && run.liveness < CONFIG.antispoof.minReal) {
+                fail('Please use your real face — a photo or phone screen was detected.');
+                return;
+            }
+
             setHint('Matching…', null);
 
             var payload = {
@@ -464,6 +486,7 @@
                 action: state.action,
                 nonce:  run.nonce,
                 frames: run.frames,
+                liveness_score: run.liveness,
                 geo:    freshGeo(),
             };
 

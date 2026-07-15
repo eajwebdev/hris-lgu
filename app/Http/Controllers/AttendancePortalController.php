@@ -131,6 +131,9 @@ class AttendancePortalController extends Controller
             'frames.*.descriptor'  => ['required', 'array', 'size:' . $dimension],
             'frames.*.descriptor.*'=> ['required', 'numeric'],
             'qr'                   => ['nullable', 'string', 'max:512', 'required_if:mode,qr'],
+            // Live-face probability from the browser's anti-spoof model. Nullable:
+            // the model may be absent, in which case the check does not apply.
+            'liveness_score'       => ['nullable', 'numeric', 'between:0,1'],
             // Optional on purpose: an employee with location services off can
             // still punch — the missing fix is itself recorded for HR to see.
             'geo'                  => ['nullable', 'array'],
@@ -210,6 +213,24 @@ class AttendancePortalController extends Controller
             return $this->fail($refusal, 403);
         }
 
+        // Anti-spoof. The browser already blocked an obvious photo/screen locally;
+        // this enforces the same threshold server-side and — more importantly —
+        // logs the score, so a run of low scores from one spot shows up for HR.
+        // A null score means the model was not available, so the check is skipped
+        // (the server cannot recompute it — the pixels never leave the browser).
+        $liveness = $validated['liveness_score'] ?? null;
+
+        if (config('face.antispoof.enabled', true) && $liveness !== null
+            && (float) $liveness < (float) config('face.antispoof.min_real', 0.5)) {
+            Log::warning('Portal anti-spoof rejected.', [
+                'emp_ID'   => $employee->emp_ID,
+                'liveness' => round((float) $liveness, 3),
+                'ip'       => $request->ip(),
+            ]);
+
+            return $this->fail('Spoof detected. Please use your real face, not a photo or screen.', 403);
+        }
+
         if ((int) $employee->stat_1 !== 1) {
             return $this->fail('This employee record is inactive. Please see HR.', 403);
         }
@@ -246,6 +267,7 @@ class AttendancePortalController extends Controller
             'action'   => $result['action'],
             'mode'     => $validated['mode'],
             'distance' => round((float) $distance, 4),
+            'liveness' => $liveness !== null ? round((float) $liveness, 3) : null,
             'station'  => $location['station_name'],
             'ip'       => $request->ip(),
         ]);

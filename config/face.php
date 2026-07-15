@@ -137,18 +137,41 @@ return [
         // Seconds a challenge stays usable. Single-use regardless.
         'challenge_ttl' => 90,
 
-        // The heart of the frontal anti-spoof. Consecutive frames of a live face
-        // never come out identical — the head drifts, the eyes move, sensor noise
-        // differs. A still photo held to the lens very nearly does. This is the
-        // floor on the largest pairwise distance among the frames: below it, the
-        // capture is treated as a static image and refused.
-        //
-        // ArcFace scale. ArcFace embeddings are steadier frame-to-frame than the
-        // old face-api descriptors were, and a flat photo is flatter still, so
-        // the floor stays low. FIELD-TUNE THIS FIRST if honest employees see
-        // "please use your face, not a photo": watch the logged distances and
-        // move the floor just under what live faces actually produce.
-        'min_variation' => 0.04,
+        // A weak secondary check: consecutive frames of a live face are never
+        // identical, while a photo held perfectly still is. This only catches a
+        // rigidly-held still image; the real work is done by the anti-spoof model
+        // below. Kept low so it never rejects a live employee.
+        'min_variation' => 0.02,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Anti-spoofing (MiniFASNet)
+    |--------------------------------------------------------------------------
+    |
+    | A trained model (public/models/arcface/antispoof.onnx) that looks at the
+    | face crop and its border and judges whether it is a live person or a
+    | picture of one — a printed photo, or a face shown on a phone or monitor.
+    | This is what the frame-variation check above cannot do: a photo waved in
+    | front of the lens varies frame to frame just like a face, but it still
+    | looks like a photo to this model.
+    |
+    | It runs in the browser (the pixels are only there; no image is sent to the
+    | server). In the locked kiosk WebView that is a real defence. The score is
+    | also sent to the server, which enforces the same threshold and logs it —
+    | so the policy lives here, in one place.
+    |
+    | 'min_real' is the probability-of-live floor. A genuine face scores very
+    | high (~0.95+); a photo or screen scores low. 0.5 is the model's own
+    | default. RAISE IT toward 0.7–0.8 if spoofs still get through; LOWER IT if
+    | real employees on a poor camera are being turned away. Watch the logged
+    | 'liveness' values to tune.
+    |
+    */
+
+    'antispoof' => [
+        'enabled'  => true,
+        'min_real' => 0.5,
     ],
 
     /*
@@ -203,12 +226,11 @@ return [
         // Yaw is measured on the raw, un-mirrored camera frame, where a negative
         // value means the subject turned toward their own left.
         //
-        // Shared by BOTH the registration module and the attendance portal, and
-        // it has to stay that way: the portal's liveness check compares a turned
-        // frame against the capture that registration filed as "left". If the two
-        // disagreed about which way left is, every honest employee would fail the
-        // check. Flip this once, here, if it reads backwards on your cameras.
-        'yaw_invert' => false,
+        // Flip this if "turn left" / "turn right" read backwards on your cameras
+        // during registration. Set true because on the deployment cameras the
+        // nose-offset yaw sign came out mirrored: the app was asking for the turn
+        // opposite to the arrow shown.
+        'yaw_invert' => true,
     ],
 
 ];
