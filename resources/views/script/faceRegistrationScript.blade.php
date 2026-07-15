@@ -74,9 +74,11 @@
             margin: 0;
             max-width: 100%;
             width: 100%;
+            height: 100vh;
             height: 100dvh;
         }
         #face-modal .modal-content {
+            height: 100vh;
             height: 100dvh;
             border: 0;
             border-radius: 0;
@@ -148,8 +150,8 @@
 
     /* Short landscape phones: same treatment triggered by height. */
     @media (max-height: 450px) and (max-width: 991.98px) {
-        #face-modal .modal-dialog { margin: 0; max-width: 100%; width: 100%; height: 100dvh; }
-        #face-modal .modal-content { height: 100dvh; border-radius: 0; }
+        #face-modal .modal-dialog { margin: 0; max-width: 100%; width: 100%; height: 100vh; height: 100dvh; }
+        #face-modal .modal-content { height: 100vh; height: 100dvh; border-radius: 0; }
         #face-modal .modal-body { overflow-y: auto; }
     }
 </style>

@@ -284,6 +284,19 @@ class AttendanceGeoTest extends TestCase
         $this->get(route('attendanceMonitor'))->assertStatus(403);
     }
 
+    public function test_the_settings_page_shows_the_stations_group(): void
+    {
+        $this->station();
+
+        $this->actingAs($this->admin(), 'web');
+
+        $this->get(route('settings'))
+            ->assertOk()
+            ->assertSee('Attendance Stations')
+            ->assertSee('Municipal Hall')
+            ->assertSee(route('stationStore'));
+    }
+
     // ---------------------------------------------------------------- monitor
 
     public function test_the_monitor_lists_todays_punches_with_their_flags(): void

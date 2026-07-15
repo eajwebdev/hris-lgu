@@ -1,0 +1,6 @@
+# Model weights never change in place — a new model would ship under a new
+# filename. Long immutable caching means the kiosk phone downloads these ~7 MB
+# once, and every later visit starts instantly even on slow LAN/mobile links.
+<IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>

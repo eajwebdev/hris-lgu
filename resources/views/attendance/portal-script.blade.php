@@ -827,6 +827,13 @@
         return true;
     };
 
+    // A fix the app pushed while the page was still parsing landed in the head
+    // stub's buffer — consume it now that the real implementation exists.
+    if (window.__pendingGeo) {
+        window.setPortalLocation.apply(null, window.__pendingGeo);
+        delete window.__pendingGeo;
+    }
+
     // ---------------------------------------------------------------- warmup
 
     /**

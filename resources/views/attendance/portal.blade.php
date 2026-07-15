@@ -12,6 +12,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="robots" content="noindex, nofollow">
 
+    {{-- Stub for the Android WebView's native location bridge. The wrapper app
+         pushes fixes with evaluateJavascript("window.setPortalLocation(...)") and
+         may fire before the main script at the end of <body> has parsed — this
+         buffers such a fix so it is consumed, not lost, the moment the real
+         implementation replaces this stub. --}}
+    <script>
+        window.setPortalLocation = function (lat, lng, accuracy) {
+            window.__pendingGeo = [lat, lng, accuracy];
+            return true;
+        };
+    </script>
+
     <title>Attendance — LGU Mabinay</title>
 
     <link rel="shortcut icon" href="{{ asset('mabinay-logo.png') }}">
@@ -50,7 +62,8 @@
         .portal {
             display: flex;
             flex-direction: column;
-            height: 100dvh;
+            height: 100vh;
+            height: 100dvh; /* newer engines; the vh line above is the fallback */
             max-width: 560px;
             margin: 0 auto;
             position: relative;

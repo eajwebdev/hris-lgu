@@ -1,0 +1,5 @@
+# Vendored library, pinned version — cache hard. A version bump ships as a new
+# file, not an overwrite.
+<IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>
