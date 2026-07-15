@@ -30,6 +30,10 @@
         go:        document.getElementById('go'),
         goText:    document.getElementById('go-text'),
         modeBtn:   document.getElementById('mode-toggle'),
+        modeIcon:  document.getElementById('mode-toggle-icon'),
+        geohud:    document.getElementById('geohud'),
+        geoDist:   document.getElementById('geo-distance'),
+        geoCoords: document.getElementById('geo-coords'),
         named:     document.getElementById('named'),
         namedName: document.getElementById('named-name'),
         namedPos:  document.getElementById('named-pos'),
@@ -76,19 +80,12 @@
 
     /**
      * Head turn as a signed, scale-free ratio. Negative means the subject has
-     * turned toward their own left.
+     * turned toward their own left. The measure itself (nose offset from the
+     * eye midpoint over interocular distance) lives in the engine; only the
+     * camera-orientation flip is applied here.
      */
     function yawOf(landmarks) {
-        var jaw  = landmarks.getJawOutline();
-        var nose = landmarks.getNose()[3];
-
-        var left  = nose.x - jaw[0].x;
-        var right = jaw[16].x - nose.x;
-        var total = left + right;
-
-        if (total <= 0) return 0;
-
-        var yaw = (right - left) / total;
+        var yaw = FaceEngine.yawOf(landmarks);
 
         return YAW_INVERT ? -yaw : yaw;
     }
@@ -169,12 +166,12 @@
         if (detections.length > 1) return { ok: false, message: 'Only one person should be visible' };
 
         var d = detections[0];
-        var box = d.detection.box;
+        var box = d.box;
 
         if (box.width / el.video.videoWidth < T.min_face_ratio) {
             return { ok: false, message: 'Please move closer to the camera', detection: d };
         }
-        if (d.detection.score < T.min_detection_score) {
+        if (d.score < T.min_detection_score) {
             return { ok: false, message: 'Please position your face properly', detection: d };
         }
         if (brightnessOf(box) < T.min_brightness) {
@@ -208,7 +205,7 @@
 
         if (!detection) return;
 
-        var b = detection.detection.box;
+        var b = detection.box;
         ctx.lineWidth = 4;
         ctx.strokeStyle = ok ? '#22C55E' : '#F97316';
         ctx.strokeRect(b.x, b.y, b.width, b.height);
@@ -216,21 +213,20 @@
 
     // ---------------------------------------------------------------- detectors
 
-    // 256 for the preview loop: the framing gate already demands a face filling a
-    // fifth of the frame, and a face that size is trivially found at 256 — at
-    // roughly 60% the cost of 320, which is the difference between a smooth and a
-    // stuttering preview on a cheap phone.
-    var cheapOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 256, scoreThreshold: 0.3 });
-    var fullOptions  = new faceapi.TinyFaceDetectorOptions({ inputSize: 416 });
-
-    /** Landmarks only — cheap enough to poll while the person moves. */
+    /**
+     * 320 for the preview loop: the framing gate already demands a face filling
+     * a fifth of the frame, and SCRFD finds a face that size trivially at 320 —
+     * cheap enough to keep the preview smooth on a low-end phone. The permissive
+     * score lets a rejected-but-seen face through so the gate can say WHY it is
+     * being refused instead of just "no face".
+     */
     function detectCheap() {
-        return faceapi.detectAllFaces(el.video, cheapOptions).withFaceLandmarks();
+        return FaceEngine.detect(el.video, { size: 320, scoreThreshold: 0.35 });
     }
 
-    /** Landmarks + the 128-float descriptor. The expensive one, run sparingly. */
+    /** The capture pass: tighter boxes and cleaner landmarks at 640. */
     function detectFull() {
-        return faceapi.detectSingleFace(el.video, fullOptions).withFaceLandmarks().withFaceDescriptor();
+        return FaceEngine.detect(el.video, { size: 640, scoreThreshold: 0.45 });
     }
 
     // ---------------------------------------------------------------- QR
@@ -428,9 +424,13 @@
 
             setHint('Hold still…', 'ok');
 
-            var full = await detectFull();
+            // The quality pass, then the embedding — and the pose is re-checked
+            // on the fresh detection, because the head may have drifted in the
+            // milliseconds between.
+            var full = (await detectFull())[0];
 
             if (full && poseHolds(full.landmarks, pose)) {
+                full.descriptor = await FaceEngine.embed(el.video, full);
                 return full;
             }
 
@@ -541,7 +541,8 @@
                 ? (location.distance_m / 1000).toFixed(1) + ' km'
                 : location.distance_m + ' m';
 
-            return 'Recorded ' + d + ' from ' + location.station_name;
+            return 'Recorded ' + d + ' from ' + location.station_name
+                 + ' — flagged for HR clarification.';
         }
 
         if (location.out_of_range === false) {
@@ -618,9 +619,11 @@
         el.guideOval.classList.toggle('d-none', qr);
         el.guideBox.classList.toggle('d-none', !qr);
 
-        el.modeBtn.innerHTML = (qr || mode === 'qrface')
-            ? '<i class="fas fa-user"></i>&nbsp; Use face only instead'
-            : '<i class="fas fa-qrcode"></i>&nbsp; Scan QR first — faster and more accurate';
+        // Icon-only switch pinned over the camera: show what tapping it goes TO.
+        var toQr = !(qr || mode === 'qrface');
+        el.modeIcon.className = toQr ? 'fas fa-qrcode' : 'fas fa-user';
+        el.modeBtn.title = toQr ? 'Scan QR instead' : 'Use face only instead';
+        el.modeBtn.setAttribute('aria-label', el.modeBtn.title);
 
         if (mode !== 'qrface') {
             el.named.classList.add('d-none');
@@ -758,7 +761,75 @@
         }
     });
 
-    // ---------------------------------------------------------------- geo
+    // ---------------------------------------------------------------- geo HUD
+
+    /**
+     * Metres between two coordinates — the same haversine GeoService runs on
+     * the server. The HUD must agree with what HR will later see on the punch,
+     * or the employee gets told one distance and flagged at another.
+     */
+    function haversine(lat1, lng1, lat2, lng2) {
+        var rad = Math.PI / 180, earth = 6371000;
+        var dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
+        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+              + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 2 * earth * Math.asin(Math.min(1, Math.sqrt(a)));
+    }
+
+    function nearestStation(lat, lng) {
+        var best = null, shortest = Infinity;
+
+        (CONFIG.stations || []).forEach(function (s) {
+            var d = haversine(lat, lng, s.lat, s.lng);
+            if (d < shortest) { shortest = d; best = s; }
+        });
+
+        return best ? { station: best, distance: Math.round(shortest) } : null;
+    }
+
+    function fmtMeters(m) {
+        return m >= 1000 ? (m / 1000).toFixed(1) + ' km' : m + ' m';
+    }
+
+    /**
+     * The live location readout over the camera: nearest station, distance, and
+     * the raw fix. Amber when outside the station radius — with the reassurance
+     * that the punch still counts, just flagged for HR. Courtesy only: the
+     * server re-derives all of this at punch time.
+     */
+    function updateGeoHud() {
+        el.geohud.classList.remove('geohud--ok', 'geohud--far');
+
+        if (!state.geo) {
+            el.geoDist.textContent = 'Location off — punch is recorded without location';
+            el.geoCoords.textContent = 'Lat —, Lng —';
+            return;
+        }
+
+        el.geoCoords.textContent =
+            'Lat ' + state.geo.lat.toFixed(5) + ', Lng ' + state.geo.lng.toFixed(5) +
+            (state.geo.accuracy ? '  (±' + Math.round(state.geo.accuracy) + ' m)' : '');
+
+        var near = nearestStation(state.geo.lat, state.geo.lng);
+
+        if (!near) {
+            el.geoDist.textContent = 'No attendance station configured';
+            return;
+        }
+
+        if (near.distance <= near.station.radius_m) {
+            el.geohud.classList.add('geohud--ok');
+            el.geoDist.textContent = near.station.name + ' · ' + fmtMeters(near.distance) + ' away — within range';
+        } else {
+            el.geohud.classList.add('geohud--far');
+            el.geoDist.textContent = fmtMeters(near.distance) + ' from ' + near.station.name + ' — outside station range';
+        }
+    }
+
+    updateGeoHud();
+    // A fix that ages out of the 2-minute punch window should stop reading as
+    // live; a slow refresh keeps the HUD honest without burning the battery.
+    setInterval(updateGeoHud, 15000);
 
     /**
      * Keep a rolling GPS fix so the punch doesn't have to sit and wait for one.
@@ -778,8 +849,11 @@
                 accuracy: pos.coords.accuracy,
                 at:       Date.now(),
             };
+
+            updateGeoHud();
         }, function () {
             /* leave state.geo as-is; a stale fix beats none */
+            updateGeoHud();
         }, { enableHighAccuracy: true, maximumAge: 20000, timeout: 15000 });
     }
 
@@ -824,6 +898,8 @@
             at:       Date.now(),
         };
 
+        updateGeoHud();
+
         return true;
     };
 
@@ -834,33 +910,7 @@
         delete window.__pendingGeo;
     }
 
-    // ---------------------------------------------------------------- warmup
-
-    /**
-     * TF.js compiles its WebGL shaders on first inference, which turns the very
-     * first real detection into a multi-second stall on a phone. Running each net
-     * once against a blank canvas moves that stall into boot, behind the veil,
-     * where nobody is standing in front of the camera waiting on it.
-     */
-    async function warmupModels() {
-        try {
-            var c = document.createElement('canvas');
-            c.width = c.height = 256;
-            c.getContext('2d').fillRect(0, 0, 256, 256);
-
-            await faceapi.detectAllFaces(c, cheapOptions);
-
-            var c150 = document.createElement('canvas');
-            c150.width = c150.height = 150;
-            c150.getContext('2d').fillRect(0, 0, 150, 150);
-
-            await faceapi.nets.faceLandmark68Net.detectLandmarks(c150);
-            await faceapi.nets.faceRecognitionNet.computeFaceDescriptor(c150);
-        } catch (e) {
-            // Warmup is an optimisation; a failure here must never block boot.
-            console.warn('model warmup skipped', e);
-        }
-    }
+    // ---------------------------------------------------------------- boot
 
     (async function boot() {
         paintAction();
@@ -872,14 +922,16 @@
         startGeoWatch();
 
         // Camera and models in parallel: the preview appears as soon as the
-        // camera grants, and the loop simply says "loading" until the nets are
-        // warm instead of holding the whole screen hostage.
-        Promise.all([
-            faceapi.nets.tinyFaceDetector.loadFromUri(CONFIG.modelsUrl),
-            faceapi.nets.faceLandmark68Net.loadFromUri(CONFIG.modelsUrl),
-            faceapi.nets.faceRecognitionNet.loadFromUri(CONFIG.modelsUrl),
-        ]).then(warmupModels).then(function () {
+        // camera grants, and the loop simply says "loading" until the engine is
+        // warm instead of holding the whole screen hostage. init() loads both
+        // ONNX sessions (WebGPU where available, WASM otherwise) and runs one
+        // warmup inference each, so the first real frame pays no compile stall.
+        FaceEngine.init({
+            modelsUrl: CONFIG.modelsUrl,
+            ortPath:   CONFIG.ortPath,
+        }).then(function () {
             state.modelsReady = true;
+            console.info('FaceEngine ready on ' + FaceEngine.provider);
         }).catch(function (e) {
             console.error(e);
             veil('Could not load face recognition. Check your connection and reload.');

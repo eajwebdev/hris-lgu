@@ -4,15 +4,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Descriptor dimension
+    | Embedding dimension
     |--------------------------------------------------------------------------
     |
-    | face-api.js FaceRecognitionNet emits a 128-float descriptor. Every vector
-    | we accept, average or compare is checked against this length.
+    | The ArcFace recognition model (w600k_mbf.onnx, run in the browser on ONNX
+    | Runtime Web) emits a 512-float embedding. Every vector we accept, average
+    | or compare is checked against this length.
+    |
+    | MIGRATION NOTE: the previous engine (face-api.js) produced 128-float
+    | descriptors. The two are mathematically incompatible — a 128-d enrolment
+    | cannot be compared to, or converted into, a 512-d ArcFace embedding. Any
+    | employee enrolled under the old engine shows as "not registered" (the
+    | length check filters their stored vectors out everywhere) and must be
+    | re-registered through the Face Recognition page.
     |
     */
 
-    'dimension' => 128,
+    'dimension' => 512,
 
     /*
     |--------------------------------------------------------------------------
@@ -40,12 +48,15 @@ return [
     | Higher = looser (catches more duplicates, risks blocking lookalikes such
     |          as identical twins, which this system cannot separate anyway).
     |
-    | 0.55 euclidean is a deliberately conservative starting point; face-api's
-    | own same-person guideline is ~0.6 on raw descriptors.
+    | ArcFace scale. Distances live on the unit sphere (d² = 2 − 2·cosine), and
+    | ArcFace spreads people much further apart than face-api did: same person
+    | across sessions typically lands at cosine 0.55+ (d ≤ ~0.95), different
+    | people below cosine 0.3 (d ≥ ~1.18). 1.0 (cosine 0.5) sits between with
+    | margin on both sides.
     |
     */
 
-    'duplicate_distance' => 0.55,
+    'duplicate_distance' => 1.0,
 
     /*
     |--------------------------------------------------------------------------
@@ -64,10 +75,15 @@ return [
     | 'shortlist' caps how many candidates get the expensive per-capture refine
     | pass after the cheap master-embedding scan.
     |
+    | ArcFace scale (see the duplicate_distance note): 1.10 euclidean is cosine
+    | ≈ 0.40, a standard acceptance point for this model family. The ratio test
+    | is unchanged — it is scale-free, and ArcFace's wider person-to-person
+    | separation only makes it bite harder.
+    |
     */
 
     'match' => [
-        'distance'  => 0.62,
+        'distance'  => 1.10,
         'ratio'     => 0.78,
         'shortlist' => 24,
     ],
@@ -125,10 +141,14 @@ return [
         // never come out identical — the head drifts, the eyes move, sensor noise
         // differs. A still photo held to the lens very nearly does. This is the
         // floor on the largest pairwise distance among the frames: below it, the
-        // capture is treated as a static image and refused. Low enough that a
-        // living person clears it without trying, high enough that a flat photo
-        // (pairwise spread ~0.01–0.03) does not.
-        'min_variation' => 0.045,
+        // capture is treated as a static image and refused.
+        //
+        // ArcFace scale. ArcFace embeddings are steadier frame-to-frame than the
+        // old face-api descriptors were, and a flat photo is flatter still, so
+        // the floor stays low. FIELD-TUNE THIS FIRST if honest employees see
+        // "please use your face, not a photo": watch the logged distances and
+        // move the floor just under what live faces actually produce.
+        'min_variation' => 0.04,
     ],
 
     /*
@@ -143,11 +163,12 @@ return [
     */
 
     'client' => [
-        // TinyFaceDetector confidence below which we refuse to capture.
-        'min_detection_score' => 0.55,
+        // SCRFD confidence below which we refuse to capture. SCRFD's usual
+        // operating threshold is 0.5; confident real faces score well above it.
+        'min_detection_score' => 0.50,
 
         // Face box width as a fraction of the video width. Under this the face
-        // is too far away for a usable descriptor.
+        // is too far away for a usable embedding.
         'min_face_ratio' => 0.20,
 
         // Mean luma (0-255) inside the face box. Under this it is too dark.
@@ -155,24 +176,28 @@ return [
 
         // Variance of a Laplacian filter over the face crop (64x64 grayscale).
         // Motion blur flattens edges and drags this toward zero; a blurred frame
-        // yields a mushy descriptor that degrades every later match, so it is
+        // yields a mushy embedding that degrades every later match, so it is
         // cheaper to refuse the frame than to enrol it. Deliberately low — it is
         // an obvious-blur catch, not a focus meter. Kept low so a cheap phone
         // camera is not made to re-capture "hold still" over and over — that
         // re-capture loop is dead time an employee reads as the portal hanging.
         'min_sharpness' => 14,
 
+        // Yaw is now the nose tip's offset from the eye midpoint in units of
+        // interocular distance (SCRFD gives 5 landmarks, not 68). ~0 facing the
+        // camera, roughly ±0.5 at a strong turn — a different scale from the old
+        // jaw-based measure, hence the re-tuned values below.
+
         // |yaw| under this counts as looking straight at the camera.
-        'front_yaw_max' => 0.20,
+        'front_yaw_max' => 0.15,
 
         // |yaw| over this counts as a deliberate head turn.
-        'turn_yaw_min' => 0.18,
+        'turn_yaw_min' => 0.22,
 
-        // Eye-aspect-ratio under this is a closed eye (used to spot a blink).
-        'blink_ear_max' => 0.21,
-
-        // Landmark travel, in fractions of face width, that counts as movement
-        // when the employee moves their head instead of blinking.
+        // Landmark travel, in fractions of face width, that counts as movement.
+        // NOTE: blink detection is gone with the engine swap — 5 landmarks carry
+        // no eye contour — so the registration "movement" step is satisfied by
+        // head movement alone.
         'movement_min' => 0.06,
 
         // Yaw is measured on the raw, un-mirrored camera frame, where a negative

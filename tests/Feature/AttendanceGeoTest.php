@@ -15,7 +15,8 @@ use Tests\TestCase;
 /**
  * The geo layer: stations, the punch tag, and the HR monitor.
  *
- * The face fixtures mirror AttendancePortalTest: a person is a random 128-vector
+ * The face fixtures mirror AttendancePortalTest: a person is a random vector
+ * at the configured embedding dimension
  * and a head turn adds a shared pose direction, which is the property the
  * server's liveness check verifies.
  */
@@ -45,13 +46,19 @@ class AttendanceGeoTest extends TestCase
 
     // ---------------------------------------------------------------- fixtures
 
+    /** The embedding dimension under test — whatever the config says it is. */
+    private function dim(): int
+    {
+        return (int) config('face.dimension');
+    }
+
     private function randomVector(int $seed): array
     {
         mt_srand($seed);
 
         $vector = [];
 
-        for ($i = 0; $i < 128; $i++) {
+        for ($i = 0; $i < $this->dim(); $i++) {
             $vector[] = (mt_rand() / mt_getrandmax()) - 0.5;
         }
 
@@ -65,14 +72,14 @@ class AttendanceGeoTest extends TestCase
         if ($pose !== null) {
             $direction = $this->randomVector($pose === 'left' ? 770001 : 770002);
 
-            for ($i = 0; $i < 128; $i++) {
+            for ($i = 0; $i < $this->dim(); $i++) {
                 $vector[$i] += self::POSE_STRENGTH * $direction[$i];
             }
         }
 
         $noise = $this->randomVector($jitter);
 
-        for ($i = 0; $i < 128; $i++) {
+        for ($i = 0; $i < $this->dim(); $i++) {
             $vector[$i] += $noise[$i] * $amplitude * 2;
         }
 

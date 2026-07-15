@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\AttendancePunchLog;
+use App\Models\AttendanceStation;
 use App\Models\Employee;
+use App\Models\Notification;
 use App\Services\AttendanceService;
 use App\Services\FaceEmbeddingService;
 use App\Services\GeoService;
@@ -40,7 +42,25 @@ class AttendancePortalController extends Controller
     public function show()
     {
         return view('attendance.portal', [
-            'modelsUrl' => asset('models/face-api'),
+            // The SCRFD detector + ArcFace recogniser, run in-browser on ONNX
+            // Runtime Web. ortPath is where the runtime's .wasm binaries live.
+            'modelsUrl' => asset('models/arcface'),
+            'ortPath'   => asset('js/onnx') . '/',
+
+            // The active stations, so the kiosk can show live "how far am I"
+            // feedback before the punch. Coordinates of public government
+            // buildings — nothing sensitive — and only what the HUD needs.
+            // The judgement that matters is still made server-side in
+            // GeoService against this same table; the HUD is a courtesy.
+            'stations'  => AttendanceStation::active()
+                ->get(['name', 'lat', 'lng', 'radius_m'])
+                ->map(fn ($s) => [
+                    'name'     => $s->name,
+                    'lat'      => (float) $s->lat,
+                    'lng'      => (float) $s->lng,
+                    'radius_m' => (int) $s->radius_m,
+                ])
+                ->values(),
         ]);
     }
 
@@ -249,7 +269,7 @@ class AttendancePortalController extends Controller
         $tag = $this->geo->resolve($lat, $lng);
 
         if ($result['recorded']) {
-            AttendancePunchLog::create([
+            $log = AttendancePunchLog::create([
                 'employee_id'  => $employee->id,
                 'emp_ID'       => $employee->emp_ID,
                 'action'       => $validated['action'],
@@ -265,6 +285,20 @@ class AttendancePortalController extends Controller
                 'out_of_range' => $tag['out_of_range'],
                 'ip_address'   => $request->ip(),
             ]);
+
+            // An out-of-range punch is recorded, never blocked — field work is a
+            // fact of LGU life. What it does do is ring HR's bell, so the "where
+            // were you" conversation starts from a notification with the distance
+            // on it rather than from someone's memory a week later.
+            if ($tag['out_of_range'] === true) {
+                Notification::create([
+                    'empid'   => $employee->emp_ID,
+                    'lapp_id' => $log->id,
+                    'utype'   => 'hr',
+                    'module'  => 'attendance',
+                    'status'  => 0,
+                ]);
+            }
         }
 
         return [

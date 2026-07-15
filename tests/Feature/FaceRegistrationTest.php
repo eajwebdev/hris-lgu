@@ -30,14 +30,20 @@ class FaceRegistrationTest extends TestCase
 
     // ---------------------------------------------------------------- helpers
 
-    /** A deterministic pseudo-descriptor standing in for one person's face. */
+    /** The embedding dimension under test — whatever the config says it is. */
+    private function dim(): int
+    {
+        return (int) config('face.dimension');
+    }
+
+    /** A deterministic pseudo-embedding standing in for one person's face. */
     private function face(int $seed, float $noise = 0.0): array
     {
         mt_srand($seed);
 
         $vector = [];
 
-        for ($i = 0; $i < 128; $i++) {
+        for ($i = 0; $i < $this->dim(); $i++) {
             $vector[] = (mt_rand() / mt_getrandmax()) - 0.5;
         }
 
@@ -45,7 +51,7 @@ class FaceRegistrationTest extends TestCase
             // A different capture of the *same* face: same vector, jittered.
             mt_srand($seed + 9999);
 
-            for ($i = 0; $i < 128; $i++) {
+            for ($i = 0; $i < $this->dim(); $i++) {
                 $vector[$i] += ((mt_rand() / mt_getrandmax()) - 0.5) * $noise;
             }
         }
@@ -119,7 +125,7 @@ class FaceRegistrationTest extends TestCase
 
         // The shape the spec asks for.
         $this->assertSame(['front', 'left', 'right', 'movement'], array_column($stored['captures'], 'type'));
-        $this->assertCount(128, $stored['master_embedding']);
+        $this->assertCount($this->dim(), $stored['master_embedding']);
         $this->assertNotEmpty($stored['registered_at']);
         $this->assertSame($this->admin()->id, $stored['registered_by']);
 
@@ -128,8 +134,8 @@ class FaceRegistrationTest extends TestCase
 
         $vector = EmployeeFaceVector::where('employee_id', $this->employee->id)->firstOrFail();
 
-        $this->assertSame(128, $vector->embedding_dimension);
-        $this->assertCount(128, $vector->master_embedding);
+        $this->assertSame($this->dim(), $vector->embedding_dimension);
+        $this->assertCount($this->dim(), $vector->master_embedding);
 
         // Stored on the unit sphere, which is what lets one distance threshold
         // hold everywhere.
@@ -264,7 +270,8 @@ class FaceRegistrationTest extends TestCase
             ->assertOk()
             ->assertSee('FACE RECOGNITION REGISTRATION')
             ->assertSee('Register Face')
-            ->assertSee('js/face-api/face-api.min.js')
+            ->assertSee('js/onnx/ort.all.min.js')
+            ->assertSee('js/face-engine/face-engine.js')
             ->getContent();
 
         $this->assertStringContainsString('id="face-status-registered" class="d-none"', $before);
@@ -336,8 +343,8 @@ class FaceRegistrationTest extends TestCase
 
     /**
      * Biometric enrolment is its own thing, not a field on the PDS. The panel and
-     * its 1.3 MB of face-api must not ride along on Personal Information — which
-     * every employee can open.
+     * its megabytes of face models must not ride along on Personal Information —
+     * which every employee can open.
      */
     public function test_personal_information_no_longer_carries_the_face_panel(): void
     {
@@ -347,7 +354,7 @@ class FaceRegistrationTest extends TestCase
             ->assertOk()
             ->assertSee('PERSONAL INFORMATION')
             ->assertDontSee('FACE RECOGNITION REGISTRATION')
-            ->assertDontSee('js/face-api/face-api.min.js');
+            ->assertDontSee('js/face-engine/face-engine.js');
     }
 
     /** ...and it now has its own entry in the submenu, next to E-Signature. */

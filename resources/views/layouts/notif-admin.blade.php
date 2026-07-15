@@ -203,7 +203,34 @@
                                     {{ $timeDifference }}
                                 </span>
                             </div>
-                        </a>                        
+                        </a>
+                    @break
+
+                    {{-- Out-of-range attendance punch — recorded, never blocked, but
+                         flagged here so HR can ask for clarification. --}}
+                    @case('attendance')
+                        @php
+                            $attDistance = $notif->att_distance_m >= 1000
+                                ? round($notif->att_distance_m / 1000, 1) . ' km'
+                                : ($notif->att_distance_m ?? '?') . ' m';
+                            $attAction = $notif->att_action === 'out' ? 'clocked OUT' : 'clocked IN';
+                            $remarks = "{$attAction} {$attDistance} from {$notif->att_station_name} — outside station range, for clarification.";
+                        @endphp
+                        <a href="{{ route('attendanceMonitor') }}" class="dropdown-item d-flex align-items-center">
+                            <div class="mr-3">
+                                <span class="notification-initials" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A;">
+                                    <i class="fas fa-location-dot"></i>
+                                </span>
+                            </div>
+                            <div>
+                                <p class="mb-0">
+                                    <strong>{{ ucwords(strtolower($notif->att_emp_fullname ?? 'Unknown employee')) }}</strong> {{ $remarks }}
+                                </p>
+                                <span class="{{ $notif->notifstat == 0 ? 'text-primary font-weight-bold' : 'text-muted' }} text-sm">
+                                    {{ $timeDifference }}
+                                </span>
+                            </div>
+                        </a>
                     @break
                 @endswitch
             

@@ -231,6 +231,24 @@ class NotificationController extends Controller
                 \DB::raw("CONCAT(pds_emp_learndev.fname, ' ', pds_emp_learndev.lname) as pds_emp_learndev_fullname")
             )
 
+            // ATTENDANCE (out-of-range punches flagged for clarification)
+            ->leftJoin('attendance_punch_logs as att_log', function ($join) {
+                $join->on('notifications.lapp_id', '=', 'att_log.id')
+                    ->where('notifications.module', 'attendance');
+            })
+            ->leftJoin('employees as att_emp', function ($join) {
+                $join->on('att_emp.id', '=', 'att_log.employee_id')
+                    ->where('notifications.module', 'attendance');
+            })
+            ->addSelect(
+                'att_emp.id as att_emp_id',
+                'att_emp.profile as att_emp_profile',
+                'att_log.action as att_action',
+                'att_log.station_name as att_station_name',
+                'att_log.distance_m as att_distance_m',
+                \DB::raw("CONCAT(att_emp.fname, ' ', att_emp.lname) as att_emp_fullname")
+            )
+
             ->orderBy('notifications.created_at', 'desc')
             ->skip($offset)
             ->take($limit)

@@ -13,7 +13,9 @@
         'front'    => ['label' => 'Front Face',       'icon' => 'fa-user',        'hint' => 'Look directly at the camera'],
         'left'     => ['label' => 'Left Angle',       'icon' => 'fa-arrow-left',  'hint' => 'Turn your head slightly to the left'],
         'right'    => ['label' => 'Right Angle',      'icon' => 'fa-arrow-right', 'hint' => 'Turn your head slightly to the right'],
-        'movement' => ['label' => 'Natural Movement', 'icon' => 'fa-eye',         'hint' => 'Blink or slightly move your face'],
+        {{-- Head movement only: the 5-point landmarks the SCRFD detector gives
+             carry no eye contour, so a blink cannot be seen anymore. --}}
+        'movement' => ['label' => 'Natural Movement', 'icon' => 'fa-arrows-alt',  'hint' => 'Slightly move your head'],
     ];
 @endphp
 
@@ -114,9 +116,9 @@
                     {{-- Camera --}}
                     <div class="col-lg-7 face-col-camera">
                         <div class="face-stage">
-                            {{-- Mirrored for the subject's benefit only. face-api reads the
-                                 raw video frame, so the CSS transform never touches the
-                                 geometry the checks are computed from. --}}
+                            {{-- Mirrored for the subject's benefit only. The face engine
+                                 reads the raw video frame, so the CSS transform never
+                                 touches the geometry the checks are computed from. --}}
                             <video id="face-video" autoplay muted playsinline></video>
                             <canvas id="face-overlay"></canvas>
 
@@ -210,7 +212,8 @@
         'employeeId'   => $employee->id,
         'employeeName' => trim("{$employee->fname} {$employee->lname}"),
         'registered'   => $face['registered'],
-        'modelsUrl'    => asset('models/face-api'),
+        'modelsUrl'    => asset('models/arcface'),
+        'ortPath'      => asset('js/onnx') . '/',
         'urls'         => [
             'store'  => route('faceRegister', $employee->id),
             'remove' => route('faceRemove', $employee->id),

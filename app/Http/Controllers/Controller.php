@@ -247,7 +247,15 @@ class Controller extends BaseController
 
                 'pds_emp_learndev.emp_ID as pds_emp_learndev_id',
                 'pds_emp_learndev.profile as pds_emp_learndev_profile',
-                DB::raw("CONCAT(pds_emp_learndev.fname, ' ', pds_emp_learndev.lname) as pds_emp_learndev_fullname")
+                DB::raw("CONCAT(pds_emp_learndev.fname, ' ', pds_emp_learndev.lname) as pds_emp_learndev_fullname"),
+
+                // Out-of-range attendance punches (module 'attendance').
+                'att_emp.id as att_emp_id',
+                'att_emp.profile as att_emp_profile',
+                'att_log.action as att_action',
+                'att_log.station_name as att_station_name',
+                'att_log.distance_m as att_distance_m',
+                DB::raw("CONCAT(att_emp.fname, ' ', att_emp.lname) as att_emp_fullname")
             )
             ->where('utype', 'hr')
             ->leftJoin('leave_applications', function ($join) {
@@ -297,6 +305,14 @@ class Controller extends BaseController
                 $join->on('pds_emp_learndev.emp_ID', '=', 'learning_devs.empid')
                     ->where('notifications.category', 4)
                     ->where('notifications.module', 'pds');
+            })
+            ->leftJoin('attendance_punch_logs as att_log', function ($join) {
+                $join->on('notifications.lapp_id', '=', 'att_log.id')
+                    ->where('notifications.module', 'attendance');
+            })
+            ->leftJoin('employees as att_emp', function ($join) {
+                $join->on('att_emp.id', '=', 'att_log.employee_id')
+                    ->where('notifications.module', 'attendance');
             })
             ->orderBy('notifications.created_at', 'desc')
             ->limit(10)

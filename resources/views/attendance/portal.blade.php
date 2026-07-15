@@ -26,7 +26,7 @@
 
     <title>Attendance — LGU Mabinay</title>
 
-    <link rel="shortcut icon" href="{{ asset('mabinay-logo.png') }}">
+    <link rel="shortcut icon" href="{{ asset('Uploads/time_entry.png') }}">
     <link rel="stylesheet" href="{{ asset('template/plugins/fontawesome-free-v6/css/all.min.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
@@ -269,21 +269,79 @@
         .primary:disabled { opacity: .40; cursor: not-allowed; }
         .primary--out { background: linear-gradient(135deg, #F59E0B 0%, #B45309 100%); }
 
-        .link {
-            display: block;
-            width: 100%;
-            margin-top: 11px;
-            padding: 11px;
-            background: none;
+        /* Camera / QR switch — an icon button pinned to the top-right corner of
+           the live camera, out of the framing guide's way. */
+        .camswap {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 6;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
             border: 1px solid var(--line);
-            border-radius: 12px;
-            color: var(--muted);
-            font: inherit;
-            font-size: 12.5px;
-            font-weight: 600;
+            background: rgba(11, 18, 32, .78);
+            color: var(--text);
+            font-size: 17px;
+            display: grid;
+            place-items: center;
             cursor: pointer;
+            backdrop-filter: blur(8px);
         }
-        .link:active { background: var(--ink-soft); }
+        .camswap:active:not(:disabled) { transform: scale(.94); }
+        .camswap:disabled { opacity: .35; cursor: not-allowed; }
+
+        /* When the capture cue banner is up it owns the top strip; the switch
+           steps aside rather than sitting on the text. */
+        .cue:not(.d-none) ~ .camswap { display: none; }
+
+        /* ------------------------------------------------------------ geo HUD */
+
+        /* Live location readout over the bottom of the camera: how far from the
+           nearest station, and the raw fix. Courtesy display only — the server
+           re-derives all of it at punch time from the same station table. */
+        .geohud {
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            z-index: 3;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 9px 12px;
+            border-radius: 12px;
+            background: rgba(11, 18, 32, .72);
+            border: 1px solid var(--line);
+            backdrop-filter: blur(8px);
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .geohud__row {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-weight: 600;
+        }
+        .geohud__row i { flex: 0 0 auto; }
+        .geohud__note {
+            font-size: 10.5px;
+            color: #FDE68A;
+            display: none;
+        }
+        .geohud__coords {
+            font-size: 10px;
+            color: var(--muted);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: .03em;
+        }
+        .geohud--ok  .geohud__row { color: #86EFAC; }
+        .geohud--far .geohud__row { color: #FCD34D; }
+        .geohud--far .geohud__note { display: block; }
+
+        /* The QR name card and the HUD share the bottom edge; when the card is
+           visible the HUD steps up so both stay readable. */
+        .named:not(.d-none) ~ .geohud { bottom: 84px; }
 
         /* ---------------------------------------------------------------- name card */
 
@@ -365,7 +423,7 @@
 <div class="portal">
 
     <header class="top">
-        <img class="top__seal" src="{{ asset('mabinay-logo.png') }}" alt="">
+        <img class="top__seal" src="{{ asset('Uploads/time_entry.png') }}" alt="">
         <div>
             <div class="top__title">MUNICIPALITY OF MABINAY</div>
             <div class="top__sub">Attendance</div>
@@ -403,6 +461,26 @@
             <span id="cue-text">Look straight at the camera</span>
         </div>
 
+        {{-- Face/QR switch (also flips to the rear camera for QR). Pinned over
+             the live view's top-right corner rather than in the control bar. --}}
+        <button type="button" class="camswap" id="mode-toggle" title="Scan QR instead" aria-label="Switch camera mode">
+            <i class="fas fa-qrcode" id="mode-toggle-icon"></i>
+        </button>
+
+        {{-- Live location: distance to the nearest station + the raw fix. When
+             out of range it says so — and says the punch still goes through,
+             flagged for HR clarification. --}}
+        <div class="geohud" id="geohud">
+            <div class="geohud__row">
+                <i class="fas fa-location-dot"></i>
+                <span id="geo-distance">Waiting for location…</span>
+            </div>
+            <div class="geohud__note" id="geo-note">
+                You can still clock in — this punch will be flagged for HR clarification.
+            </div>
+            <div class="geohud__coords" id="geo-coords">Lat —, Lng —</div>
+        </div>
+
         <div class="veil" id="veil">
             <i class="fas fa-spinner fa-spin fa-2x"></i>
             <div id="veil-text">Starting camera…</div>
@@ -424,10 +502,6 @@
             <i class="fas fa-camera"></i>
             <span id="go-text">CLOCK IN</span>
         </button>
-
-        <button type="button" class="link" id="mode-toggle">
-            <i class="fas fa-qrcode"></i>&nbsp; Scan QR first — faster and more accurate
-        </button>
     </div>
 
     {{-- Result takes over the whole screen, then hands it back. --}}
@@ -446,6 +520,7 @@
 @php
     $portalConfig = [
         'modelsUrl'  => $modelsUrl,
+        'ortPath'    => $ortPath,
         'urls'       => [
             'punch'     => route('attendancePunch'),
             'qrCheck'   => route('attendanceQrCheck'),
@@ -453,6 +528,9 @@
         ],
         'resetAfter' => (int) config('attendance.portal.reset_after', 5),
         'thresholds' => config('face.client'),
+        // For the live distance HUD only — the authoritative distance/range
+        // judgement is re-derived server-side at punch time.
+        'stations'   => $stations,
         // Only how many frontal frames to gather. Every threshold that decides
         // whether the face is alive stays on the server, where it cannot be edited.
         'liveness'   => [
@@ -462,7 +540,11 @@
 @endphp
 <script id="portal-config" type="application/json">@json($portalConfig)</script>
 
-<script src="{{ asset('js/face-api/face-api.min.js') }}"></script>
+{{-- ONNX Runtime Web + the FaceEngine wrapper (SCRFD detection, ArcFace
+     embeddings). Vendored, no CDN: the portal must work on the LGU LAN with no
+     internet. The .wasm binaries live next to ort.all.min.js under js/onnx. --}}
+<script src="{{ asset('js/onnx/ort.all.min.js') }}"></script>
+<script src="{{ asset('js/face-engine/face-engine.js') }}"></script>
 <script src="{{ asset('js/jsqr/jsQR.min.js') }}"></script>
 @include('attendance.portal-script')
 

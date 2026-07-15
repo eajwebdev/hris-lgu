@@ -1,10 +1,12 @@
 {{-- Same gate as the panel itself. Without it every employee viewing their own
-     PDS would download 1.3 MB of face-api they are not permitted to use. --}}
+     PDS would download megabytes of face models they are not permitted to use. --}}
 @if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
 
-{{-- face-api.js, vendored. No CDN at runtime: this HRIS is reachable on the LGU
+{{-- ONNX Runtime Web + the FaceEngine wrapper (SCRFD detection, ArcFace
+     embeddings), vendored. No CDN at runtime: this HRIS is reachable on the LGU
      LAN and enrolment has to keep working when the internet does not. --}}
-<script defer src="{{ asset('js/face-api/face-api.min.js') }}"></script>
+<script defer src="{{ asset('js/onnx/ort.all.min.js') }}"></script>
+<script defer src="{{ asset('js/face-engine/face-engine.js') }}"></script>
 
 <style>
     .face-stage {
@@ -16,7 +18,7 @@
         overflow: hidden;
     }
     /* Mirrored so the subject sees themselves the way a mirror shows them and
-       turns their head the right way. face-api reads the underlying video frame,
+       turns their head the right way. The face engine reads the underlying video frame,
        which this transform does not touch. */
     .face-stage video,
     .face-stage canvas {
@@ -197,10 +199,10 @@
         stream:      null,
         looping:     false,
         stepIndex:   0,
-        captures:    {},   // type -> Float32Array descriptor
+        captures:    {},   // type -> embedding array
         lastCheck:   null, // the most recent validation result
         // Movement step: reset each time that step is entered.
-        movement: { baseline: null, moved: false, blinked: false, eyesClosed: false },
+        movement: { baseline: null, moved: false },
     };
 
     var luma = document.createElement('canvas');
@@ -209,39 +211,17 @@
 
     // ---------------------------------------------------------------- geometry
 
-    function distance(a, b) {
-        return Math.hypot(a.x - b.x, a.y - b.y);
-    }
-
     /**
-     * Head turn, as a signed ratio in roughly [-1, 1].
-     *
-     * Compares how far the nose tip sits from each edge of the jaw. Frontal is
-     * ~0. It is scale-free, so it does not drift as the subject moves closer to
-     * or further from the camera.
+     * Head turn, as a signed ratio. Frontal is ~0; negative means the subject
+     * turned toward their own left. The measure (nose offset from the eye
+     * midpoint over interocular distance) lives in the engine; only the
+     * camera-orientation flip is applied here. Scale-free, so it does not drift
+     * as the subject moves closer to or further from the camera.
      */
     function yawOf(landmarks) {
-        var jaw  = landmarks.getJawOutline();
-        var nose = landmarks.getNose()[3];
-        var left  = nose.x - jaw[0].x;
-        var right = jaw[16].x - nose.x;
-        var total = left + right;
-
-        if (total <= 0) return 0;
-
-        var yaw = (right - left) / total;
+        var yaw = FaceEngine.yawOf(landmarks);
 
         return YAW_INVERT ? -yaw : yaw;
-    }
-
-    /**
-     * Eye aspect ratio: eye height over eye width. Collapses toward 0 as the
-     * lid closes, which is what makes a blink visible without a dedicated model.
-     */
-    function eyeAspect(eye) {
-        var width = distance(eye[0], eye[3]);
-        if (width <= 0) return 0;
-        return (distance(eye[1], eye[5]) + distance(eye[2], eye[4])) / (2 * width);
     }
 
     /** Mean luma inside the face box — the face being lit is what matters, not the room. */
@@ -327,8 +307,8 @@
         }
 
         var d      = detections[0];
-        var box    = d.detection.box;
-        var score  = d.detection.score;
+        var box    = d.box;
+        var score  = d.score;
         var ratio  = box.width / el.video.videoWidth;
 
         if (ratio < T.min_face_ratio) {
@@ -374,21 +354,12 @@
             return yaw >= T.turn_yaw_min ? null : 'Turn your head slightly to the right';
         }
 
-        // movement: accept either a blink or a deliberate head shift, which is
-        // what the instruction asks for and what a still photograph held up to
-        // the lens cannot produce.
-        var m   = state.movement;
-        var ear = (eyeAspect(landmarks.getLeftEye()) + eyeAspect(landmarks.getRightEye())) / 2;
-
-        if (ear < T.blink_ear_max) {
-            m.eyesClosed = true;
-        } else if (m.eyesClosed && ear > T.blink_ear_max + 0.04) {
-            // Closed, then reopened: a blink rather than a squint.
-            m.blinked    = true;
-            m.eyesClosed = false;
-        }
-
-        var nose = landmarks.getNose()[3];
+        // movement: a deliberate head shift, which is what the instruction asks
+        // for and what a still photograph held up to the lens cannot produce.
+        // (This used to also accept a blink; the 5-point landmarks the SCRFD
+        // detector emits carry no eye contour, so a blink cannot be seen.)
+        var m    = state.movement;
+        var nose = landmarks.nose;
 
         if (!m.baseline) {
             m.baseline = { x: nose.x, y: nose.y };
@@ -399,7 +370,7 @@
             }
         }
 
-        return (m.blinked || m.moved) ? null : 'Blink or slightly move your face';
+        return m.moved ? null : 'Slightly move your head';
     }
 
     // ---------------------------------------------------------------- drawing
@@ -417,7 +388,7 @@
 
         if (!detection) return;
 
-        var box = detection.detection.box;
+        var box = detection.box;
 
         ctx.lineWidth   = 3;
         ctx.strokeStyle = ok ? '#22C55E' : '#F97316';
@@ -431,13 +402,11 @@
 
         try {
             if (el.video.readyState === 4) {
-                var detections = await faceapi
-                    .detectAllFaces(el.video, new faceapi.TinyFaceDetectorOptions({
-                        inputSize: 256,      // preview only — capture re-detects at 512
-                        scoreThreshold: 0.3, // permissive: our own gate decides, and a
-                                             // rejected-but-seen face lets us say why
-                    }))
-                    .withFaceLandmarks();
+                var detections = await FaceEngine.detect(el.video, {
+                    size: 320,            // preview only — capture re-detects at 640
+                    scoreThreshold: 0.35, // permissive: our own gate decides, and a
+                                          // rejected-but-seen face lets us say why
+                });
 
                 var step   = ORDER[state.stepIndex];
                 var result = evaluate(detections, step);
@@ -478,15 +447,10 @@
         el.captureText.textContent = 'Capturing…';
 
         try {
-            // The descriptor net is the expensive one, so it runs here — four
-            // times per registration — rather than on every preview frame.
-            var result = await faceapi
-                // 512 for the enrolment frame itself: a tighter box and cleaner
-                // landmarks give the recognition net a better-aligned crop, and
-                // this price is paid exactly four times per registration.
-                .detectSingleFace(el.video, new faceapi.TinyFaceDetectorOptions({ inputSize: 512 }))
-                .withFaceLandmarks()
-                .withFaceDescriptor();
+            // 640 for the enrolment frame itself: a tighter box and cleaner
+            // landmarks give the recognition net a better-aligned crop, and
+            // this price is paid exactly four times per registration.
+            var result = (await FaceEngine.detect(el.video, { size: 640, scoreThreshold: 0.45 }))[0];
 
             if (!result) {
                 setFeedback('No face detected', false);
@@ -502,7 +466,9 @@
                 return;
             }
 
-            state.captures[step] = Array.from(result.descriptor);
+            // The ArcFace pass is the expensive one, so it runs here — four
+            // times per registration — rather than on every preview frame.
+            state.captures[step] = Array.from(await FaceEngine.embed(el.video, result));
 
             markStepDone(step);
 
@@ -549,7 +515,7 @@
     }
 
     function resetMovement() {
-        state.movement = { baseline: null, moved: false, blinked: false, eyesClosed: false };
+        state.movement = { baseline: null, moved: false };
     }
 
     /** All four in hand — only now does Finish become clickable. */
@@ -563,49 +529,28 @@
 
     /**
      * Loading starts the moment the page does, not when the modal opens — by the
-     * time HR has found the employee and clicked Register, the ~7 MB of weights
-     * are already in. The warmup pass matters just as much: TF.js compiles its
-     * WebGL shaders on first inference, and doing that against a blank canvas
-     * here is what makes the first real frame instant instead of a stall.
+     * time HR has found the employee and clicked Register, the ~16 MB of ONNX
+     * models are already in. FaceEngine.init() also runs one warmup inference
+     * per net, which is what makes the first real frame instant instead of a
+     * compile stall.
      */
     var modelsPromise = null;
 
     function ensureModels() {
         if (!modelsPromise) {
-            modelsPromise = Promise.all([
-                faceapi.nets.tinyFaceDetector.loadFromUri(CONFIG.modelsUrl),
-                faceapi.nets.faceLandmark68Net.loadFromUri(CONFIG.modelsUrl),
-                faceapi.nets.faceRecognitionNet.loadFromUri(CONFIG.modelsUrl),
-            ]).then(function () {
-                return warmupModels();
+            modelsPromise = FaceEngine.init({
+                modelsUrl: CONFIG.modelsUrl,
+                ortPath:   CONFIG.ortPath,
             }).then(function () {
                 state.modelsReady = true;
+                console.info('FaceEngine ready on ' + FaceEngine.provider);
             });
         }
 
         return modelsPromise;
     }
 
-    async function warmupModels() {
-        try {
-            var c = document.createElement('canvas');
-            c.width = c.height = 256;
-            c.getContext('2d').fillRect(0, 0, 256, 256);
-
-            await faceapi.detectAllFaces(c, new faceapi.TinyFaceDetectorOptions({ inputSize: 256 }));
-
-            var c150 = document.createElement('canvas');
-            c150.width = c150.height = 150;
-            c150.getContext('2d').fillRect(0, 0, 150, 150);
-
-            await faceapi.nets.faceLandmark68Net.detectLandmarks(c150);
-            await faceapi.nets.faceRecognitionNet.computeFaceDescriptor(c150);
-        } catch (e) {
-            console.warn('model warmup skipped', e);
-        }
-    }
-
-    // Kick it off as soon as face-api itself is ready. The library loads with
+    // Kick it off as soon as the engine itself is ready. The library loads with
     // `defer`, so it is NOT yet defined while this inline script parses —
     // DOMContentLoaded is the earliest moment both are guaranteed present.
     function preload() {

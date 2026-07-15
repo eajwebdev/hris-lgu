@@ -13,7 +13,8 @@ use Tests\TestCase;
  * Face descriptors are simulated here, and the simulation matters, so it is worth
  * being explicit about it.
  *
- * A person is a random 128-vector (their identity). A live capture is that vector
+ * A person is a random vector at the configured embedding dimension (their
+ * identity). A live capture is that vector
  * sampled several times with fresh per-frame noise, so consecutive frames drift
  * apart — which is the property the FRONTAL-ONLY liveness check leans on. A still
  * photograph is that same identity vector barely changing between frames, and that
@@ -52,13 +53,19 @@ class AttendancePortalTest extends TestCase
 
     // ---------------------------------------------------------------- fixtures
 
+    /** The embedding dimension under test — whatever the config says it is. */
+    private function dim(): int
+    {
+        return (int) config('face.dimension');
+    }
+
     private function randomVector(int $seed): array
     {
         mt_srand($seed);
 
         $vector = [];
 
-        for ($i = 0; $i < 128; $i++) {
+        for ($i = 0; $i < $this->dim(); $i++) {
             $vector[] = (mt_rand() / mt_getrandmax()) - 0.5;
         }
 
@@ -84,14 +91,14 @@ class AttendancePortalTest extends TestCase
         if ($pose !== null) {
             $direction = $this->poseDirection($pose);
 
-            for ($i = 0; $i < 128; $i++) {
+            for ($i = 0; $i < $this->dim(); $i++) {
                 $vector[$i] += self::POSE_STRENGTH * $direction[$i];
             }
         }
 
         $noise = $this->randomVector($jitter);
 
-        for ($i = 0; $i < 128; $i++) {
+        for ($i = 0; $i < $this->dim(); $i++) {
             $vector[$i] += $noise[$i] * $amplitude * 2;
         }
 
@@ -514,7 +521,8 @@ class AttendancePortalTest extends TestCase
             ->assertOk()
             ->assertSee('CLOCK IN')
             ->assertSee('CLOCK OUT')
-            ->assertSee('js/face-api/face-api.min.js')
+            ->assertSee('js/onnx/ort.all.min.js')
+            ->assertSee('js/face-engine/face-engine.js')
             ->assertSee('js/jsqr/jsQR.min.js');
     }
 
