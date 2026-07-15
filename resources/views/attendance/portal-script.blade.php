@@ -202,10 +202,10 @@
     }
 
     /**
-     * The face tracker. Not a box any more — four rounded corner brackets that
-     * lock onto the detected face, cyan while searching and green when the frame
-     * is good, with a soft glow. Modern and unobtrusive; the aiming reticle in
-     * the CSS handles the "where to stand" guidance.
+     * Nothing is drawn on the face any more — no box, no brackets following it
+     * around. The fixed aiming reticle (in the CSS) is the only framing guide;
+     * this just keeps the overlay canvas clear. Kept as a function so the call
+     * sites in the idle loop and capture pass don't have to change.
      */
     function drawBox(detection, ok) {
         var c = el.overlay, ctx = c.getContext('2d');
@@ -216,44 +216,6 @@
         }
 
         ctx.clearRect(0, 0, c.width, c.height);
-
-        if (!detection) return;
-
-        var b   = detection.box;
-        var col = ok ? '#22C55E' : '#38E0FF';
-        var len = Math.max(16, Math.min(b.width, b.height) * 0.24); // bracket arm
-        var r   = 12;                                               // corner radius
-        var x0  = b.x, y0 = b.y, x1 = b.x + b.width, y1 = b.y + b.height;
-
-        ctx.lineWidth   = 4;
-        ctx.lineCap     = 'round';
-        ctx.lineJoin    = 'round';
-        ctx.strokeStyle = col;
-        ctx.shadowColor = col;
-        ctx.shadowBlur  = 12;
-
-        // top-left
-        ctx.beginPath();
-        ctx.moveTo(x0, y0 + len); ctx.lineTo(x0, y0 + r);
-        ctx.arcTo(x0, y0, x0 + r, y0, r); ctx.lineTo(x0 + len, y0);
-        ctx.stroke();
-        // top-right
-        ctx.beginPath();
-        ctx.moveTo(x1 - len, y0); ctx.lineTo(x1 - r, y0);
-        ctx.arcTo(x1, y0, x1, y0 + r, r); ctx.lineTo(x1, y0 + len);
-        ctx.stroke();
-        // bottom-right
-        ctx.beginPath();
-        ctx.moveTo(x1, y1 - len); ctx.lineTo(x1, y1 - r);
-        ctx.arcTo(x1, y1, x1 - r, y1, r); ctx.lineTo(x1 - len, y1);
-        ctx.stroke();
-        // bottom-left
-        ctx.beginPath();
-        ctx.moveTo(x0 + len, y1); ctx.lineTo(x0 + r, y1);
-        ctx.arcTo(x0, y1, x0, y1 - r, r); ctx.lineTo(x0, y1 - len);
-        ctx.stroke();
-
-        ctx.shadowBlur = 0;
     }
 
     // ---------------------------------------------------------------- detectors
