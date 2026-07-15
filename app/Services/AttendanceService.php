@@ -76,6 +76,15 @@ class AttendanceService
                 return ['recorded' => false, 'wait' => 0];
             }
 
+            // Daily cap. Clock-ins and clock-outs are capped independently, each
+            // at this many, because beyond a handful the extra entries are always
+            // mistakes rather than real movements.
+            $max = (int) config('attendance.max_punches_per_day', 5);
+
+            if (count($times) >= $max) {
+                return ['recorded' => false, 'wait' => 0, 'limit' => true];
+            }
+
             $times[]   = $time;
             $devices[] = $zoneId;
 
@@ -90,6 +99,7 @@ class AttendanceService
         return [
             'recorded' => $result['recorded'],
             'wait'     => $result['wait'],
+            'limit'    => $result['limit'] ?? false,
             'action'   => $action === self::CLOCK_OUT ? 'CLOCK OUT' : 'CLOCK IN',
             'time'     => $now->format('g:i:s A'),
             'date'     => $now->format('l, F j, Y'),

@@ -34,6 +34,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Daily punch cap
+    |--------------------------------------------------------------------------
+    |
+    | The most times, per day, an employee may clock in — and, separately, clock
+    | out. The DTR holds these as comma-separated lists, and beyond a handful the
+    | extra entries are always mistakes (a double-tap, someone re-scanning "just
+    | to be sure"). Five each is generous for a normal day with a lunch break.
+    |
+    */
+
+    'max_punches_per_day' => 5,
+
+    /*
+    |--------------------------------------------------------------------------
     | Portal
     |--------------------------------------------------------------------------
     */

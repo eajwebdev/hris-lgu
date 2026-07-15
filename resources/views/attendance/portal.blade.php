@@ -220,55 +220,36 @@
             padding: 12px 16px calc(env(safe-area-inset-bottom) + 14px);
         }
 
-        .segmented {
+        /* Two big action buttons. Each tap captures the face and writes the punch
+           directly — there is no separate "confirm" step. In is green, out amber,
+           so the choice reads at a glance across a room. */
+        .actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 4px;
-            padding: 4px;
-            background: var(--ink-soft);
-            border: 1px solid var(--line);
-            border-radius: 14px;
-            margin-bottom: 10px;
+            gap: 10px;
         }
-        .segmented button {
-            appearance: none;
-            border: 0;
-            background: transparent;
-            color: var(--muted);
-            font: inherit;
-            font-weight: 700;
-            font-size: 13px;
-            letter-spacing: .04em;
-            padding: 11px 8px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: background .15s ease, color .15s ease;
-        }
-        .segmented button[aria-pressed="true"] { background: var(--green); color: #fff; }
-        .segmented button[data-action="out"][aria-pressed="true"] { background: var(--amber); color: #1a1200; }
-
-        .primary {
-            width: 100%;
+        .action {
             appearance: none;
             border: 0;
             border-radius: 16px;
-            padding: 17px;
+            padding: 18px 12px;
             font: inherit;
             font-weight: 800;
             font-size: 15px;
-            letter-spacing: .05em;
+            letter-spacing: .04em;
             color: #fff;
-            background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
             cursor: pointer;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            gap: 9px;
+            gap: 6px;
             transition: opacity .15s ease, transform .06s ease;
         }
-        .primary:active:not(:disabled) { transform: scale(.985); }
-        .primary:disabled { opacity: .40; cursor: not-allowed; }
-        .primary--out { background: linear-gradient(135deg, #F59E0B 0%, #B45309 100%); }
+        .action i { font-size: 20px; }
+        .action--in  { background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%); }
+        .action--out { background: linear-gradient(135deg, #F59E0B 0%, #B45309 100%); color: #1a1200; }
+        .action:active:not(:disabled) { transform: scale(.97); }
+        .action:disabled { opacity: .40; cursor: not-allowed; }
 
         /* Camera / QR switch — an icon button pinned to the top-right corner of
            the live camera, out of the framing guide's way. */
@@ -494,15 +475,18 @@
     </div>
 
     <div class="controls">
-        <div class="segmented" role="group" aria-label="Attendance action">
-            <button type="button" data-action="in"  aria-pressed="true">CLOCK IN</button>
-            <button type="button" data-action="out" aria-pressed="false">CLOCK OUT</button>
+        {{-- Each button captures the face and records the punch directly — no
+             separate confirm tap. --}}
+        <div class="actions" role="group" aria-label="Attendance action">
+            <button type="button" class="action action--in" data-action="in">
+                <i class="fas fa-camera"></i>
+                <span>CLOCK IN</span>
+            </button>
+            <button type="button" class="action action--out" data-action="out">
+                <i class="fas fa-right-from-bracket"></i>
+                <span>CLOCK OUT</span>
+            </button>
         </div>
-
-        <button type="button" class="primary" id="go" disabled>
-            <i class="fas fa-camera"></i>
-            <span id="go-text">CLOCK IN</span>
-        </button>
     </div>
 
     {{-- Result takes over the whole screen, then hands it back. --}}

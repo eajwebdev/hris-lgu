@@ -220,6 +220,17 @@ class AttendancePortalController extends Controller
 
         $result = $this->attendance->punch($employee->emp_ID, $action);
 
+        if (! $result['recorded'] && ($result['limit'] ?? false)) {
+            $max = (int) config('attendance.max_punches_per_day', 5);
+
+            return response()->json([
+                'status'   => 429,
+                'message'  => 'Daily limit reached — ' . $max . ' ' . strtolower($result['action'])
+                             . ' entries already recorded today.',
+                'employee' => $this->card($employee),
+            ], 429);
+        }
+
         if (! $result['recorded'] && $result['wait'] > 0) {
             return response()->json([
                 'status'   => 429,
@@ -292,11 +303,14 @@ class AttendancePortalController extends Controller
             // on it rather than from someone's memory a week later.
             if ($tag['out_of_range'] === true) {
                 Notification::create([
-                    'empid'   => $employee->emp_ID,
-                    'lapp_id' => $log->id,
-                    'utype'   => 'hr',
-                    'module'  => 'attendance',
-                    'status'  => 0,
+                    'empid'    => $employee->emp_ID,
+                    'lapp_id'  => $log->id,
+                    // 'category' is NOT NULL with no default in this table, and
+                    // the attendance module does not use it, so it is set to 0.
+                    'category' => 0,
+                    'utype'    => 'hr',
+                    'module'   => 'attendance',
+                    'status'   => 0,
                 ]);
             }
         }

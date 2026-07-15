@@ -27,8 +27,6 @@
         hint:      document.getElementById('hint'),
         hintIcon:  document.getElementById('hint-icon'),
         hintText:  document.getElementById('hint-text'),
-        go:        document.getElementById('go'),
-        goText:    document.getElementById('go-text'),
         modeBtn:   document.getElementById('mode-toggle'),
         modeIcon:  document.getElementById('mode-toggle-icon'),
         geohud:    document.getElementById('geohud'),
@@ -41,8 +39,12 @@
         result:    document.getElementById('result'),
         clock:     document.getElementById('clock'),
         today:     document.getElementById('today'),
-        segments:  document.querySelectorAll('.segmented button'),
+        actions:   document.querySelectorAll('.action'),
     };
+
+    function setActionsDisabled(disabled) {
+        el.actions.forEach(function (btn) { btn.disabled = disabled; });
+    }
 
     var state = {
         mode:    'face',   // face | qr | qrface | result
@@ -297,9 +299,7 @@
         drawBox(gate.detection, gate.ok);
         el.guide.classList.toggle('guide--ok', gate.ok);
 
-        el.go.disabled = !gate.ok;
-
-        setHint(gate.ok ? 'Ready — tap ' + label() : gate.message, gate.ok ? 'ok' : 'bad');
+        setHint(gate.ok ? 'Ready — tap CLOCK IN or CLOCK OUT' : gate.message, gate.ok ? 'ok' : 'bad');
     }
 
     async function idleQr() {
@@ -443,10 +443,15 @@
     // ---------------------------------------------------------------- punch
 
     async function punch() {
-        if (state.busy || el.go.disabled) return;
+        if (state.busy) return;
+
+        if (!state.modelsReady) {
+            setHint('Loading face recognition… one moment', null);
+            return;
+        }
 
         state.busy = true;
-        el.go.disabled = true;
+        setActionsDisabled(true);
         el.modeBtn.disabled = true;
 
         try {
@@ -490,15 +495,16 @@
         setHint(message, 'bad');
 
         // Hold the reason on screen for a moment. Without this, the idle loop
-        // repaints "Ready — tap CLOCK IN" within a frame or two and the employee
-        // never sees why the punch failed — so they tap again into the same
-        // failure, which is what made it look like an endless loop. Keeping busy
-        // set both freezes the hint and disables the button during the pause.
+        // repaints "Ready…" within a frame or two and the employee never sees why
+        // the punch failed — so they tap again into the same failure, which made
+        // it look like an endless loop. Keeping busy set freezes the hint and the
+        // action buttons during the pause.
         el.modeBtn.disabled = false;
 
         setTimeout(function () {
             // The challenge is spent either way, so a retry starts a fresh one.
             state.busy = false;
+            setActionsDisabled(false);
         }, 1800);
     }
 
@@ -581,6 +587,7 @@
         el.result.classList.add('d-none');
         el.named.classList.add('d-none');
         el.modeBtn.disabled = false;
+        setActionsDisabled(false);
 
         state.qrToken = null;
         state.busy    = false;
@@ -590,24 +597,11 @@
 
     // ---------------------------------------------------------------- modes
 
-    function label() {
-        return state.action === 'out' ? 'CLOCK OUT' : 'CLOCK IN';
-    }
-
-    function paintAction() {
-        el.goText.textContent = label();
-        el.go.classList.toggle('primary--out', state.action === 'out');
-
-        el.segments.forEach(function (btn) {
-            btn.setAttribute('aria-pressed', String(btn.dataset.action === state.action));
-        });
-    }
-
     async function setMode(mode) {
         state.mode = mode;
         state.busy = false;
 
-        el.go.disabled = true;
+        setActionsDisabled(false);
         el.guide.classList.remove('guide--ok');
         hideCue();
 
@@ -733,16 +727,16 @@
 
     // ---------------------------------------------------------------- boot
 
-    el.segments.forEach(function (btn) {
+    // Each action button both picks in/out and fires the punch — one tap records
+    // the time, no separate confirm.
+    el.actions.forEach(function (btn) {
         btn.addEventListener('click', function () {
             if (state.busy) return; // not mid-sequence
 
             state.action = btn.dataset.action;
-            paintAction();
+            punch();
         });
     });
-
-    el.go.addEventListener('click', punch);
 
     el.modeBtn.addEventListener('click', function () {
         if (state.busy) return;
@@ -913,8 +907,6 @@
     // ---------------------------------------------------------------- boot
 
     (async function boot() {
-        paintAction();
-
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
             return veil('The camera needs a secure connection. Open this page over https:// and try again.');
         }
