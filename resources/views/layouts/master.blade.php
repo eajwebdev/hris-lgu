@@ -36,7 +36,7 @@
     <script src="{{ asset('template/dist/js/html2canvas.min.js') }}"></script>
     <script src="{{ asset('template/dist/js/qrcode.min.js') }}"></script>
     <!-- Favicon -->
-    <link rel="shortcut icon" href="{{ asset('mabinay-logo.png') }}">
+    <link rel="shortcut icon" href="{{ asset('logo.png') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
     .profile-image {
@@ -136,7 +136,7 @@
         <aside class="main-sidebar elevation-0">
             <!-- Brand Logo -->
             <a href="{{ route('dashboard') }}" class="brand-link">
-                <img src="{{ asset('mabinay-logo.png') }}" alt="Municipality of Mabinay Official Seal" class="brand-image">
+                <img src="{{ asset('logo.png') }}" alt="Municipality of Mabinay Official Seal" class="brand-image">
                 <span class="brand-text">
                     HRIS
                     <small>LGU Mabinay</small>

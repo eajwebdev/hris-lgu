@@ -319,7 +319,7 @@
                     <div class="employee-card" id="employeeCard">
 
                         <div class="employee-card__header">
-                            <img src="{{ asset('mabinay-logo.png') }}" alt="Municipality of Mabinay Official Seal" class="employee-card__seal">
+                            <img src="{{ asset('logo.png') }}" alt="Municipality of Mabinay Official Seal" class="employee-card__seal">
                             <p class="employee-card__org">Municipality of Mabinay</p>
                             <p class="employee-card__sub">Human Resource Information System</p>
                         </div>
