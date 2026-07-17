@@ -715,8 +715,9 @@
         ],
         // The browser gates locally on this; the server enforces it again.
         'antispoof'  => [
-            'enabled'  => (bool) config('face.antispoof.enabled', true),
-            'minReal'  => (float) config('face.antispoof.min_real', 0.5),
+            'enabled'      => (bool) config('face.antispoof.enabled', true),
+            'minReal'      => (float) config('face.antispoof.min_real', 0.7),
+            'minRealFrame' => (float) config('face.antispoof.min_real_frame', 0.35),
         ],
     ];
 @endphp

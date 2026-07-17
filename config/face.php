@@ -161,17 +161,30 @@ return [
     | also sent to the server, which enforces the same threshold and logs it —
     | so the policy lives here, in one place.
     |
-    | 'min_real' is the probability-of-live floor. A genuine face scores very
-    | high (~0.95+); a photo or screen scores low. 0.5 is the model's own
-    | default. RAISE IT toward 0.7–0.8 if spoofs still get through; LOWER IT if
-    | real employees on a poor camera are being turned away. Watch the logged
+    | 'min_real' is the probability-of-live floor on the AVERAGE across the
+    | captured frames. A genuine face scores very high (~0.95+); a photo or
+    | screen scores low. Raised from the model's 0.5 default after phone/print
+    | spoofs were seen slipping past it. LOWER IT back toward 0.5 if real
+    | employees on a poor camera are being turned away. Watch the logged
     | 'liveness' values to tune.
+    |
+    | 'min_real_frame' is a floor on the single WORST frame. An average can be
+    | dragged over the line by a couple of lucky frames; a live face never
+    | produces a frame the model is confident is a spoof, so one such frame is
+    | disqualifying on its own.
+    |
+    | 'require_score' makes the check fail CLOSED: a punch that arrives without
+    | a score is refused instead of waved through. Without this, a tampered
+    | client bypasses anti-spoofing by simply omitting the field. Turn it off
+    | only if a kiosk genuinely cannot load the anti-spoof model.
     |
     */
 
     'antispoof' => [
-        'enabled'  => true,
-        'min_real' => 0.5,
+        'enabled'        => true,
+        'min_real'       => 0.70,
+        'min_real_frame' => 0.35,
+        'require_score'  => true,
     ],
 
     /*

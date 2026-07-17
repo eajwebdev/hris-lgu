@@ -390,14 +390,23 @@
 
         hideCue();
 
-        // Average the live-probability across the frames. Averaging rather than
-        // taking the worst frame keeps one unlucky blurry frame from failing a
-        // real person, while a photo stays low across all of them.
+        // Two statistics travel with the punch. The average keeps one unlucky
+        // blurry frame from failing a real person, while a photo stays low
+        // across all of them. The minimum closes the other direction: an
+        // average can be dragged over the line by a couple of lucky frames,
+        // but a live face never produces a frame the model is confident is a
+        // spoof — so one such frame is disqualifying on its own.
         var liveness = reals.length
             ? reals.reduce(function (a, b) { return a + b; }, 0) / reals.length
             : null;
+        var livenessMin = reals.length ? Math.min.apply(null, reals) : null;
 
-        return { nonce: challenge.nonce, frames: frames, liveness: liveness };
+        return {
+            nonce: challenge.nonce,
+            frames: frames,
+            liveness: liveness,
+            livenessMin: livenessMin,
+        };
     }
 
     async function getChallenge() {
@@ -476,12 +485,23 @@
             var run = await runSequence();
 
             // Anti-spoof gate, client side. Blocked here means the punch is never
-            // even sent — a photo or a phone screen stops at the kiosk. Skipped
-            // only when the model produced no score at all (not loaded).
-            if (CONFIG.antispoof && CONFIG.antispoof.enabled &&
-                typeof run.liveness === 'number' && run.liveness < CONFIG.antispoof.minReal) {
-                fail('Please use your real face — a photo or phone screen was detected.');
-                return;
+            // even sent — a photo or a phone screen stops at the kiosk. The server
+            // enforces the same thresholds again, so nothing depends on this code
+            // surviving in a tampered browser.
+            if (CONFIG.antispoof && CONFIG.antispoof.enabled) {
+                // No score at all means the anti-spoof model never loaded. The
+                // server refuses a scoreless punch (fail closed), so surface the
+                // real problem here instead of a confusing rejection.
+                if (typeof run.liveness !== 'number') {
+                    fail('The face security check could not load. Please reload the page and try again.');
+                    return;
+                }
+
+                if (run.liveness < CONFIG.antispoof.minReal ||
+                    (typeof run.livenessMin === 'number' && run.livenessMin < CONFIG.antispoof.minRealFrame)) {
+                    fail('Please use your real face — a photo or phone screen was detected.');
+                    return;
+                }
             }
 
             setHint('Matching…', null);
@@ -492,6 +512,7 @@
                 nonce:  run.nonce,
                 frames: run.frames,
                 liveness_score: run.liveness,
+                liveness_min:   run.livenessMin,
                 geo:    freshGeo(),
             };
 

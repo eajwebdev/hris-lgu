@@ -131,9 +131,12 @@ class AttendancePortalController extends Controller
             'frames.*.descriptor'  => ['required', 'array', 'size:' . $dimension],
             'frames.*.descriptor.*'=> ['required', 'numeric'],
             'qr'                   => ['nullable', 'string', 'max:512', 'required_if:mode,qr'],
-            // Live-face probability from the browser's anti-spoof model. Nullable:
-            // the model may be absent, in which case the check does not apply.
+            // Live-face probability from the browser's anti-spoof model: the
+            // average across frames, and the single worst frame. Nullable at the
+            // validation layer, but when antispoof.require_score is on a missing
+            // average is refused below — fail closed, not open.
             'liveness_score'       => ['nullable', 'numeric', 'between:0,1'],
+            'liveness_min'         => ['nullable', 'numeric', 'between:0,1'],
             // Optional on purpose: an employee with location services off can
             // still punch — the missing fix is itself recorded for HR to see.
             'geo'                  => ['nullable', 'array'],
@@ -214,21 +217,39 @@ class AttendancePortalController extends Controller
         }
 
         // Anti-spoof. The browser already blocked an obvious photo/screen locally;
-        // this enforces the same threshold server-side and — more importantly —
-        // logs the score, so a run of low scores from one spot shows up for HR.
-        // A null score means the model was not available, so the check is skipped
-        // (the server cannot recompute it — the pixels never leave the browser).
-        $liveness = $validated['liveness_score'] ?? null;
+        // this enforces the same thresholds server-side and — more importantly —
+        // logs the scores, so a run of low scores from one spot shows up for HR.
+        // The server cannot recompute the score (the pixels never leave the
+        // browser), which is exactly why a missing score is refused rather than
+        // waved through: omitting the field must not disable the check.
+        $liveness    = $validated['liveness_score'] ?? null;
+        $livenessMin = $validated['liveness_min'] ?? null;
 
-        if (config('face.antispoof.enabled', true) && $liveness !== null
-            && (float) $liveness < (float) config('face.antispoof.min_real', 0.5)) {
-            Log::warning('Portal anti-spoof rejected.', [
-                'emp_ID'   => $employee->emp_ID,
-                'liveness' => round((float) $liveness, 3),
-                'ip'       => $request->ip(),
-            ]);
+        if (config('face.antispoof.enabled', true)) {
+            if ($liveness === null && config('face.antispoof.require_score', true)) {
+                Log::warning('Portal anti-spoof score missing.', [
+                    'emp_ID' => $employee->emp_ID,
+                    'ip'     => $request->ip(),
+                ]);
 
-            return $this->fail('Spoof detected. Please use your real face, not a photo or screen.', 403);
+                return $this->fail('The face security check did not run. Please reload the page and try again.', 403);
+            }
+
+            $meanLow  = $liveness !== null
+                && (float) $liveness < (float) config('face.antispoof.min_real', 0.7);
+            $frameLow = $livenessMin !== null
+                && (float) $livenessMin < (float) config('face.antispoof.min_real_frame', 0.35);
+
+            if ($meanLow || $frameLow) {
+                Log::warning('Portal anti-spoof rejected.', [
+                    'emp_ID'       => $employee->emp_ID,
+                    'liveness'     => $liveness !== null ? round((float) $liveness, 3) : null,
+                    'liveness_min' => $livenessMin !== null ? round((float) $livenessMin, 3) : null,
+                    'ip'           => $request->ip(),
+                ]);
+
+                return $this->fail('Spoof detected. Please use your real face, not a photo or screen.', 403);
+            }
         }
 
         if ((int) $employee->stat_1 !== 1) {
