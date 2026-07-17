@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Employee QR Cards | HRIS - LGU Mabinay</title>
-    <link rel="shortcut icon" href="{{ asset('logo.png') }}">
+    <link rel="shortcut icon" href="{{ asset('Uploads/logo.png') }}">
     <style>
         * { box-sizing: border-box; }
 
@@ -162,7 +162,7 @@
 <body>
 
     <div class="sheet-header">
-        <img src="{{ asset('logo.png') }}" alt="Municipality of Mabinay Official Seal">
+        <img src="{{ asset('Uploads/logo.png') }}" alt="Municipality of Mabinay Official Seal">
         <div>
             <h1>Employee QR Cards</h1>
             <p>{{ $employees->count() }} active {{ Str::plural('employee', $employees->count()) }} &middot; Municipality of Mabinay</p>
@@ -174,7 +174,7 @@
         @foreach($employees as $employee)
             <div class="employee-card">
                 <div class="employee-card__header">
-                    <img src="{{ asset('logo.png') }}" alt="Seal" class="employee-card__seal">
+                    <img src="{{ asset('Uploads/logo.png') }}" alt="Seal" class="employee-card__seal">
                     <p class="employee-card__org">Municipality of Mabinay</p>
                     <p class="employee-card__sub">Human Resource Information System</p>
                 </div>

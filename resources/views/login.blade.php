@@ -15,7 +15,7 @@
     <!-- Auth theme (cache-busted so browsers never serve a stale copy) -->
     <link rel="stylesheet" href="{{ asset('css/auth.css') }}?v={{ filemtime(public_path('css/auth.css')) }}">
     <!-- Favicon -->
-    <link rel="shortcut icon" href="{{ asset('logo.png') }}">
+    <link rel="shortcut icon" href="{{ asset('Uploads/logo.png') }}">
 </head>
 <body class="auth-body">
 
@@ -45,7 +45,7 @@
 
         <!-- Brand pane -->
         <section class="auth-hero">
-            <img src="{{ asset('logo.png') }}" alt="Municipality of Mabinay Official Seal" class="auth-hero__seal">
+            <img src="{{ asset('Uploads/logo.png') }}" alt="Municipality of Mabinay Official Seal" class="auth-hero__seal">
 
             <span class="auth-hero__eyebrow">
                 <svg class="ico"><use href="#i-shield"></use></svg> Local Government Unit
@@ -69,7 +69,7 @@
 
         <!-- Auth card -->
         <section class="auth-card">
-            <img src="{{ asset('logo.png') }}" alt="Mabinay Seal" class="auth-card__logo">
+            <img src="{{ asset('Uploads/logo.png') }}" alt="Mabinay Seal" class="auth-card__logo">
 
             <h2 class="auth-card__title">Welcome back</h2>
             <p class="auth-card__desc">
