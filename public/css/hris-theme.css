@@ -459,6 +459,11 @@ body:not(.sidebar-collapse) .main-footer {
     box-shadow: none !important;
     transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .05s ease;
 }
+.btn-sm,
+.btn-group-sm > .btn {
+    font-size: .78rem;
+    padding: .28rem .65rem;
+}
 .btn:active { transform: translateY(1px); }
 .btn:focus, .btn.focus { box-shadow: var(--ring) !important; }
 
