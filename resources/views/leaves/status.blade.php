@@ -148,7 +148,7 @@
                                                         <button type="button" class="btn btn-warning btn-sm cancelLeave float-right" value="{{ $leaves->id }}" ><i class="fas fa-times"></i> Cancel</button>
                                                     @endif
                                                     @if(!in_array($leaves->status, [3]))
-                                                        <button type="button" class="btn btn-info btn-sm bypass-leave float-right mr-1" data-id="{{ $leaves->id }}" data-by="2" data-max="{{ $leaves->days }}" ><i class="fas fa-check"></i> Forward to pres</button>
+                                                        <button type="button" class="btn btn-info btn-sm bypass-leave float-right mr-1" data-id="{{ $leaves->id }}" data-by="2" data-max="{{ $leaves->days }}" ><i class="fas fa-check"></i> Forward to Mayor</button>
                                                     @endif
                                                 @endif
                                                 <br>
