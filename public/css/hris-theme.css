@@ -1042,7 +1042,7 @@ img { max-width: 100%; height: auto; }
     .btn { padding: .45rem .75rem; }
 
     /* Button groups in table rows stack rather than spill */
-    .btn-group-sm > .btn, .btn-sm { font-size: .78rem; }
+    .btn-group-sm > .btn, .btn-sm { font-size: .78rem; padding: .28rem .65rem; }
 
     .modal-dialog { margin: .5rem; }
     .modal-body { padding: 1rem; }
