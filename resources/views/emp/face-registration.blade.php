@@ -1,12 +1,12 @@
 {{--
     Face Recognition Registration — Phase 1 (enrolment only).
 
-    Rendered only for Admin/HR on the web guard. This @if is cosmetic: the routes
-    behind every control here are gated by the face.registrar middleware, so a
-    user who reaches the URLs another way is refused regardless of what this view
-    decided to draw.
+    Rendered for Admin/HR on the web guard, and for an employee viewing their
+    own record. This @if is cosmetic: the routes behind every control here are
+    gated by the face.self / face.registrar middleware, so a user who reaches
+    the URLs another way is refused regardless of what this view decided to draw.
 --}}
-@if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
+@if(\App\Http\Middleware\EnsureFaceSelfOrRegistrar::allowsFor($employee))
 @php
     $face = $employee->faceSummary();
     $steps = [
@@ -60,9 +60,13 @@
                     <button type="button" class="btn btn-warning btn-sm" id="face-reregister-btn">
                         <i class="fas fa-sync-alt"></i> Re-register Face
                     </button>
+                    {{-- Erasing a biometric stays with Admin/HR; self-service
+                         covers registering and re-registering only. --}}
+                    @if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
                     <button type="button" class="btn btn-danger btn-sm" id="face-remove-btn">
                         <i class="fas fa-trash"></i> Remove Face Data
                     </button>
+                    @endif
                 </div>
             </div>
         </div>

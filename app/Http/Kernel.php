@@ -67,5 +67,6 @@ class Kernel extends HttpKernel
         'login_auth' => \App\Http\Middleware\LoginAuth::class,
         'role' => \App\Http\Middleware\LoginAuth::class,
         'face.registrar' => \App\Http\Middleware\EnsureFaceRegistrar::class,
+        'face.self' => \App\Http\Middleware\EnsureFaceSelfOrRegistrar::class,
     ];
 }

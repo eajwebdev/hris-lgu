@@ -214,8 +214,11 @@ class FaceEmbeddingService
 
     /**
      * Build the JSON written to employees.face_embeddings.
+     *
+     * $actorId is a users.id and is null for a self-service enrolment — an
+     * employee's id must not be written into a column read as a user id.
      */
-    public function payload(array $captures, array $master, int $actorId, string $actorName): array
+    public function payload(array $captures, array $master, ?int $actorId, string $actorName): array
     {
         return [
             'captures'           => array_values($captures),

@@ -1,6 +1,7 @@
-{{-- Same gate as the panel itself. Without it every employee viewing their own
-     PDS would download megabytes of face models they are not permitted to use. --}}
-@if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
+{{-- Registrars get the engine everywhere they might enrol; an employee only
+     downloads the megabytes of face models on the one page where they can use
+     them — their own Face Recognition page. --}}
+@if(\App\Http\Middleware\EnsureFaceRegistrar::allows() || (auth()->guard('employee')->check() && request()->routeIs('faceRecognition')))
 
 {{-- ONNX Runtime Web + the FaceEngine wrapper (SCRFD detection, ArcFace
      embeddings), vendored. No CDN at runtime: this HRIS is reachable on the LGU

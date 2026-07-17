@@ -333,12 +333,86 @@ class FaceRegistrationTest extends TestCase
         }
     }
 
-    /** The Face Recognition page is Admin/HR only, right down to the URL. */
-    public function test_an_employee_cannot_open_the_face_recognition_page(): void
+    // ---------------------------------------------------------------- self-service
+
+    /** An employee can open their own Face Recognition page and enrol from it. */
+    public function test_an_employee_can_open_their_own_face_recognition_page(): void
     {
         $this->actingAs($this->employee, 'employee');
 
-        $this->get(route('faceRecognition', $this->employee->id))->assertStatus(403);
+        $this->get(route('faceRecognition'))
+            ->assertOk()
+            ->assertSee('FACE RECOGNITION REGISTRATION')
+            ->assertSee('Register Face')
+            ->assertSee('js/face-engine/face-engine.js');
+    }
+
+    /** Naming their own id works; naming anybody else's is refused at the URL. */
+    public function test_an_employee_cannot_open_another_employees_face_page(): void
+    {
+        $this->actingAs($this->employee, 'employee');
+
+        $this->get(route('faceRecognition', $this->employee->id))->assertOk();
+        $this->get(route('faceRecognition', $this->other->id))->assertStatus(403);
+    }
+
+    public function test_an_employee_can_register_their_own_face(): void
+    {
+        $this->actingAs($this->employee, 'employee');
+
+        $this->postJson(route('faceRegister', $this->employee->id), ['captures' => $this->captures(131)])
+            ->assertOk()
+            ->assertJsonPath('face.registered', true)
+            ->assertJsonPath('face.capture_count', 4);
+
+        $stored = $this->employee->fresh()->face_embeddings;
+
+        // Attributed to the employee by name, never by a users.id they don't have.
+        $this->assertNull($stored['registered_by']);
+        $this->assertStringContainsString('(self)', $stored['registered_by_name']);
+
+        $this->assertDatabaseHas('face_audit_logs', [
+            'employee_id'  => $this->employee->id,
+            'action'       => FaceAuditLog::REGISTERED,
+            'performed_by' => null,
+        ]);
+    }
+
+    public function test_an_employee_cannot_register_a_face_for_someone_else(): void
+    {
+        $this->actingAs($this->employee, 'employee');
+
+        $this->postJson(route('faceRegister', $this->other->id), ['captures' => $this->captures(141)])
+            ->assertStatus(403);
+
+        $this->assertNull($this->other->fresh()->face_embeddings);
+    }
+
+    /** Self-service ends at registration: erasing a biometric stays Admin/HR only. */
+    public function test_an_employee_cannot_remove_their_own_face_data(): void
+    {
+        $this->actingAs($this->admin(), 'web')
+            ->postJson(route('faceRegister', $this->employee->id), ['captures' => $this->captures(151)])
+            ->assertOk();
+
+        auth()->guard('web')->logout();
+
+        $this->actingAs($this->employee, 'employee')
+            ->deleteJson(route('faceRemove', $this->employee->id))
+            ->assertStatus(403);
+
+        $this->assertNotNull($this->employee->fresh()->face_embeddings);
+    }
+
+    /** The employee's own PDS submenu carries the Face Recognition entry. */
+    public function test_the_submenu_links_to_the_face_recognition_page_for_the_employee(): void
+    {
+        $this->actingAs($this->employee, 'employee');
+
+        $this->get(route('empPDS'))
+            ->assertOk()
+            ->assertSee('Face Recognition')
+            ->assertSee(route('faceRecognition'));
     }
 
     /**

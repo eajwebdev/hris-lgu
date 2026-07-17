@@ -281,15 +281,17 @@
                         <span class="{{ request()->is('pds/signature') || request()->is('pds/signature/*') ? 'text-dark' : 'text-muted' }} text-bold">E-Signature</span>
                     </a>
                 </li>
-                {{-- Admin/HR only. The middleware on the route is the real boundary;
-                     hiding the link just keeps it out of everyone else's way. --}}
-                @if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
+                {{-- Admin/HR see it on anyone's PDS; an employee sees it on their
+                     own, where they can register their own face. The middleware on
+                     the route is the real boundary; hiding the link just keeps it
+                     out of everyone else's way. --}}
+                @if(\App\Http\Middleware\EnsureFaceSelfOrRegistrar::allowsFor($employee))
                 @php
                     $onFacePage = request()->is('pds/face-recognition') || request()->is('pds/face-recognition/*');
                     $faceRegistered = $employee->faceSummary()['registered'];
                 @endphp
                 <li class="nav-item">
-                    <a href="{{ route('faceRecognition', $employee->id) }}" class="nav-link">
+                    <a href="{{ ($guard == 'web') ? route('faceRecognition', $employee->id) : route('faceRecognition') }}" class="nav-link">
                         <i class="{{ $onFacePage ? 'text-dark' : 'text-muted' }} pr-2 fas fa-user-shield" style="width: 20px;"></i>
                         <span class="{{ $onFacePage ? 'text-dark' : 'text-muted' }} text-bold">Face Recognition</span>
                         <i class="float-right fas {{ $faceRegistered ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>

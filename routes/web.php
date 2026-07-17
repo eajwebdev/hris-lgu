@@ -205,14 +205,15 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         /*
          * Face recognition — Phase 1, enrolment only.
          *
-         * face.registrar is the access boundary. The profile panel also hides
-         * these controls from anyone who is not Admin/HR, but that is cosmetic:
-         * reaching these URLs by hand, from any other role or guard, returns 403.
+         * The middleware is the access boundary; the profile panel hiding its
+         * controls is cosmetic. Admin/HR may enrol anyone; an employee may enrol
+         * (and re-enrol) their own face. Removing a biometric stays Admin/HR
+         * only — self-service ends at registration.
          */
-        Route::prefix('face')->middleware('face.registrar')->group(function () {
-            Route::get('/{employee}', [FaceRegistrationController::class, 'status'])->name('faceStatus');
-            Route::post('/{employee}', [FaceRegistrationController::class, 'store'])->name('faceRegister');
-            Route::delete('/{employee}', [FaceRegistrationController::class, 'destroy'])->name('faceRemove');
+        Route::prefix('face')->group(function () {
+            Route::get('/{employee}', [FaceRegistrationController::class, 'status'])->middleware('face.self')->name('faceStatus');
+            Route::post('/{employee}', [FaceRegistrationController::class, 'store'])->middleware('face.self')->name('faceRegister');
+            Route::delete('/{employee}', [FaceRegistrationController::class, 'destroy'])->middleware('face.registrar')->name('faceRemove');
         });
     });
     
@@ -306,9 +307,10 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         
         //Signature
         // Face Recognition — its own page in the PDS submenu, next to E-Signature.
-        // Admin/HR only: an employee reaching this URL by hand gets a 403.
+        // Admin/HR can open anyone's; an employee only reaches their own — naming
+        // another employee's id by hand gets a 403.
         Route::get('/face-recognition/{id?}', [FaceRegistrationController::class, 'page'])
-            ->middleware('face.registrar')
+            ->middleware('face.self')
             ->name('faceRecognition');
 
         Route::get('/signature/{id?}', [PdsController::class, 'signature'])->name('signature');

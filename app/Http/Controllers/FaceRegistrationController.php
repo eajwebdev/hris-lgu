@@ -41,7 +41,15 @@ class FaceRegistrationController extends Controller
     public function page($id = null)
     {
         $guard = auth()->guard('web')->check() ? 'web' : 'employee';
-        $empid = $id ?: auth()->guard($guard)->user()->id;
+
+        // An employee only ever sees their own enrolment. The middleware already
+        // 403s a foreign {id}; ignoring the parameter here means the page cannot
+        // even render somebody else's state by accident.
+        // (->user()->id, not ->id(): the employee guard's auth identifier is the
+        // email, so ->id() would not return a primary key.)
+        $empid = $guard === 'employee'
+            ? auth()->guard('employee')->user()->id
+            : ($id ?: auth()->guard($guard)->user()->id);
 
         $employee = Employee::find($empid);
 
@@ -129,16 +137,22 @@ class FaceRegistrationController extends Controller
                 'conflicts_with' => $owner?->id,
                 'distance'     => round($duplicate['distance'], 4),
                 'performed_by' => auth()->guard('web')->id(),
+                'self_service' => auth()->guard('web')->guest(),
             ]);
 
             return $this->fail('This face is already registered to another employee.', 422);
         }
 
-        $actor = auth()->guard('web')->user();
-        $actorName = trim("{$actor->fname} {$actor->lname}");
+        // A registrar on the web guard, or the employee enrolling themselves.
+        // registered_by holds a users.id, so a self-enrolment leaves it null
+        // rather than writing an employees.id into the wrong id space — the
+        // name is what the panel displays either way.
+        $registrar = auth()->guard('web')->user();
+        $actor = $registrar ?? auth()->guard('employee')->user();
+        $actorName = trim("{$actor->fname} {$actor->lname}") . ($registrar ? '' : ' (self)');
 
-        DB::transaction(function () use ($employee, $ordered, $master, $actor, $actorName, $request) {
-            $employee->face_embeddings = $this->faces->payload($ordered, $master, $actor->id, $actorName);
+        DB::transaction(function () use ($employee, $ordered, $master, $registrar, $actorName, $request) {
+            $employee->face_embeddings = $this->faces->payload($ordered, $master, $registrar?->id, $actorName);
             $employee->save();
 
             $this->faces->storeVector($employee->id, $master);
