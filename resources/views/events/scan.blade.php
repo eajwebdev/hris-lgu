@@ -119,6 +119,31 @@
         padding: 54px 24px; text-align: center; color: var(--scan-muted);
     }
     .noevent i { font-size: 2rem; color: #9ca3af; display: block; margin-bottom: 10px; }
+
+    /* ---------------------------------------------------------- phone view */
+    @media (max-width: 640px) {
+        .scan-wrap { max-width: 100%; }
+        .container-fluid { padding-left: 10px; padding-right: 10px; }
+
+        .scan-head { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 12px; }
+        .scan-head h1 { font-size: 1.15rem; }
+        .scan-head .pick { margin-left: 0; }
+        .scan-head select { flex: 1; min-width: 0; width: 100%; }
+
+        .scan-grid { gap: 12px; }
+
+        /* The camera was 4/3 at full width — on a phone that's a tall block that
+           shoves the tally + feed off-screen. Cap it to part of the viewport so
+           the whole page still fits, and let the reticle track that height. */
+        .stage { aspect-ratio: auto; height: 46vh; max-height: 380px; min-height: 240px; }
+        .stage__reticle,
+        .stage__scanline { width: 66%; max-width: 240px; }
+
+        .scan-note { margin-top: 10px; font-size: .74rem; }
+
+        .feed { max-height: 240px; }
+        .tally b { font-size: 1.35rem; }
+    }
 </style>
 
 <div class="container-fluid">
@@ -127,7 +152,6 @@
         <div class="scan-head">
             <div>
                 <h1><i class="fas fa-qrcode text-success1"></i> Event QR Attendance</h1>
-                <div class="sub">Scan employee QR badges to record event attendance. First scan clocks in, last scan clocks out.</div>
             </div>
             <div class="pick">
                 <label for="eventPick" class="mb-0 mr-1" style="font-weight:600; font-size:.85rem;">Event:</label>

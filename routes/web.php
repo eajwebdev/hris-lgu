@@ -393,8 +393,8 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         Route::post('/leaves-report', [LeaveApplicationController::class, 'leaveReport'])->name('leaveReport');
     });
     
-    // events
-    Route::prefix('event')->group(function() {
+    // events — Admin / HR Administrator only (same gate as attendance admin).
+    Route::prefix('event')->middleware('face.registrar')->group(function() {
         Route::get('/', [EventController::class, 'eventIndex'])->name('eventIndex');
         Route::post('/create', [EventController::class, 'eventCreate'])->name('eventCreate');
         Route::get('/event-json', [EventController::class, 'eventShow'])->name('eventJson');
@@ -405,17 +405,15 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         Route::get('/reports-generate/{eventid}/{statusid}', [EventController::class, 'reportGenrate'])->name('reportGenrate');
 
         /*
-         * Event QR attendance scanner. Admin/HR only — the operator logs in, the
-         * face.registrar gate (Administrator / HR Administrator) is the same one
-         * used for attendance administration, so a plain employee reaching this
-         * URL by hand gets a 403. The QR carries an encrypted emp_ID (the same
-         * token the printed employee cards show); the server decides whose row
-         * moves. First scan clocks the attendee in, the last scan clocks them out.
+         * Event QR attendance scanner. The whole event group is already gated to
+         * Administrator / HR Administrator (face.registrar, above), the same gate
+         * used for attendance administration, so a plain employee reaching any of
+         * these URLs by hand gets a 403. The QR carries an encrypted emp_ID (the
+         * same token the printed employee cards show); the server decides whose
+         * row moves. First scan clocks the attendee in, the last scan clocks out.
          */
-        Route::middleware('face.registrar')->group(function () {
-            Route::get('/scan', [EventController::class, 'scanPortal'])->name('eventScan');
-            Route::post('/scan-punch', [EventController::class, 'scanPunch'])->name('eventScanPunch');
-        });
+        Route::get('/scan', [EventController::class, 'scanPortal'])->name('eventScan');
+        Route::post('/scan-punch', [EventController::class, 'scanPunch'])->name('eventScanPunch');
     });
 
     Route::get('/settings', [MasterController::class, 'systemSetting'])->name('settings');

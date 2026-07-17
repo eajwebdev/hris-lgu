@@ -104,13 +104,15 @@
             </li>
         @endif
 
-        <li class="nav-item">
-            <a href="{{ route('eventIndex') }}" title="Events"
-               class="nav-link {{ request()->is('event*') ? 'active' : '' }}">
-                <i class="nav-icon fas fa-calendar-days"></i>
-                <p>Events</p>
-            </a>
-        </li>
+        @if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
+            <li class="nav-item">
+                <a href="{{ route('eventIndex') }}" title="Events"
+                   class="nav-link {{ request()->is('event*') ? 'active' : '' }}">
+                    <i class="nav-icon fas fa-calendar-days"></i>
+                    <p>Events</p>
+                </a>
+            </li>
+        @endif
 
         @if($isWeb)
             {{-- -------------------------------------------------- Recruitment --}}

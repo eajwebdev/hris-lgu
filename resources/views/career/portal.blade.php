@@ -248,7 +248,6 @@
             </div>
             <div class="topbar__actions">
                 <button type="button" class="btn btn--ghost" data-open="#trackModal"><i class="fas fa-magnifying-glass-location"></i> Track application</button>
-                <a class="btn btn--ghost" href="{{ route('getLogin') }}"><i class="fas fa-right-to-bracket"></i> Employee sign in</a>
             </div>
         </div>
     </header>
@@ -330,7 +329,6 @@
         <div class="foot__inner">
             <img src="{{ asset('Uploads/logo.png') }}" alt="Seal">
             <span>© {{ date('Y') }} Municipality of Mabinay · Human Resource Management Office</span>
-            <a href="{{ route('attendancePortal') }}">Attendance portal</a>
         </div>
     </footer>
 
