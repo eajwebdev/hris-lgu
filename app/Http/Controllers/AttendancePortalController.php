@@ -123,10 +123,10 @@ class AttendancePortalController extends Controller
             'action'               => ['required', Rule::in(['in', 'out'])],
             'nonce'                => ['required', 'string', 'max:64'],
             'frames'               => ['required', 'array', 'min:3', 'max:' . $maxFrames],
-            // Frontal-only capture: every frame is a straight-ahead 'neutral'. The
-            // 'pose' union is kept so an older client mid-rollout still validates.
+            // Straight-ahead 'neutral' frames first, then one 'pose' frame per
+            // gesture the challenge demanded (random per attempt).
             'frames.*.stage'       => ['required', Rule::in(['neutral', 'pose'])],
-            'frames.*.pose'        => ['nullable', Rule::in(['left', 'right'])],
+            'frames.*.pose'        => ['nullable', Rule::in(['left', 'right', 'up', 'down'])],
             'frames.*.t'           => ['required', 'numeric'],
             'frames.*.descriptor'  => ['required', 'array', 'size:' . $dimension],
             'frames.*.descriptor.*'=> ['required', 'numeric'],
@@ -202,9 +202,11 @@ class AttendancePortalController extends Controller
             $distance = $match['distance'];
         }
 
-        // Only now, with an identity in hand, ask the question a still photo cannot
-        // answer: does this face drift frame-to-frame the way a living one does?
-        $refusal = $this->liveness->check($employee, $frames);
+        // Only now, with an identity in hand, ask the questions a picture cannot
+        // answer: does this face drift frame-to-frame the way a living one does,
+        // and did it perform the random gestures this challenge demanded, in the
+        // order it demanded them?
+        $refusal = $this->liveness->check($employee, $frames, $challenge);
 
         if ($refusal !== null) {
             Log::warning('Portal liveness check failed.', [

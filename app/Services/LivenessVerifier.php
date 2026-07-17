@@ -29,19 +29,24 @@ class LivenessVerifier
     // ---------------------------------------------------------------- challenge
 
     /**
-     * Mint a single-use challenge naming both head turns, in a random order.
+     * Mint a single-use challenge naming a random sequence of head gestures.
      *
-     * Both, not one: a challenge that asked for a single random pose could be
-     * re-rolled until it named the pose the attacker happens to hold a photo of.
-     * Demanding left *and* right, in an order they cannot predict, means a
-     * printed photo is useless no matter how many times they ask.
+     * Several distinct gestures in a shuffled order, not one: a challenge that
+     * asked for a single random pose could be re-rolled until it named the pose
+     * the attacker happens to hold a photo of. Demanding a sequence they cannot
+     * predict means a printed photo or a phone screen is useless no matter how
+     * many times they ask.
      */
     public function issue(string $ip): array
     {
         $nonce = Str::random(40);
-        $poses = ['left', 'right'];
 
-        shuffle($poses);
+        $pool  = (array) config('face.liveness.pose_pool', ['left', 'right']);
+        $count = min((int) config('face.liveness.pose_count', 2), count($pool));
+
+        shuffle($pool);
+
+        $poses = array_slice($pool, 0, max(1, $count));
 
         $ttl = (int) config('face.liveness.challenge_ttl', 90);
 
@@ -92,37 +97,37 @@ class LivenessVerifier
     // ---------------------------------------------------------------- verdict
 
     /**
-     * Does this sequence of frontal frames come from the living employee it
-     * claims to?
+     * Does this sequence of frames come from the living employee it claims to,
+     * performing the gestures this challenge demanded?
      *
-     * Frontal-only: no head turns. Liveness rests entirely on the natural drift
-     * between frames of a real face (see checkNeutrals). Returns null when
-     * satisfied, or a human-readable reason when not. The reasons are deliberately
-     * vague on screen — telling an attacker *which* check they tripped tells them
-     * what to fix.
+     * Returns null when satisfied, or a human-readable reason when not. The
+     * reasons are deliberately vague on screen — telling an attacker *which*
+     * check they tripped tells them what to fix.
      */
-    public function check(Employee $employee, array $frames): ?string
+    public function check(Employee $employee, array $frames, array $challenge = []): ?string
     {
         $config = (array) config('face.liveness');
 
-        // Every frame is a straight-ahead 'neutral' now; tolerate a stray 'pose'
-        // tag from an older client by simply treating whatever arrived as the set
-        // to judge.
         $neutral = array_values(array_filter($frames, fn ($f) => $f['stage'] === 'neutral'));
+        $posed   = array_values(array_filter($frames, fn ($f) => $f['stage'] === 'pose'));
 
         if (! $neutral) {
-            $neutral = array_values($frames);
+            return 'Face check incomplete. Please try again.';
         }
 
         if (count($neutral) < (int) $config['min_neutral_frames']) {
             return 'Face check incomplete. Please try again.';
         }
 
-        if ($reason = $this->checkTiming($neutral, $config)) {
+        if ($reason = $this->checkTiming($frames, $config)) {
             return $reason;
         }
 
-        return $this->checkNeutrals($employee, $neutral, $config);
+        if ($reason = $this->checkNeutrals($employee, $neutral, $config)) {
+            return $reason;
+        }
+
+        return $this->checkPoses($employee, $neutral, $posed, $challenge, $config);
     }
 
     /**
@@ -175,6 +180,66 @@ class LivenessVerifier
 
         if ($spread < (float) $config['min_variation']) {
             return 'Please use your face, not a photo.';
+        }
+
+        return null;
+    }
+
+    /**
+     * The challenged gestures, held to the letter of the challenge.
+     *
+     * Three things a picture cannot fake at once: the frames tagged with the
+     * challenged poses must be there IN THE ISSUED ORDER (which the attacker
+     * could not know before asking), every one of them must still verify as
+     * this employee, and each must sit measurably away from the straight-ahead
+     * master — a flat image swivelled in front of the lens produces embeddings
+     * that barely move, while a real head turn moves them decisively.
+     */
+    private function checkPoses(Employee $employee, array $neutral, array $posed, array $challenge, array $config): ?string
+    {
+        $demanded = array_values((array) ($challenge['poses'] ?? []));
+
+        // A challenge without poses (mid-rollout cache entry) falls back to the
+        // neutral-drift verdict already given.
+        if (! $demanded) {
+            return null;
+        }
+
+        // First occurrence of each pose, in the order the frames were captured.
+        usort($posed, fn ($a, $b) => $a['t'] <=> $b['t']);
+
+        $performed = [];
+
+        foreach ($posed as $frame) {
+            $pose = $frame['pose'] ?? null;
+
+            if ($pose !== null && ! in_array($pose, $performed, true)) {
+                $performed[] = $pose;
+            }
+        }
+
+        if ($performed !== $demanded) {
+            return 'Face check failed. Please follow the on-screen instructions.';
+        }
+
+        $master = $this->faces->masterEmbedding(array_column($neutral, 'descriptor'));
+
+        if ($master === null) {
+            return 'Face check failed. Please try again.';
+        }
+
+        $minShift = (float) ($config['min_pose_shift'] ?? 0.05);
+
+        foreach ($posed as $frame) {
+            // Still this employee mid-gesture — enrolment includes turned
+            // captures, so a genuine turn keeps verifying.
+            if ($this->faces->verify($employee, $frame['descriptor']) === null) {
+                return 'Face not recognised. Please try again.';
+            }
+
+            if ($this->distance($frame['descriptor'], $master) < $minShift) {
+                return 'Face check failed. Please follow the on-screen instructions.';
+            }
         }
 
         return null;

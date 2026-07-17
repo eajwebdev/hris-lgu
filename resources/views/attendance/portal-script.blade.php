@@ -98,6 +98,21 @@
         return YAW_INVERT ? -yaw : yaw;
     }
 
+    /**
+     * Head tilt as the nose tip's vertical offset from the eye midpoint, in
+     * units of interocular distance. The absolute value varies face to face, so
+     * up/down gestures are judged as a CHANGE from the employee's own frontal
+     * baseline, captured during the straight-ahead frames.
+     */
+    function pitchOf(landmarks) {
+        var L = landmarks.leftEye, R = landmarks.rightEye, N = landmarks.nose;
+        var inter = Math.hypot(R.x - L.x, R.y - L.y);
+
+        if (inter <= 0) return 0;
+
+        return (N.y - (L.y + R.y) / 2) / inter;
+    }
+
     function brightnessOf(box) {
         var v = el.video;
         var sx = Math.max(0, box.x), sy = Math.max(0, box.y);
@@ -192,13 +207,28 @@
         return { ok: true, detection: d, message: 'Ready' };
     }
 
-    function poseHolds(landmarks, pose) {
+    /**
+     * Whether the head is currently holding the named pose. Yaw turns are
+     * absolute; pitch tilts are relative to `baselinePitch`, the employee's own
+     * frontal pitch measured during the straight-ahead frames (null before the
+     * baseline exists, which only 'front' captures ever are).
+     */
+    function poseHolds(landmarks, pose, baselinePitch) {
         var yaw = yawOf(landmarks);
 
         if (pose === 'front') return Math.abs(yaw) <= T.front_yaw_max;
         if (pose === 'left')  return yaw <= -T.turn_yaw_min;
+        if (pose === 'right') return yaw >= T.turn_yaw_min;
 
-        return yaw >= T.turn_yaw_min;
+        if (typeof baselinePitch !== 'number') return false;
+
+        var delta = pitchOf(landmarks) - baselinePitch;
+
+        // Tilting up moves the nose toward the eye line — the offset shrinks.
+        if (pose === 'up')   return delta <= -T.turn_pitch_min;
+        if (pose === 'down') return delta >=  T.turn_pitch_min;
+
+        return false;
     }
 
     /**
@@ -346,33 +376,47 @@
 
     // ---------------------------------------------------------------- liveness run
 
+    /** On-screen wording for each gesture the challenge can demand. */
+    var POSE_TEXT = {
+        left:  'Turn your head to the LEFT',
+        right: 'Turn your head to the RIGHT',
+        up:    'Tilt your head UP',
+        down:  'Tilt your head DOWN',
+    };
+
     /**
-     * The guided capture — frontal only. The employee faces the camera and holds
-     * still for a beat while a handful of frames are taken a moment apart.
+     * The guided capture. The employee faces the camera and holds still while a
+     * handful of straight-ahead frames are taken — then performs the random
+     * gestures the SERVER chose for this attempt (turn left/right, tilt
+     * up/down), one by one, in the server's order.
      *
-     * There are no head turns. Liveness is decided server-side from the natural
-     * frame-to-frame drift of a real face: a living person is never perfectly
-     * still, so consecutive descriptors differ, whereas a flat static photo held
-     * to the lens produces very nearly the same vector every time. The cue on
-     * screen is only guidance; the verdict is the server's.
-     *
-     * Honest limit: this defeats a printed or on-screen still photo. It does not
-     * defeat a video/live replay of the employee, which drifts like a real face.
-     * The QR path stays the stronger option where that matters.
+     * That randomness is the anti-spoof property: a printed photo or a phone
+     * screen cannot turn its head when told to, and because the sequence is
+     * different every attempt, a pre-recorded video of the right moves does not
+     * exist. The cue on screen is only guidance; the verdict is the server's —
+     * it re-checks the poses, the order, the identity of every frame, and how
+     * far each gesture moved the embedding.
      */
     async function runSequence() {
         var t0     = performance.now();
         var frames = [];
         var reals  = [];   // per-frame anti-spoof "live" probabilities
 
-        // Still single-use: the nonce is redeemed server-side so a captured
-        // payload cannot be replayed, even though we no longer ask for poses.
+        // Single-use: the nonce is redeemed server-side, so a captured payload
+        // cannot be replayed. The pose list rides in with it — chosen by the
+        // server precisely so this code cannot be talked into easier gestures.
         var challenge = await getChallenge();
+        var poses     = challenge.poses || [];
 
         showCue(null, 'Look at the camera and hold still');
 
+        // The frontal pitch baseline for up/down: each face carries its nose at
+        // a different height, so tilts are judged against the employee's own
+        // straight-ahead geometry rather than a universal number.
+        var pitchSum = 0, pitchN = 0;
+
         for (var i = 0; i < L.frames; i++) {
-            var frame = await captureAt('front', 'Look straight at the camera');
+            var frame = await captureAt('front', 'Look straight at the camera', null);
 
             frames.push({
                 stage: 'neutral',
@@ -383,9 +427,34 @@
 
             if (typeof frame.real === 'number') reals.push(frame.real);
 
+            pitchSum += pitchOf(frame.landmarks);
+            pitchN++;
+
             // Spaced out so consecutive frames are genuinely different moments —
             // that spread is exactly what the liveness check reads.
             await sleep(180);
+        }
+
+        var baselinePitch = pitchN ? pitchSum / pitchN : null;
+
+        // Now the challenge gestures, in the server's order. One frame each —
+        // captured only once the head is actually holding the pose.
+        for (var p = 0; p < poses.length; p++) {
+            var pose = poses[p];
+            var text = POSE_TEXT[pose] || 'Follow the instruction';
+
+            showCue(pose, text);
+
+            var posed = await captureAt(pose, text, baselinePitch);
+
+            frames.push({
+                stage: 'pose',
+                pose: pose,
+                t: Math.round(performance.now() - t0),
+                descriptor: Array.from(posed.descriptor),
+            });
+
+            if (typeof posed.real === 'number') reals.push(posed.real);
         }
 
         hideCue();
@@ -422,7 +491,7 @@
      * descriptor pass — and re-check the pose on that same result, because the
      * head may have drifted in the milliseconds between.
      */
-    async function captureAt(pose, instruction) {
+    async function captureAt(pose, instruction, baselinePitch) {
         // A genuine head turn lands in a second or two. A shorter deadline than
         // the old 20s does not rush an honest employee — it just stops a stalled
         // capture from holding the whole sequence hostage before the retry, which
@@ -440,7 +509,7 @@
                 continue;
             }
 
-            if (!poseHolds(gate.detection.landmarks, pose)) {
+            if (!poseHolds(gate.detection.landmarks, pose, baselinePitch)) {
                 setHint(instruction, 'bad');
                 await sleep(90);
                 continue;
@@ -453,7 +522,7 @@
             // milliseconds between.
             var full = (await detectFull())[0];
 
-            if (full && poseHolds(full.landmarks, pose)) {
+            if (full && poseHolds(full.landmarks, pose, baselinePitch)) {
                 full.descriptor = await FaceEngine.embed(el.video, full);
                 // Same frame, judged by the anti-spoof model. null when the model
                 // is not loaded, in which case the check simply does not apply.
@@ -564,6 +633,8 @@
 
         el.cueIcon.className = pose === 'left'  ? 'fas fa-arrow-left'
                              : pose === 'right' ? 'fas fa-arrow-right'
+                             : pose === 'up'    ? 'fas fa-arrow-up'
+                             : pose === 'down'  ? 'fas fa-arrow-down'
                              : 'fas fa-user';
 
         el.cue.classList.remove('d-none');

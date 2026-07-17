@@ -95,43 +95,60 @@ return [
     |
     | A photograph passes every ordinary face check: it is a real face, correctly
     | lit, the right size, looking at the lens. What a still photograph cannot do
-    | is move like a living face.
+    | is obey an instruction it has never seen.
     |
-    | This build is FRONTAL ONLY — no head turns are asked for. The employee faces
-    | the camera and holds still while several frames are taken a moment apart, and
-    | the server proves liveness from the natural frame-to-frame drift of a real
-    | face: a living person is never perfectly still, so their descriptors vary,
-    | whereas a flat static photo held to the lens yields nearly the same vector
-    | every time (see 'min_variation'). The single-use challenge nonce is still
-    | issued and redeemed, so a captured payload cannot be replayed.
+    | This build uses RANDOM POSE CHALLENGES. The server mints a single-use
+    | challenge naming a random sequence of head gestures (drawn from 'pose_pool',
+    | shuffled), and the client must capture the employee performing them in that
+    | exact order, after a run of straight-ahead frames. A printed photo or a
+    | phone screen cannot turn left when told to — and because the sequence is
+    | random per attempt, an attacker cannot pre-record the right moves.
     |
-    | None of this is enforced in the browser. The browser is untrusted — it only
-    | gathers frames. Every check below runs on the server, against descriptors it
-    | can compare to what HR enrolled.
+    | The browser is untrusted — it only gathers frames. Everything below is
+    | re-checked on the server against the descriptors: the challenged poses must
+    | be present in the issued order, every frame must verify as the enrolled
+    | employee, the straight-ahead frames must drift the way a living face does
+    | ('min_variation'), and the pose frames must sit measurably away from the
+    | straight-ahead master ('min_pose_shift') — a rigid image swivelled on the
+    | spot produces embeddings that barely move.
     |
-    | Honest limit: frontal-only liveness defeats a printed or on-screen STILL
-    | photo. It does NOT defeat a video / live replay of the employee, which drifts
-    | like a real face. Where that matters, the QR path (encrypted token + 1:1 face
-    | verify) is the stronger option. Catching a replay attack would need a model
-    | that looks at pixels, which is not part of this system.
+    | Blink detection is NOT possible on this engine: SCRFD provides five
+    | landmarks (eyes, nose tip, mouth corners) with no eye contour to read a
+    | blink from. Head gestures are the challenge this hardware can verify.
+    |
+    | Honest limit: a coached live video replay of the employee performing many
+    | gestures could in principle follow along; the random order, the timing
+    | window, and the anti-spoof pixel model below are what make that
+    | impractical. Where identity truly matters, the QR path (encrypted token +
+    | 1:1 face verify) remains the stronger option.
     |
     */
 
     'liveness' => [
-        // Frontal frames the client gathers while the employee faces the camera.
-        // More frames give the variation test below more to read and average the
-        // identity match over a steadier signal; five keeps the whole capture
-        // inside a second or two.
+        // Straight-ahead frames the client gathers before the gestures. More
+        // frames give the variation test below more to read and average the
+        // identity match over a steadier signal.
         'min_neutral_frames' => 5,
+
+        // Gestures the challenge can demand, and how many are drawn per attempt
+        // (distinct, shuffled). left/right are yaw turns; up/down are pitch
+        // tilts measured against the employee's own frontal baseline.
+        'pose_pool'  => ['left', 'right', 'up', 'down'],
+        'pose_count' => 2,
+
+        // Squared-free euclidean distance a challenged-pose frame must sit from
+        // the straight-ahead master embedding. A genuine head turn moves the
+        // embedding well past this; a flat image rotated in front of the lens
+        // barely moves it. Kept modest so a subtle but real turn still passes.
+        'min_pose_shift' => 0.05,
 
         // Upper bound on the whole payload, so the endpoint cannot be used to
         // ship megabytes of vectors.
         'max_frames' => 12,
 
-        // The frames must span at least this long — a spread of moments, not one
-        // instant cloned. No head turn to perform now, so this is short; it only
-        // rules out a payload whose frames all carry the same timestamp.
-        'min_duration_ms' => 500,
+        // The frames must span at least this long — a human takes time to
+        // perform two gestures; a payload assembled in one instant does not.
+        'min_duration_ms' => 1200,
         'max_duration_ms' => 40000,
 
         // Seconds a challenge stays usable. Single-use regardless.
@@ -139,8 +156,8 @@ return [
 
         // A weak secondary check: consecutive frames of a live face are never
         // identical, while a photo held perfectly still is. This only catches a
-        // rigidly-held still image; the real work is done by the anti-spoof model
-        // below. Kept low so it never rejects a live employee.
+        // rigidly-held still image; the real work is done by the pose challenge
+        // and the anti-spoof model. Kept low so it never rejects a live employee.
         'min_variation' => 0.02,
     ],
 
@@ -229,6 +246,13 @@ return [
 
         // |yaw| over this counts as a deliberate head turn.
         'turn_yaw_min' => 0.22,
+
+        // Pitch is the nose tip's vertical offset from the eye midpoint in
+        // units of interocular distance. It varies per face, so up/down are
+        // judged as a CHANGE from the employee's own frontal baseline (captured
+        // during the straight-ahead frames): a tilt counts once the pitch has
+        // moved this far from that baseline.
+        'turn_pitch_min' => 0.12,
 
         // Landmark travel, in fractions of face width, that counts as movement.
         // NOTE: blink detection is gone with the engine swap — 5 landmarks carry
