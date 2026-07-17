@@ -3,28 +3,13 @@
         $('#pdfModal').on('show.bs.modal', function(event) {
             var button = $(event.relatedTarget);
             var leaveId = button.data('id');
-            $.ajax({
-                url: "{{ route('getPdfPath') }}",
-                type: 'POST',
-                data: {
-                    id: leaveId,
-                    _token: '{{ csrf_token() }}'
-                },
-                success: function(response) {
-                    if (response.path) {
-                        var fullPath = "{{ url('/') }}" + response.path;
-                        $('#pdfIframe').attr('src', fullPath);
-                    } else {
-                        console.error('PDF path not found');
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error loading PDF:', error);
-                    $('#pdfIframe').attr('src', '');
-                }
-            });
+
+            var baseUrl = "{{ route('previewLeave', ['id' => '__ID__']) }}";
+            var previewUrl = baseUrl.replace('__ID__', leaveId);
+
+            $('#pdfIframe').attr('src', previewUrl);
         });
-    
+
         $('#pdfModal').on('hidden.bs.modal', function() {
             $('#pdfIframe').attr('src', '');
         });
@@ -70,26 +55,11 @@ $(document).ready(function() {
     $('#pdfModalHistory').on('show.bs.modal', function(event) {
         var button = $(event.relatedTarget);
         var leaveId = button.data('id');
-        $.ajax({
-            url: "{{ route('getPdfPath') }}",
-            type: 'POST',
-            data: {
-                id: leaveId,
-                _token: '{{ csrf_token() }}'
-            },
-            success: function(response) {
-                if (response.path) {
-                    var fullPath = "{{ url('/') }}" + response.path;
-                    $('#pdfIframeHistory').attr('src', fullPath);
-                } else {
-                    console.error('PDF path not found');
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('Error loading PDF:', error);
-                $('#pdfIframeHistory').attr('src', '');
-            }
-        });
+
+        var baseUrl = "{{ route('previewLeave', ['id' => '__ID__']) }}";
+        var previewUrl = baseUrl.replace('__ID__', leaveId);
+
+        $('#pdfIframeHistory').attr('src', previewUrl);
     });
 
     $('#pdfModalHistory').on('hidden.bs.modal', function() {
