@@ -56,8 +56,20 @@ class RouteServiceProvider extends ServiceProvider
      */
     protected function configureRateLimiting()
     {
+        // General API budget, per client.
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Tighter budget for endpoints an attacker would hammer: password /
+        // passcode checks and the face-claim identity endpoints. Keyed by IP so
+        // one host cannot grind guesses, and it returns a JSON 429.
+        RateLimiter::for('sensitive', function (Request $request) {
+            return Limit::perMinute(10)->by($request->ip())->response(function () {
+                return response()->json([
+                    'message' => 'Too many attempts. Please wait a minute and try again.',
+                ], 429);
+            });
         });
     }
 }

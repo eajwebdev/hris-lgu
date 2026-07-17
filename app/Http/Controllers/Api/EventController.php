@@ -13,75 +13,72 @@ use Illuminate\Support\Carbon;
 
 class EventController extends Controller
 {
+    /**
+     * The shared passcode is verified by the `event.passcode` middleware before
+     * any of these actions run, so the controller no longer carries the secret
+     * or repeats the check.
+     */
     public function eventList($passcode)
     {
-        if($passcode == '$2a$12$mWBPFC966rwEZ6V2DxtTsex4ZqvG7.fTiJ52WDHMRM6dG56wO2n0O'){
-            $events = Event::where('event_stat', 1)->get();
-            $eventData = [];
-            
-            foreach ($events as $event) {
-                $eventData[] = [
-                    'id' => $event->id,
-                    'title' => $event->title,
-                ];
-            }
+        $events = Event::where('event_stat', 1)->get();
+        $eventData = [];
 
-            return response()->json($eventData);
+        foreach ($events as $event) {
+            $eventData[] = [
+                'id' => $event->id,
+                'title' => $event->title,
+            ];
         }
+
+        return response()->json($eventData);
     }
 
-    function shortDecrypt($encrypted)
+    private function shortDecrypt($encrypted)
     {
-        $key = 'fA7xB93kL0pTzWmQ';
-        $cipher = 'AES-128-ECB';
+        $key    = config('api.crypto.key');
+        $cipher = config('api.crypto.cipher');
         $encrypted = strtr($encrypted, '-_', '+/');
         return openssl_decrypt(base64_decode($encrypted), $cipher, $key, 0);
     }
 
     public function eventLogin($passcode, $eventid, $encryptedempid)
     {
-        if ($passcode == '$2a$12$mWBPFC966rwEZ6V2DxtTsex4ZqvG7.fTiJ52WDHMRM6dG56wO2n0O') {
-            $empid = $this->shortDecrypt($encryptedempid);
-            
-            if ($empid !== false) {
-                $employee = Employee::where('emp_ID', $empid)->first();
+        $empid = $this->shortDecrypt($encryptedempid);
 
-                if (!$employee) {
-                    return response()->json(['message' => 'Employee not found.'], 404);
-                }
+        if ($empid !== false) {
+            $employee = Employee::where('emp_ID', $empid)->first();
 
-                $fullname = strtoupper($employee->lname) . ', ' . strtoupper($employee->fname) . ' ' . strtoupper($employee->suffix);
+            if (!$employee) {
+                return response()->json(['message' => 'Employee not found.'], 404);
+            }
 
-                $log = EventLog::where('event_id', $eventid)
-                            ->where('empid', $empid)
-                            ->first();
+            $fullname = strtoupper($employee->lname) . ', ' . strtoupper($employee->fname) . ' ' . strtoupper($employee->suffix);
 
-                if (!$log) {
-                    return response()->json(['message' => 'Employee not registered for this event.'], 404);
-                }
+            $log = EventLog::where('event_id', $eventid)
+                        ->where('empid', $empid)
+                        ->first();
 
-                if (is_null($log->in)) {
-                    $log->in = Carbon::now();
-                    $log->save();
-                    return response()->json(['message' => $fullname], 200);
-                } elseif (!is_null($log->in)) {
-                    $log->out = Carbon::now();
-                    $log->save();
-                    return response()->json(['message' => $fullname], 200);
-                }
-            } else {
-                return response()->json(['message' => 'Invalid employee ID.'], 400);
+            if (!$log) {
+                return response()->json(['message' => 'Employee not registered for this event.'], 404);
+            }
+
+            if (is_null($log->in)) {
+                $log->in = Carbon::now();
+                $log->save();
+                return response()->json(['message' => $fullname], 200);
+            } elseif (!is_null($log->in)) {
+                $log->out = Carbon::now();
+                $log->save();
+                return response()->json(['message' => $fullname], 200);
             }
         } else {
-            return response()->json(['message' => 'Unauthorized access.'], 401);
+            return response()->json(['message' => 'Invalid employee ID.'], 400);
         }
     }
-    
+
     public function eventLogs($passcode, $eventId)
     {
-        if($passcode == '$2a$12$mWBPFC966rwEZ6V2DxtTsex4ZqvG7.fTiJ52WDHMRM6dG56wO2n0O'){   
-
-            $eventlogs = EventLog::join('employees', function($join) {
+        $eventlogs = EventLog::join('employees', function($join) {
                 $join->on(DB::raw('BINARY event_logs.empid'), '=', DB::raw('BINARY employees.emp_ID'));
             })
             ->where('event_logs.event_id', $eventId)
@@ -117,6 +114,5 @@ class EventController extends Controller
             }
         
             return response()->json($eventlogData);
-        }
     }
 }

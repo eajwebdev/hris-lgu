@@ -18,7 +18,7 @@ class TimeEntryController extends Controller
     private float $dedupeThr2     = 0.28 * 0.28;
     private float $acceptThr2     = 0.65 * 0.65;    
     // ==== HELPERS ====
-    private function shortDecrypt($encrypted) { $key = 'fA7xB93kL0pTzWmQ'; $cipher = 'AES-128-ECB'; $encrypted = strtr($encrypted, '-_', '+/'); return openssl_decrypt(base64_decode($encrypted), $cipher, $key, 0); }
+    private function shortDecrypt($encrypted) { $key = config('api.crypto.key'); $cipher = config('api.crypto.cipher'); $encrypted = strtr($encrypted, '-_', '+/'); return openssl_decrypt(base64_decode($encrypted), $cipher, $key, 0); }
     private function l2Normalize(array $v): array {
         $sum = 0.0;
         foreach ($v as $x) { $sum += $x * $x; }

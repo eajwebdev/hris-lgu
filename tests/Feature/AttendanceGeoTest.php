@@ -70,7 +70,8 @@ class AttendanceGeoTest extends TestCase
         $vector = $this->randomVector($person);
 
         if ($pose !== null) {
-            $direction = $this->randomVector($pose === 'left' ? 770001 : 770002);
+            $seed = ['left' => 770001, 'right' => 770002, 'up' => 770003, 'down' => 770004][$pose] ?? 770001;
+            $direction = $this->randomVector($seed);
 
             for ($i = 0; $i < $this->dim(); $i++) {
                 $vector[$i] += self::POSE_STRENGTH * $direction[$i];
@@ -108,7 +109,8 @@ class AttendanceGeoTest extends TestCase
     {
         $challenge = $this->postJson(route('attendanceChallenge'))->assertOk()->json('challenge');
 
-        // Frontal-only: a run of straight-ahead frames, no head turns.
+        // A straight-ahead run, then one frame per gesture the challenge chose,
+        // in order — the shape the server's liveness check now requires.
         $frames = [];
         $t      = 0;
 
@@ -117,12 +119,20 @@ class AttendanceGeoTest extends TestCase
             $t += 400;
         }
 
+        foreach (($challenge['poses'] ?? []) as $pose) {
+            $frames[] = ['stage' => 'pose', 'pose' => $pose, 't' => $t, 'descriptor' => $this->frame($person, $pose, $person + 500 + $t, 0.02)];
+            $t += 600;
+        }
+
         return $this->postJson(route('attendancePunch'), [
-            'mode'   => 'face',
-            'action' => 'in',
-            'nonce'  => $challenge['nonce'],
-            'frames' => $frames,
-            'geo'    => $geo,
+            'mode'           => 'face',
+            'action'         => 'in',
+            'nonce'          => $challenge['nonce'],
+            'frames'         => $frames,
+            'geo'            => $geo,
+            // A live face passes both anti-spoof floors.
+            'liveness_score' => 0.97,
+            'liveness_min'   => 0.90,
         ]);
     }
 

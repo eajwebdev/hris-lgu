@@ -8,6 +8,7 @@ use App\Models\Status;
 use App\Models\Employee;
 use App\Models\EventLog;
 use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 
 class EventController extends Controller
 {
@@ -130,6 +131,130 @@ class EventController extends Controller
         } catch (\Exception $e) {
             return response()->json(['status' => 500, 'message' => 'Failed to delete event.'], 500);
         }
+    }
+
+    /**
+     * The event QR attendance scanner (Admin/HR only — gated by face.registrar).
+     * The operator picks the event, then scans employee QR badges.
+     */
+    public function scanPortal()
+    {
+        $guard = $this->getGuard();
+
+        // Active events, soonest first, so the operator picks the right one.
+        $events = Event::where('event_stat', 1)
+            ->orderBy('start')
+            ->get(['id', 'title', 'venue', 'start', 'end']);
+
+        return view('events.scan', compact('guard', 'events'));
+    }
+
+    /**
+     * Record one QR scan against an event.
+     *
+     * The badge carries an encrypted emp_ID, not a name — the browser cannot
+     * name an attendee, the server decides whose row moves. First scan clocks
+     * the attendee IN; every later scan moves the clock-OUT to now, so the last
+     * scan of the day is the one that sticks.
+     */
+    public function scanPunch(Request $request)
+    {
+        $request->validate([
+            'event_id' => ['required', 'integer'],
+            'qr'       => ['required', 'string', 'max:512'],
+        ]);
+
+        $event = Event::where('id', $request->event_id)->where('event_stat', 1)->first();
+
+        if (! $event) {
+            return response()->json(['status' => 404, 'message' => 'Event not found or no longer active.'], 404);
+        }
+
+        // Decrypt the badge. A garbled scan decrypts to nothing rather than to
+        // somebody else's id — see the shortEncrypt on the printed QR cards.
+        try {
+            $empid = trim((string) shortDecrypt(trim($request->input('qr'))));
+        } catch (\Throwable $e) {
+            $empid = '';
+        }
+
+        if ($empid === '') {
+            return response()->json(['status' => 422, 'message' => 'Unrecognised QR code. Please try again.'], 422);
+        }
+
+        $employee = Employee::where('emp_ID', $empid)->first();
+
+        if (! $employee) {
+            return response()->json(['status' => 404, 'message' => 'This badge does not match any employee.'], 422);
+        }
+
+        $log = EventLog::where('event_id', $event->id)->where('empid', $empid)->first();
+
+        // Attendance is only for employees enrolled to the event (EventCreate
+        // seeds one row per eligible employee). No row means not on the list.
+        if (! $log) {
+            return response()->json([
+                'status'   => 409,
+                'message'  => $this->scanName($employee) . ' is not on the attendee list for this event.',
+                'employee' => $this->scanCard($employee),
+            ], 409);
+        }
+
+        $now      = Carbon::now();
+        $cooldown = 8; // seconds — a single pass past the lens must not read as in AND out
+
+        if (is_null($log->in)) {
+            $log->in = $now;
+            $log->save();
+
+            return $this->scanResult('CLOCK IN', true, $employee, $now, 'Clocked in');
+        }
+
+        // Already clocked in. Ignore a repeat scan of the same badge within the
+        // cooldown so a fresh clock-in is not instantly flipped to a clock-out.
+        $last = Carbon::parse($log->out ?? $log->in);
+
+        if ($now->diffInSeconds($last) < $cooldown) {
+            return $this->scanResult(
+                $log->out ? 'CLOCK OUT' : 'CLOCK IN',
+                false, $employee, $last, 'Already scanned a moment ago'
+            );
+        }
+
+        // Last scan wins: move the clock-out to now.
+        $log->out = $now;
+        $log->save();
+
+        return $this->scanResult('CLOCK OUT', true, $employee, $now, 'Clocked out');
+    }
+
+    private function scanResult(string $action, bool $recorded, Employee $employee, Carbon $at, string $message)
+    {
+        return response()->json([
+            'status'   => 200,
+            'recorded' => $recorded,
+            'action'   => $action,
+            'message'  => $message,
+            'employee' => $this->scanCard($employee),
+            'time'     => $at->format('h:i A'),
+            'date'     => $at->format('M d, Y'),
+        ]);
+    }
+
+    private function scanName(Employee $employee): string
+    {
+        return trim(strtoupper($employee->lname) . ', ' . strtoupper($employee->fname)
+            . ' ' . strtoupper($employee->suffix ?? ''));
+    }
+
+    private function scanCard(Employee $employee): array
+    {
+        return [
+            'name'     => $this->scanName($employee),
+            'position' => $employee->position ?: 'Employee',
+            'id'       => $employee->emp_ID,
+            'initials' => strtoupper(substr($employee->fname, 0, 1) . substr($employee->lname, 0, 1)),
+        ];
     }
 
     public function showReport(){

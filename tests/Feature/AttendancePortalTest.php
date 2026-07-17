@@ -72,10 +72,17 @@ class AttendancePortalTest extends TestCase
         return $vector;
     }
 
-    /** The direction a left / right head turn pushes any face's descriptor. */
+    /** The direction each head gesture pushes any face's descriptor. */
     private function poseDirection(string $pose): array
     {
-        return $this->randomVector($pose === 'left' ? 770001 : 770002);
+        $seed = [
+            'left'  => 770001,
+            'right' => 770002,
+            'up'    => 770003,
+            'down'  => 770004,
+        ][$pose] ?? 770001;
+
+        return $this->randomVector($seed);
     }
 
     /**
@@ -181,17 +188,52 @@ class AttendancePortalTest extends TestCase
         return $this->postJson(route('attendancePunch'), $payload);
     }
 
-    /** The happy path, end to end: challenge, live frames, punch. */
+    /**
+     * A neutral run followed by one frame per gesture the challenge demanded,
+     * in the order it demanded them — the shape a real capture now produces.
+     * Each pose frame is pushed in that gesture's direction so it sits clear of
+     * the straight-ahead master (the min_pose_shift the server enforces).
+     */
+    private function challengedFrames(int $person, array $challenge, int $spacing = 400): array
+    {
+        $frames = $this->liveFrames($person, $spacing);
+        $t      = 5 * $spacing;
+
+        foreach (($challenge['poses'] ?? []) as $pose) {
+            $frames[] = [
+                'stage'      => 'pose',
+                'pose'       => $pose,
+                't'          => $t,
+                'descriptor' => $this->frame($person, $pose, $person + 500 + $t, 0.02),
+            ];
+
+            $t += 600;
+        }
+
+        return $frames;
+    }
+
+    /** A full, valid live payload for a given challenge (frames + spoof scores). */
+    private function livePayload(int $person, array $challenge, string $action, array $extra = []): array
+    {
+        return array_merge([
+            'mode'           => 'face',
+            'action'         => $action,
+            'nonce'          => $challenge['nonce'],
+            'frames'         => $this->challengedFrames($person, $challenge),
+            // The browser's anti-spoof scores. A live face scores high on both
+            // the average and the worst frame; the server enforces both floors.
+            'liveness_score' => 0.97,
+            'liveness_min'   => 0.90,
+        ], $extra);
+    }
+
+    /** The happy path, end to end: challenge, live frames + gestures, punch. */
     private function livePunch(int $person, string $action = 'in', array $extra = [])
     {
         $challenge = $this->challenge();
 
-        return $this->punch(array_merge([
-            'mode'   => 'face',
-            'action' => $action,
-            'nonce'  => $challenge['nonce'],
-            'frames' => $this->liveFrames($person),
-        ], $extra));
+        return $this->punch($this->livePayload($person, $challenge, $action, $extra));
     }
 
     private function todayFor(Employee $employee): ?Dtr
@@ -235,13 +277,11 @@ class AttendancePortalTest extends TestCase
         $this->enrol($this->alice, 130);
 
         $challenge = $this->challenge();
-        $frames    = $this->liveFrames(130);
+        $payload   = $this->livePayload(130, $challenge, 'in');
 
-        $this->punch(['mode' => 'face', 'action' => 'in', 'nonce' => $challenge['nonce'], 'frames' => $frames])
-            ->assertOk();
+        $this->punch($payload)->assertOk();
 
-        $this->punch(['mode' => 'face', 'action' => 'in', 'nonce' => $challenge['nonce'], 'frames' => $frames])
-            ->assertStatus(419);
+        $this->punch($payload)->assertStatus(419);
     }
 
     /** A failed attempt burns the challenge too — otherwise it could be ground at. */

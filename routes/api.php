@@ -15,14 +15,26 @@ use App\Http\Controllers\Api\CptController;
 
 Route::post('/dtrs', [DtrController::class, 'syncDtr'])->name('api.syncDtr');
 Route::post('/dtrs-batch', [DtrController::class, 'syncDtrBatch'])->name('api.syncDtrBatch');
-Route::get('/event-list/{passcode}', [EventController::class, 'eventList'])->name('api.eventList');
-Route::get('/event-login/{passcode}/{eventid}/{empid}', [EventController::class, 'eventLogin'])->name('api.eventLogin');
-Route::get('/event-logs/{passcode}/{eventid}', [EventController::class, 'eventLogs'])->name('api.eventLogs');
+
+// Event API — shared-secret gated (event.passcode middleware, constant-time).
+// The login endpoint mutates attendance and is passcode-guessable, so it also
+// carries the tighter 'sensitive' throttle.
+Route::middleware('event.passcode')->group(function () {
+    Route::get('/event-list/{passcode}', [EventController::class, 'eventList'])->name('api.eventList');
+    Route::get('/event-login/{passcode}/{eventid}/{empid}', [EventController::class, 'eventLogin'])
+        ->middleware('throttle:sensitive')->name('api.eventLogin');
+    Route::get('/event-logs/{passcode}/{eventid}', [EventController::class, 'eventLogs'])->name('api.eventLogs');
+});
 
 Route::get('/job-list', [JobHiringController::class, 'jobList'])->name('api.jobList');
-Route::post('/application/store', [ApplicationController::class, 'applicationStore'])->name('application.store');
-Route::get('/application/check/{jid}/{email}', [ApplicationController::class, 'applicationCheck'])->name('application.check');
-Route::get('/application/status/{appnumber}', [ApplicationController::class, 'applicationStatus'])->name('application.status');
+// Public application intake: throttled harder, both to blunt spam submissions
+// and because it enumerates by email (application/check).
+Route::post('/application/store', [ApplicationController::class, 'applicationStore'])
+    ->middleware('throttle:sensitive')->name('application.store');
+Route::get('/application/check/{jid}/{email}', [ApplicationController::class, 'applicationCheck'])
+    ->middleware('throttle:sensitive')->name('application.check');
+Route::get('/application/status/{appnumber}', [ApplicationController::class, 'applicationStatus'])
+    ->middleware('throttle:sensitive')->name('application.status');
 Route::get('/gad-gender-count', [GadController::class, 'genderCount'])->name('gender-count');
 
 Route::get('/cpt/sync', [CptController::class, 'sync']);
@@ -59,14 +71,18 @@ Route::prefix('app')->group(function() {
     Route::post('/fetch-license', [TimeEntryController::class, 'fetchLicense']);
     Route::post('/fetch-logzones-with-campuses', [TimeEntryController::class, 'fetchLogzonesWithCampuses']);
     Route::post('/validate-qr', [TimeEntryController::class, 'validateQr']);
-    Route::post('/face-claim', [TimeEntryController::class, 'faceClaim']);
+    // Identity-claim endpoints match a face/QR to an employee — brute-force
+    // targets, so tighter throttling on top of the shared api budget.
+    Route::post('/face-claim', [TimeEntryController::class, 'faceClaim'])->middleware('throttle:sensitive');
     Route::post('/log-attendance', [TimeEntryController::class, 'logAttendance']);
     Route::post('/fetch-latest-logs', [TimeEntryController::class, 'fetchLatestLogs']);
     Route::post('/download-dtr', [TimeEntryController::class, 'downloadDtr']);
 
     // ── Admin/kiosk flows ──────────────────────────────────────────────
-    Route::post('/admin-face-claim', [TimeEntryController::class, 'adminFaceClaim']);
-    Route::post('/admin-pass-verify', [TimeEntryController::class, 'adminPassVerify']);
+    Route::post('/admin-face-claim', [TimeEntryController::class, 'adminFaceClaim'])->middleware('throttle:sensitive');
+    // Password gate — the prime brute-force target. Constant-time check in the
+    // controller; the throttle is what makes online guessing infeasible.
+    Route::post('/admin-pass-verify', [TimeEntryController::class, 'adminPassVerify'])->middleware('throttle:sensitive');
 
     // ── Directory/registration utilities ───────────────────────────────
     Route::post('/fetch-employees', [TimeEntryController::class, 'fetchEmployees']);

@@ -75,4 +75,21 @@ class Handler extends ExceptionHandler
                 ->with('error', 'Your session expired. Please try again.');
         });
     }
+
+    /**
+     * Any request under /api/* is an API client, so it must always receive JSON
+     * — including for failures that happen BEFORE route middleware runs (an
+     * unmatched URL's 404, a method-not-allowed 405). Without this those render
+     * the HTML error page, which an app cannot parse and which leaks framework
+     * markup. Forcing the Accept header before the parent decides how to render
+     * routes the response through the framework's JSON exception renderer.
+     */
+    public function render($request, Throwable $e)
+    {
+        if ($request->is('api/*')) {
+            $request->headers->set('Accept', 'application/json');
+        }
+
+        return parent::render($request, $e);
+    }
 }

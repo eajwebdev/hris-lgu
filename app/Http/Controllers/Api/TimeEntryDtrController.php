@@ -15,8 +15,8 @@ class TimeEntryDtrController extends Controller
 {
     private function shortDecrypt($encrypted)
     {
-        $key    = 'fA7xB93kL0pTzWmQ';
-        $cipher = 'AES-128-ECB';
+        $key    = config('api.crypto.key');
+        $cipher = config('api.crypto.cipher');
         $encrypted = strtr($encrypted, '-_', '+/');
         $decrypted = openssl_decrypt(base64_decode($encrypted), $cipher, $key, 0);
         if ($decrypted === false) { abort(404, 'Invalid Employee ID'); }

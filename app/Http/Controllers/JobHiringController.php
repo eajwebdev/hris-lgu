@@ -17,6 +17,21 @@ class JobHiringController extends Controller
         }
     }
 
+    /**
+     * The public careers portal — no auth, applicants are not users.
+     * Only positions that are Open and not past their closing date are shown;
+     * everything else about a vacancy stays internal.
+     */
+    public function portal()
+    {
+        $jobs = JobHiring::where('status', 'Open')
+            ->whereDate('expiration_at', '>=', now()->toDateString())
+            ->orderBy('expiration_at')
+            ->get();
+
+        return view('career.portal', compact('jobs'));
+    }
+
     public function jlist()
     {
         $guard = $this->getGuaard();

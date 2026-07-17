@@ -42,6 +42,7 @@ class Kernel extends HttpKernel
 
         'api' => [
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            \App\Http\Middleware\ForceJsonResponse::class,
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
@@ -68,5 +69,6 @@ class Kernel extends HttpKernel
         'role' => \App\Http\Middleware\LoginAuth::class,
         'face.registrar' => \App\Http\Middleware\EnsureFaceRegistrar::class,
         'face.self' => \App\Http\Middleware\EnsureFaceSelfOrRegistrar::class,
+        'event.passcode' => \App\Http\Middleware\VerifyEventApiPasscode::class,
     ];
 }

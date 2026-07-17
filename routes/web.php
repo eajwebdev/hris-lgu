@@ -67,6 +67,17 @@ Route::prefix('attendance')->group(function () {
     Route::post('/punch', [AttendancePortalController::class, 'punch'])->middleware($limit)->name('attendancePunch');
 });
 
+/*
+ * Public careers portal.
+ *
+ * Applicants are not users of this system — no account, no login. They browse
+ * the open positions, apply, and track their application by its number. The
+ * submission and tracking endpoints live in routes/api.php and were already
+ * built for this portal; this page is the front door the confirmation emails
+ * have been linking to.
+ */
+Route::get('/careers', [JobHiringController::class, 'portal'])->name('careersPortal');
+
 Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], function() {
 
     /*
@@ -392,6 +403,19 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         Route::get('/reports', [EventController::class, 'showReport'])->name('showReport');
         Route::post('/reports', [EventController::class, 'searchReport'])->name('searchReport');
         Route::get('/reports-generate/{eventid}/{statusid}', [EventController::class, 'reportGenrate'])->name('reportGenrate');
+
+        /*
+         * Event QR attendance scanner. Admin/HR only — the operator logs in, the
+         * face.registrar gate (Administrator / HR Administrator) is the same one
+         * used for attendance administration, so a plain employee reaching this
+         * URL by hand gets a 403. The QR carries an encrypted emp_ID (the same
+         * token the printed employee cards show); the server decides whose row
+         * moves. First scan clocks the attendee in, the last scan clocks them out.
+         */
+        Route::middleware('face.registrar')->group(function () {
+            Route::get('/scan', [EventController::class, 'scanPortal'])->name('eventScan');
+            Route::post('/scan-punch', [EventController::class, 'scanPunch'])->name('eventScanPunch');
+        });
     });
 
     Route::get('/settings', [MasterController::class, 'systemSetting'])->name('settings');
