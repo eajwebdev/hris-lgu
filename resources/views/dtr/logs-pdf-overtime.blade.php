@@ -17,12 +17,6 @@
     <style>
         body {
             font-family: 'Roboto', sans-serif;
-            background-image: url('{{ pdf_image('Uploads/pdf/hris.jpg') }}') !important;
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-            opacity: 0.95;
             margin: 0;
             padding: 0;
         }
