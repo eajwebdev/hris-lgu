@@ -17,6 +17,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::dropIfExists('employee_face_vectors');
         Schema::create('employee_face_vectors', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('employee_id');
@@ -45,6 +46,10 @@ return new class extends Migration
      */
     private function backfill(): void
     {
+        if (!Schema::hasColumn('employees', 'face_embeddings')) {
+            return;
+        }
+
         $dimension = (int) config('face.dimension', 128);
         $now = now();
 

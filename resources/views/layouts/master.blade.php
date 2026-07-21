@@ -73,9 +73,91 @@
     .privacy-container ul {
         padding-left: 20px;
     }
+
+    /* =====================================================================
+       STRICT SIDEBAR COLLAPSE NO-HOVER-EXPAND OVERRIDE
+       ===================================================================== */
+    body.sidebar-collapse .main-sidebar,
+    body.sidebar-collapse .main-sidebar::before,
+    body.sidebar-collapse .main-sidebar:hover,
+    body.sidebar-collapse.sidebar-focused .main-sidebar,
+    body.sidebar-collapse .main-sidebar.sidebar-focused,
+    body.sidebar-collapse .main-sidebar:focus,
+    body.sidebar-no-expand.sidebar-collapse .main-sidebar:hover {
+        width: 4.6rem !important;
+        transition: none !important;
+    }
+
+    /* Brand Link & Logo in collapsed mode */
+    body.sidebar-collapse .brand-link,
+    body.sidebar-collapse .main-sidebar:hover .brand-link {
+        width: 4.6rem !important;
+        padding: 0.8125rem 0.5rem !important;
+        text-align: center !important;
+        margin: 0 !important;
+    }
+
+    body.sidebar-collapse .brand-image,
+    body.sidebar-collapse .main-sidebar:hover .brand-image {
+        float: none !important;
+        margin: 0 auto !important;
+        display: inline-block !important;
+        max-height: 33px !important;
+    }
+
+    body.sidebar-collapse .brand-text,
+    body.sidebar-collapse .main-sidebar:hover .brand-text {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        width: 0 !important;
+    }
+
+    /* User Panel Avatar & Info in collapsed mode */
+    body.sidebar-collapse .user-panel,
+    body.sidebar-collapse .main-sidebar:hover .user-panel {
+        width: 4.6rem !important;
+        padding: 0 !important;
+        margin: 1rem 0 !important;
+        display: flex !important;
+        justify-content: center !important;
+    }
+
+    body.sidebar-collapse .user-panel .image,
+    body.sidebar-collapse .main-sidebar:hover .user-panel .image {
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        margin: 0 auto !important;
+        float: none !important;
+    }
+
+    body.sidebar-collapse .user-panel .info,
+    body.sidebar-collapse .main-sidebar:hover .user-panel .info {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        width: 0 !important;
+    }
+
+    /* Nav links in collapsed mode */
+    body.sidebar-collapse .main-sidebar .nav-sidebar .nav-link,
+    body.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-link {
+        width: 4.6rem !important;
+    }
+
+    body.sidebar-collapse .main-sidebar .nav-sidebar .nav-link p,
+    body.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-link p,
+    body.sidebar-collapse .main-sidebar .nav-header,
+    body.sidebar-collapse .main-sidebar:hover .nav-header {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        width: 0 !important;
+    }
     </style>
 </head>
-<body class="hold-transition sidebar-mini layout-fixed layout-navbar-fixed text-sm">
+<body class="hold-transition sidebar-mini layout-fixed layout-navbar-fixed text-sm sidebar-no-expand">
     <div class="wrapper">
         <!-- Dims the page behind the off-canvas sidebar on phones -->
         <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -249,7 +331,7 @@
                     </a>
                 </div>
                 <div class="d-none d-sm-inline">
-                    Maintained and Managed by the <strong>MIS Office</strong>.
+                    Managed by <strong>EAJ Web Development Services</strong>.
                 </div>
             </div>
         </footer>

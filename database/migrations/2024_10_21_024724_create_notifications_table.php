@@ -15,6 +15,13 @@ return new class extends Migration
     {
         Schema::create('notifications', function (Blueprint $table) {
             $table->id();
+            $table->string('empid')->nullable();
+            $table->unsignedBigInteger('lapp_id')->nullable();
+            $table->unsignedBigInteger('esign_id')->nullable();
+            $table->integer('category')->nullable();
+            $table->string('utype')->nullable();
+            $table->string('module')->nullable();
+            $table->integer('status')->default(0);
             $table->timestamps();
         });
     }

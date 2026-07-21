@@ -7,6 +7,7 @@ use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Notification;
@@ -193,6 +194,10 @@ class Controller extends BaseController
 
     public function __construct()
     {
+        if (app()->runningInConsole()) {
+            return;
+        }
+
         // The queries below only feed the notification bell and job-application
         // dropdown that appear on full HTML pages. They are expensive (two large
         // multi-join queries plus an unbounded applications fetch) and running them
@@ -203,165 +208,184 @@ class Controller extends BaseController
             return;
         }
 
-        $employeeEmpId = Auth::guard('employee')->check()
-            ? Auth::guard('employee')->user()->emp_ID
-            : null;
+        $jobapplication = collect();
+        $notifications = collect();
+        $notifications1 = collect();
+        $notificationsCount = 0;
+        $notificationsCount1 = 0;
 
-        // Count of HR notifications (status 0)
-        $notificationsCount = Notification::where('utype', 'hr')
-            ->where('status', 0)
-            ->count();
-        
-        // Employee notifications excluding leavecredit modules
-        $notificationsCount1 = Notification::where('utype', 'employee')
-            ->whereNotIn('module', ['leavecredit', 'leavecreditadd'])
-            ->when($employeeEmpId, fn ($query) => $query->where('empid', $employeeEmpId))
-            ->where('status', 0)
-            ->count();
+        try {
+            $employeeEmpId = Auth::guard('employee')->check()
+                ? Auth::guard('employee')->user()->emp_ID
+                : null;
 
-        // Admin notifications (latest 10)
-        $notifications = Notification::query()
-            ->select(
-                'notifications.*',
-                'notifications.status as notifstat',
-                'notifications.created_at as notif_created_at',
-                
-                // Only select needed columns from employees
-                'leave_emp.id as leave_emp_id',
-                'leave_emp.profile as leave_emp_profile',
-                'leave_applications.leave_type',
-                'leave_applications.transnum',
-                DB::raw("CONCAT(leave_emp.fname, ' ', leave_emp.lname) as leave_emp_fullname"),
+            $hasNotificationsTable = Schema::hasTable('notifications') && Schema::hasColumn('notifications', 'utype');
 
-                'pds_emp_eligi.emp_ID as pds_emp_eligi_id',
-                'pds_emp_eligi.profile as pds_emp_eligi_profile',
-                DB::raw("CONCAT(pds_emp_eligi.fname, ' ', pds_emp_eligi.lname) as pds_emp_eligi_fullname"),
+            if ($hasNotificationsTable) {
+                // Count of HR notifications (status 0)
+                $notificationsCount = Notification::where('utype', 'hr')
+                    ->where('status', 0)
+                    ->count();
 
-                'pds_emp_workexp.emp_ID as pds_emp_workexp_id',
-                'pds_emp_workexp.profile as pds_emp_workexp_profile',
-                DB::raw("CONCAT(pds_emp_workexp.fname, ' ', pds_emp_workexp.lname) as pds_emp_workexp_fullname"),
+                // Employee notifications excluding leavecredit modules
+                $notificationsCount1 = Notification::where('utype', 'employee')
+                    ->whereNotIn('module', ['leavecredit', 'leavecreditadd'])
+                    ->when($employeeEmpId, fn ($query) => $query->where('empid', $employeeEmpId))
+                    ->where('status', 0)
+                    ->count();
 
-                'pds_emp_volworks.emp_ID as pds_emp_volworks_id',
-                'pds_emp_volworks.profile as pds_emp_volworks_profile',
-                DB::raw("CONCAT(pds_emp_volworks.fname, ' ', pds_emp_volworks.lname) as pds_emp_volworks_fullname"),
+                // Admin notifications (latest 10)
+                $notifications = Notification::query()
+                    ->select(
+                        'notifications.*',
+                        'notifications.status as notifstat',
+                        'notifications.created_at as notif_created_at',
+                        
+                        'leave_emp.id as leave_emp_id',
+                        'leave_emp.profile as leave_emp_profile',
+                        'leave_applications.leave_type',
+                        'leave_applications.transnum',
+                        DB::raw("CONCAT(leave_emp.fname, ' ', leave_emp.lname) as leave_emp_fullname"),
 
-                'pds_emp_learndev.emp_ID as pds_emp_learndev_id',
-                'pds_emp_learndev.profile as pds_emp_learndev_profile',
-                DB::raw("CONCAT(pds_emp_learndev.fname, ' ', pds_emp_learndev.lname) as pds_emp_learndev_fullname"),
+                        'pds_emp_eligi.emp_ID as pds_emp_eligi_id',
+                        'pds_emp_eligi.profile as pds_emp_eligi_profile',
+                        DB::raw("CONCAT(pds_emp_eligi.fname, ' ', pds_emp_eligi.lname) as pds_emp_eligi_fullname"),
 
-                // Out-of-range attendance punches (module 'attendance').
-                'att_emp.id as att_emp_id',
-                'att_emp.profile as att_emp_profile',
-                'att_log.action as att_action',
-                'att_log.station_name as att_station_name',
-                'att_log.distance_m as att_distance_m',
-                DB::raw("CONCAT(att_emp.fname, ' ', att_emp.lname) as att_emp_fullname")
-            )
-            ->where('utype', 'hr')
-            ->leftJoin('leave_applications', function ($join) {
-                $join->on('notifications.lapp_id', '=', 'leave_applications.id')
-                    ->where('notifications.module', 'leave');
-            })
-            ->leftJoin('employees as leave_emp', function ($join) {
-                $join->on('leave_emp.emp_ID', '=', 'leave_applications.empid')
-                    ->where('notifications.module', 'leave');
-            })
-            ->leftJoin('eligibilities', function ($join) {
-                $join->on('notifications.lapp_id', '=', 'eligibilities.id')
-                    ->where('notifications.category', 1)
-                    ->where('notifications.module', 'pds');
-            })
-            ->leftJoin('employees as pds_emp_eligi', function ($join) {
-                $join->on('pds_emp_eligi.emp_ID', '=', 'eligibilities.empid')
-                    ->where('notifications.category', 1)
-                    ->where('notifications.module', 'pds');
-            })
-            ->leftJoin('work_experiences', function ($join) {
-                $join->on('notifications.lapp_id', '=', 'work_experiences.id')
-                    ->where('notifications.category', 2)
-                    ->where('notifications.module', 'pds');
-            })
-            ->leftJoin('employees as pds_emp_workexp', function ($join) {
-                $join->on('pds_emp_workexp.emp_ID', '=', 'work_experiences.empid')
-                    ->where('notifications.category', 2)
-                    ->where('notifications.module', 'pds');
-            })
-            ->leftJoin('voluntary_works', function ($join) {
-                $join->on('notifications.lapp_id', '=', 'voluntary_works.id')
-                    ->where('notifications.category', 3)
-                    ->where('notifications.module', 'pds');
-            })
-            ->leftJoin('employees as pds_emp_volworks', function ($join) {
-                $join->on('pds_emp_volworks.emp_ID', '=', 'voluntary_works.empid')
-                    ->where('notifications.category', 3)
-                    ->where('notifications.module', 'pds');
-            })
-            ->leftJoin('learning_devs', function ($join) {
-                $join->on('notifications.lapp_id', '=', 'learning_devs.id')
-                    ->where('notifications.category', 4)
-                    ->where('notifications.module', 'pds');
-            })
-            ->leftJoin('employees as pds_emp_learndev', function ($join) {
-                $join->on('pds_emp_learndev.emp_ID', '=', 'learning_devs.empid')
-                    ->where('notifications.category', 4)
-                    ->where('notifications.module', 'pds');
-            })
-            ->leftJoin('attendance_punch_logs as att_log', function ($join) {
-                $join->on('notifications.lapp_id', '=', 'att_log.id')
-                    ->where('notifications.module', 'attendance');
-            })
-            ->leftJoin('employees as att_emp', function ($join) {
-                $join->on('att_emp.id', '=', 'att_log.employee_id')
-                    ->where('notifications.module', 'attendance');
-            })
-            ->orderBy('notifications.created_at', 'desc')
-            ->limit(10)
-            ->get();
+                        'pds_emp_workexp.emp_ID as pds_emp_workexp_id',
+                        'pds_emp_workexp.profile as pds_emp_workexp_profile',
+                        DB::raw("CONCAT(pds_emp_workexp.fname, ' ', pds_emp_workexp.lname) as pds_emp_workexp_fullname"),
 
-        // Employee notifications (latest 10)
-        $notifications1 = Notification::query()
-            ->select(
-                'notifications.*',
-                'notifications.empid as notifempid',
-                'notifications.status as notifstat',
-                'notifications.created_at as notif_created_at',
-                'leave_applications.leave_type',
-                'leave_applications.transnum',
-                
-                'pds_emp_eligi.profile as pds_emp_eligi_profile',
-                'pds_emp_workexp.profile as pds_emp_workexp_profile',
-                'pds_emp_volworks.profile as pds_emp_volworks_profile',
-                'pds_emp_learndev.profile as pds_emp_learndev_profile',
+                        'pds_emp_volworks.emp_ID as pds_emp_volworks_id',
+                        'pds_emp_volworks.profile as pds_emp_volworks_profile',
+                        DB::raw("CONCAT(pds_emp_volworks.fname, ' ', pds_emp_volworks.lname) as pds_emp_volworks_fullname"),
 
-                'eligibilities.careereligible as eligibilities_careereligible',
-                'work_experiences.department as work_experiences_department',
-                'voluntary_works.org_name as voluntary_works_org_name',
-                'learning_devs.learning_dev as learning_devs_learning_dev'
-            )
-            ->where('utype', 'employee')
-            ->when($employeeEmpId, fn ($query) => $query->where('notifications.empid', $employeeEmpId))
-            ->leftJoin('leave_applications', function ($join) {
-                $join->on('notifications.lapp_id', '=', 'leave_applications.id')
-                    ->where('notifications.module', 'leave');
-            })
-            ->leftJoin('eligibilities', 'notifications.lapp_id', '=', 'eligibilities.id')
-            ->leftJoin('work_experiences', 'notifications.lapp_id', '=', 'work_experiences.id')
-            ->leftJoin('voluntary_works', 'notifications.lapp_id', '=', 'voluntary_works.id')
-            ->leftJoin('learning_devs', 'notifications.lapp_id', '=', 'learning_devs.id')
-            ->leftJoin('employees as pds_emp_eligi', 'pds_emp_eligi.emp_ID', '=', 'eligibilities.empid')
-            ->leftJoin('employees as pds_emp_workexp', 'pds_emp_workexp.emp_ID', '=', 'work_experiences.empid')
-            ->leftJoin('employees as pds_emp_volworks', 'pds_emp_volworks.emp_ID', '=', 'voluntary_works.empid')
-            ->leftJoin('employees as pds_emp_learndev', 'pds_emp_learndev.emp_ID', '=', 'learning_devs.empid')
-            ->orderBy('notifications.created_at', 'desc')
-            ->limit(10)
-            ->get();
+                        'pds_emp_learndev.emp_ID as pds_emp_learndev_id',
+                        'pds_emp_learndev.profile as pds_emp_learndev_profile',
+                        DB::raw("CONCAT(pds_emp_learndev.fname, ' ', pds_emp_learndev.lname) as pds_emp_learndev_fullname"),
 
-        $jobapplication = Application::whereNull('ctrl_no')
-            ->join('job_hirings', 'applications.jid', '=', 'job_hirings.id')
-            ->select('applications.*', 'job_hirings.title', 'job_hirings.id as job_id')
-            ->orderByDesc('applications.checked')
-            ->orderByDesc('applications.created_at')
-            ->get();
+                        'att_emp.id as att_emp_id',
+                        'att_emp.profile as att_emp_profile',
+                        'att_log.action as att_action',
+                        'att_log.station_name as att_station_name',
+                        'att_log.distance_m as att_distance_m',
+                        DB::raw("CONCAT(att_emp.fname, ' ', att_emp.lname) as att_emp_fullname")
+                    )
+                    ->where('utype', 'hr')
+                    ->when(Schema::hasTable('leave_applications') && Schema::hasTable('employees'), function ($query) {
+                        $query->leftJoin('leave_applications', function ($join) {
+                            $join->on('notifications.lapp_id', '=', 'leave_applications.id')
+                                ->where('notifications.module', 'leave');
+                        })
+                        ->leftJoin('employees as leave_emp', function ($join) {
+                            $join->on('leave_emp.emp_ID', '=', 'leave_applications.empid')
+                                ->where('notifications.module', 'leave');
+                        });
+                    })
+                    ->when(Schema::hasTable('eligibilities') && Schema::hasTable('employees'), function ($query) {
+                        $query->leftJoin('eligibilities', function ($join) {
+                            $join->on('notifications.lapp_id', '=', 'eligibilities.id')
+                                ->where('notifications.category', 1)
+                                ->where('notifications.module', 'pds');
+                        })
+                        ->leftJoin('employees as pds_emp_eligi', function ($join) {
+                            $join->on('pds_emp_eligi.emp_ID', '=', 'eligibilities.empid')
+                                ->where('notifications.category', 1)
+                                ->where('notifications.module', 'pds');
+                        });
+                    })
+                    ->when(Schema::hasTable('work_experiences') && Schema::hasTable('employees'), function ($query) {
+                        $query->leftJoin('work_experiences', function ($join) {
+                            $join->on('notifications.lapp_id', '=', 'work_experiences.id')
+                                ->where('notifications.category', 2)
+                                ->where('notifications.module', 'pds');
+                        })
+                        ->leftJoin('employees as pds_emp_workexp', function ($join) {
+                            $join->on('pds_emp_workexp.emp_ID', '=', 'work_experiences.empid')
+                                ->where('notifications.category', 2)
+                                ->where('notifications.module', 'pds');
+                        });
+                    })
+                    ->when(Schema::hasTable('voluntary_works') && Schema::hasTable('employees'), function ($query) {
+                        $query->leftJoin('voluntary_works', function ($join) {
+                            $join->on('notifications.lapp_id', '=', 'voluntary_works.id')
+                                ->where('notifications.category', 3)
+                                ->where('notifications.module', 'pds');
+                        })
+                        ->leftJoin('employees as pds_emp_volworks', function ($join) {
+                            $join->on('pds_emp_volworks.emp_ID', '=', 'voluntary_works.empid')
+                                ->where('notifications.category', 3)
+                                ->where('notifications.module', 'pds');
+                        });
+                    })
+                    ->when(Schema::hasTable('learning_devs') && Schema::hasTable('employees'), function ($query) {
+                        $query->leftJoin('learning_devs', function ($join) {
+                            $join->on('notifications.lapp_id', '=', 'learning_devs.id')
+                                ->where('notifications.category', 4)
+                                ->where('notifications.module', 'pds');
+                        })
+                        ->leftJoin('employees as pds_emp_learndev', function ($join) {
+                            $join->on('pds_emp_learndev.emp_ID', '=', 'learning_devs.empid')
+                                ->where('notifications.category', 4)
+                                ->where('notifications.module', 'pds');
+                        });
+                    })
+                    ->when(Schema::hasTable('attendance_punch_logs') && Schema::hasTable('employees'), function ($query) {
+                        $query->leftJoin('attendance_punch_logs as att_log', function ($join) {
+                            $join->on('notifications.lapp_id', '=', 'att_log.id')
+                                ->where('notifications.module', 'attendance');
+                        })
+                        ->leftJoin('employees as att_emp', function ($join) {
+                            $join->on('att_emp.id', '=', 'att_log.employee_id')
+                                ->where('notifications.module', 'attendance');
+                        });
+                    })
+                    ->orderBy('notifications.created_at', 'desc')
+                    ->limit(10)
+                    ->get();
+
+                // Employee notifications (latest 10)
+                $notifications1 = Notification::query()
+                    ->select(
+                        'notifications.*',
+                        'notifications.empid as notifempid',
+                        'notifications.status as notifstat',
+                        'notifications.created_at as notif_created_at',
+                        'leave_applications.leave_type',
+                        'leave_applications.transnum',
+                        
+                        'pds_emp_eligi.profile as pds_emp_eligi_profile',
+                        'pds_emp_workexp.profile as pds_emp_workexp_profile',
+                        'pds_emp_volworks.profile as pds_emp_volworks_profile',
+                        'pds_emp_learndev.profile as pds_emp_learndev_profile',
+
+                        'eligibilities.careereligible as eligibilities_careereligible',
+                        'work_experiences.department as work_experiences_department',
+                        'voluntary_works.org_name as voluntary_works_org_name',
+                        'learning_devs.learning_dev as learning_devs_learning_dev'
+                    )
+                    ->where('utype', 'employee')
+                    ->when($employeeEmpId, fn ($query) => $query->where('notifications.empid', $employeeEmpId))
+                    ->when(Schema::hasTable('leave_applications'), fn ($q) => $q->leftJoin('leave_applications', fn ($join) => $join->on('notifications.lapp_id', '=', 'leave_applications.id')->where('notifications.module', 'leave')))
+                    ->when(Schema::hasTable('eligibilities') && Schema::hasTable('employees'), fn ($q) => $q->leftJoin('eligibilities', 'notifications.lapp_id', '=', 'eligibilities.id')->leftJoin('employees as pds_emp_eligi', 'pds_emp_eligi.emp_ID', '=', 'eligibilities.empid'))
+                    ->when(Schema::hasTable('work_experiences') && Schema::hasTable('employees'), fn ($q) => $q->leftJoin('work_experiences', 'notifications.lapp_id', '=', 'work_experiences.id')->leftJoin('employees as pds_emp_workexp', 'pds_emp_workexp.emp_ID', '=', 'work_experiences.empid'))
+                    ->when(Schema::hasTable('voluntary_works') && Schema::hasTable('employees'), fn ($q) => $q->leftJoin('voluntary_works', 'notifications.lapp_id', '=', 'voluntary_works.id')->leftJoin('employees as pds_emp_volworks', 'pds_emp_volworks.emp_ID', '=', 'voluntary_works.empid'))
+                    ->when(Schema::hasTable('learning_devs') && Schema::hasTable('employees'), fn ($q) => $q->leftJoin('learning_devs', 'notifications.lapp_id', '=', 'learning_devs.id')->leftJoin('employees as pds_emp_learndev', 'pds_emp_learndev.emp_ID', '=', 'learning_devs.empid'))
+                    ->orderBy('notifications.created_at', 'desc')
+                    ->limit(10)
+                    ->get();
+            }
+
+            if (Schema::hasTable('applications') && Schema::hasTable('job_hirings')) {
+                $jobapplication = Application::whereNull('ctrl_no')
+                    ->join('job_hirings', 'applications.jid', '=', 'job_hirings.id')
+                    ->select('applications.*', 'job_hirings.title', 'job_hirings.id as job_id')
+                    ->orderByDesc('applications.checked')
+                    ->orderByDesc('applications.created_at')
+                    ->get();
+            }
+        } catch (\Throwable $e) {
+            // Silently fallback if DB tables are unmigrated or unavailable
+        }
 
         View::share([
             'jobapplication' => $jobapplication,

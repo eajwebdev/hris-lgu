@@ -56,6 +56,16 @@ class Employee extends Authenticatable
     }
 
     /**
+     * Check if employee is an Office Head or OIC.
+     */
+    public function isOfficeHead(): bool
+    {
+        return Office::where('office_head_id', $this->id)
+            ->orWhere('oic_id', $this->id)
+            ->exists();
+    }
+
+    /**
      * Registration metadata for the profile panel — never the vectors themselves.
      */
     public function faceSummary(): array

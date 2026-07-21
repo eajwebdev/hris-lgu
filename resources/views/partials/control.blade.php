@@ -3,9 +3,12 @@
     $isStaff   = $role !== 'employee';           // HR / administrators
     $isAdmin   = $role === 'Administrator';
     $isWeb     = $guard === 'web';
+    $user      = auth()->guard($guard)->user();
+    $isHead    = $isStaff || ($user && method_exists($user, 'isOfficeHead') && $user->isOfficeHead());
 
     $careersOpen = request()->is('career*') || request()->is('applications*')
                 || request()->is('ete*') || request()->is('interview*');
+    $spmsOpen    = request()->is('spms*');
 @endphp
 
 <nav class="mt-2">
@@ -113,6 +116,17 @@
                 </a>
             </li>
         @endif
+
+        {{-- ------------------------------------------------ SPMS / Performance --}}
+        <li class="nav-header">Performance</li>
+
+        <li class="nav-item">
+            <a href="{{ route('spms.drive') }}" title="SPMS"
+               class="nav-link {{ $spmsOpen ? 'active' : '' }}">
+                <i class="nav-icon fas fa-folder"></i>
+                <p>SPMS</p>
+            </a>
+        </li>
 
         @if($isWeb)
             {{-- -------------------------------------------------- Recruitment --}}

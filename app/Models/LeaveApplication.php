@@ -50,6 +50,7 @@ class LeaveApplication extends Model
         'less',
         'balance',
         'status',
+        'history',
         'gen_app',
         'as_of',
         'holiday'

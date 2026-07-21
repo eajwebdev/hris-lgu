@@ -37,6 +37,7 @@ use App\Http\Controllers\InterviewEvaluationController;
 use App\Http\Controllers\FaceRegistrationController;
 use App\Http\Controllers\AttendancePortalController;
 use App\Http\Controllers\AttendanceAdminController;
+use App\Http\Controllers\SpmsController;
 
 //login
 Route::get('/hr-admin',[LoginAuthController::class,'getLoginAdmin'])->name('getLoginAdmin');
@@ -98,6 +99,21 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
     // Dashboard
     Route::get('/dashboard', [MasterController::class, 'dashboard'])->name('dashboard');
     Route::get('/data-privacy', [MasterController::class, 'dataPrivacy'])->name('dataPrivacy');
+
+    // SPMS (Strategic Performance Management System)
+    Route::prefix('spms')->group(function() {
+        Route::get('/', [SpmsController::class, 'drive'])->name('spms.drive');
+        Route::get('/opcr', [SpmsController::class, 'opcrList'])->name('spms.opcr');
+        Route::post('/opcr/create', [SpmsController::class, 'createOpcr'])->name('spms.opcr.create');
+        Route::get('/opcr/{id}', [SpmsController::class, 'opcrMatrix'])->name('spms.opcr.matrix');
+        Route::post('/opcr/item/store', [SpmsController::class, 'storeOpcrItem'])->name('spms.opcr.item.store');
+        Route::post('/opcr/item/{id}/delete', [SpmsController::class, 'deleteOpcrItem'])->name('spms.opcr.item.delete');
+        Route::post('/opcr/item/cascade', [SpmsController::class, 'cascadeOpcrItem'])->name('spms.opcr.item.cascade');
+
+        Route::get('/ipcr/{id?}', [SpmsController::class, 'ipcrMatrix'])->name('spms.ipcr');
+        Route::post('/ipcr/accomplishment/submit', [SpmsController::class, 'submitAccomplishment'])->name('spms.ipcr.accomplishment.submit');
+        Route::post('/ipcr/item/rate', [SpmsController::class, 'rateIpcrItem'])->name('spms.ipcr.item.rate');
+    });
 
 
 
@@ -419,4 +435,19 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
     Route::get('/settings', [MasterController::class, 'systemSetting'])->name('settings');
     Route::get('/leave/disapprove', [LeaveApplicationController::class, 'leaveDisapprove']);
     Route::post('/logout', [MasterController::class, 'logout'])->name('logout');
+
+    // SPMS Routes
+    Route::prefix('spms')->group(function() {
+        Route::get('/', [SpmsController::class, 'drive'])->name('spms.drive');
+        Route::get('/opcr', [SpmsController::class, 'opcrList'])->name('spms.opcr');
+        Route::get('/opcr/{id}', [SpmsController::class, 'opcrMatrix'])->name('spms.opcr.matrix');
+        Route::post('/opcr/item/store', [SpmsController::class, 'storeOpcrItem'])->name('spms.opcr.item.store');
+        Route::post('/opcr/item/delete/{id}', [SpmsController::class, 'deleteOpcrItem'])->name('spms.opcr.item.delete');
+        Route::post('/opcr/item/cascade', [SpmsController::class, 'cascadeOpcrItem'])->name('spms.opcr.item.cascade');
+        Route::get('/ipcr/{id?}', [SpmsController::class, 'ipcrMatrix'])->name('spms.ipcr');
+        Route::post('/ipcr/accomplishment/submit', [SpmsController::class, 'submitAccomplishment'])->name('spms.ipcr.accomplishment.submit');
+        Route::post('/ipcr/item/store', [SpmsController::class, 'storeIpcrItem'])->name('spms.ipcr.item.store');
+        Route::post('/ipcr/item/rate', [SpmsController::class, 'rateIpcrItem'])->name('spms.ipcr.item.rate');
+        Route::get('/evidence/{id}', [SpmsController::class, 'viewEvidence'])->name('spms.evidence.view');
+    });
 });

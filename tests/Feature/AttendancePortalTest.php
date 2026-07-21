@@ -244,7 +244,7 @@ class AttendancePortalTest extends TestCase
             ->first();
     }
 
-    private function name(Employee $employee): string
+    private function employeeName(Employee $employee): string
     {
         return trim("{$employee->fname} {$employee->lname}");
     }

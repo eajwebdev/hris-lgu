@@ -48,7 +48,11 @@ return new class extends Migration
         // Which official actually signed: 'Mayor' or 'Vice Mayor'.
         if (!Schema::hasColumn('leave_applications', 'approver_role')) {
             Schema::table('leave_applications', function (Blueprint $table) {
-                $table->string('approver_role')->nullable()->after('approver');
+                if (Schema::hasColumn('leave_applications', 'approver')) {
+                    $table->string('approver_role')->nullable()->after('approver');
+                } else {
+                    $table->string('approver_role')->nullable();
+                }
             });
         }
 
