@@ -124,6 +124,7 @@ return new class extends Migration
                 if (!Schema::hasColumn('leave_applications', 'gen_app')) $table->string('gen_app')->nullable();
                 if (!Schema::hasColumn('leave_applications', 'as_of')) $table->date('as_of')->nullable();
                 if (!Schema::hasColumn('leave_applications', 'holiday')) $table->string('holiday')->nullable();
+                if (!Schema::hasColumn('leave_applications', 'history')) $table->integer('history')->default(1);
             });
         }
 
@@ -248,6 +249,18 @@ return new class extends Migration
                 if (!Schema::hasColumn('work_experiences', 'list_accom')) $table->text('list_accom')->nullable();
                 if (!Schema::hasColumn('work_experiences', 'actual_summary')) $table->text('actual_summary')->nullable();
                 if (!Schema::hasColumn('work_experiences', 'remarks')) $table->text('remarks')->nullable();
+            });
+        }
+
+        // 15. dtr_tests
+        if (Schema::hasTable('dtr_tests')) {
+            Schema::table('dtr_tests', function (Blueprint $table) {
+                if (!Schema::hasColumn('dtr_tests', 'emp_ID')) $table->string('emp_ID')->nullable();
+                if (!Schema::hasColumn('dtr_tests', 'date')) $table->date('date')->nullable();
+                if (!Schema::hasColumn('dtr_tests', 'time_in')) $table->string('time_in')->nullable();
+                if (!Schema::hasColumn('dtr_tests', 'time_out')) $table->string('time_out')->nullable();
+                if (!Schema::hasColumn('dtr_tests', 'time_over')) $table->string('time_over')->nullable();
+                if (!Schema::hasColumn('dtr_tests', 'device_id')) $table->string('device_id')->nullable();
             });
         }
     }
