@@ -109,6 +109,9 @@ class SpmsController extends Controller
 
         $office = Office::findOrFail($request->office_id);
 
+        $guard = $this->getGuard();
+        $user = auth()->guard($guard)->user();
+
         $opcr = SpmsOpcr::firstOrCreate(
             [
                 'office_id' => $office->id,
@@ -116,7 +119,7 @@ class SpmsController extends Controller
                 'semester' => $request->semester,
             ],
             [
-                'office_head_id' => $office->office_head_id ?? auth()->guard($this->getGuard())->id(),
+                'office_head_id' => $office->office_head_id ?? ($user ? $user->id : null),
                 'status' => 'Draft',
             ]
         );
@@ -226,7 +229,8 @@ class SpmsController extends Controller
         $opcrItem = SpmsOpcrItem::with('opcr')->findOrFail($request->opcr_item_id);
         $opcr = $opcrItem->opcr;
         $guard = $this->getGuard();
-        $assignerId = ($guard === 'employee') ? auth()->guard('employee')->id() : null;
+        $user = auth()->guard($guard)->user();
+        $assignerId = $user ? $user->id : null;
 
         $assignedNames = [];
         $failedNames = [];
