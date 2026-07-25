@@ -100,20 +100,6 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
     Route::get('/dashboard', [MasterController::class, 'dashboard'])->name('dashboard');
     Route::get('/data-privacy', [MasterController::class, 'dataPrivacy'])->name('dataPrivacy');
 
-    // SPMS (Strategic Performance Management System)
-    Route::prefix('spms')->group(function() {
-        Route::get('/', [SpmsController::class, 'drive'])->name('spms.drive');
-        Route::get('/opcr', [SpmsController::class, 'opcrList'])->name('spms.opcr');
-        Route::post('/opcr/create', [SpmsController::class, 'createOpcr'])->name('spms.opcr.create');
-        Route::get('/opcr/{id}', [SpmsController::class, 'opcrMatrix'])->name('spms.opcr.matrix');
-        Route::post('/opcr/item/store', [SpmsController::class, 'storeOpcrItem'])->name('spms.opcr.item.store');
-        Route::post('/opcr/item/{id}/delete', [SpmsController::class, 'deleteOpcrItem'])->name('spms.opcr.item.delete');
-        Route::post('/opcr/item/cascade', [SpmsController::class, 'cascadeOpcrItem'])->name('spms.opcr.item.cascade');
-
-        Route::get('/ipcr/{id?}', [SpmsController::class, 'ipcrMatrix'])->name('spms.ipcr');
-        Route::post('/ipcr/accomplishment/submit', [SpmsController::class, 'submitAccomplishment'])->name('spms.ipcr.accomplishment.submit');
-        Route::post('/ipcr/item/rate', [SpmsController::class, 'rateIpcrItem'])->name('spms.ipcr.item.rate');
-    });
 
 
 
