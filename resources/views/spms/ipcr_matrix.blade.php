@@ -120,6 +120,12 @@
     }
 </style>
 
+@php
+    $currentSysYear = (int)date('Y');
+    $currentSysSemester = (int)date('n') <= 6 ? 1 : 2;
+    $isEditablePeriod = ($year == $currentSysYear && $semester == $currentSysSemester);
+@endphp
+
 <div class="container-fluid py-2">
     {{-- Breadcrumb Bar --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -175,7 +181,7 @@
                     </a>
                     <div class="dropdown-divider"></div>
                     <h6 class="dropdown-header text-uppercase font-weight-bold text-muted small">Switch Year</h6>
-                    @foreach([date('Y'), date('Y')-1, date('Y')+1] as $y)
+                    @foreach(range(2026, max(2026, (int)date('Y'))) as $y)
                         <a class="dropdown-item py-1 small {{ $year == $y ? 'font-weight-bold text-teal' : '' }}" href="{{ route('spms.ipcr', ['id' => $employee->id, 'semester' => $semester, 'year' => $y]) }}">
                             <i class="fas fa-history mr-2 text-secondary"></i> Year {{ $y }}
                         </a>
@@ -193,14 +199,20 @@
             </h6>
             <div class="ml-auto d-flex align-items-center">
                 <span class="badge badge-success px-3 py-2 font-weight-bold mr-2">Status: {{ $ipcr->status }}</span>
-                @if(!empty($isJoOrCos) && $isJoOrCos)
-                    <button type="button" class="btn btn-sm btn-outline-info font-weight-bold shadow-sm mr-2" data-toggle="modal" data-target="#loadCosTemplateModal" title="Load standard Job Order / Contract of Service rating form template">
-                        <i class="fas fa-file-invoice mr-1"></i> Load COS / JO Rating Template
+                @if($isEditablePeriod)
+                    @if(!empty($isJoOrCos) && $isJoOrCos)
+                        <button type="button" class="btn btn-sm btn-outline-info font-weight-bold shadow-sm mr-2" data-toggle="modal" data-target="#loadCosTemplateModal" title="Load standard Job Order / Contract of Service rating form template">
+                            <i class="fas fa-file-invoice mr-1"></i> Load COS / JO Rating Template
+                        </button>
+                    @endif
+                    <button type="button" class="btn btn-sm btn-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#addCustomIpcrModal">
+                        <i class="fas fa-plus mr-1"></i> Add Custom Objective
                     </button>
+                @else
+                    <span class="badge badge-secondary px-3 py-2 font-weight-bold shadow-sm" title="Past rating periods are locked for viewing only">
+                        <i class="fas fa-lock mr-1"></i> Read-Only (Past Period)
+                    </span>
                 @endif
-                <button type="button" class="btn btn-sm btn-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#addCustomIpcrModal">
-                    <i class="fas fa-plus mr-1"></i> Add Custom Objective
-                </button>
             </div>
         </div>
 
@@ -223,7 +235,9 @@
                             <tr class="table-secondary font-weight-bold text-left">
                                 <td colspan="7" class="py-2 px-3">
                                     <i class="fas fa-folder text-warning mr-2"></i> {{ $catLabel }}
-                                    <small class="text-muted font-weight-normal ml-2 font-italic">(Drag rows below to reorder within this function)</small>
+                                    @if($isEditablePeriod)
+                                        <small class="text-muted font-weight-normal ml-2 font-italic">(Drag rows below to reorder within this function)</small>
+                                    @endif
                                 </td>
                             </tr>
                         </tbody>
@@ -232,11 +246,13 @@
                             $categoryItems = $ipcr->items->where('category', $catKey);
                         @endphp
 
-                        <tbody class="ipcr-sortable-body" data-category="{{ $catKey }}" data-reorderurl="{{ route('spms.ipcr.item.reorder') }}">
+                        <tbody class="{{ $isEditablePeriod ? 'ipcr-sortable-body' : '' }}" data-category="{{ $catKey }}" data-reorderurl="{{ route('spms.ipcr.item.reorder') }}">
                             @forelse($categoryItems as $index => $item)
-                                <tr class="ipcr-sortable-row" data-id="{{ $item->id }}">
+                                <tr class="{{ $isEditablePeriod ? 'ipcr-sortable-row' : '' }}" data-id="{{ $item->id }}">
                                     <td class="text-center font-weight-bold align-middle">
-                                        <i class="fas fa-grip-vertical text-secondary mr-1 drag-handle no-print" style="cursor: grab;" title="Drag to reorder within {{ $catKey }}"></i>
+                                        @if($isEditablePeriod)
+                                            <i class="fas fa-grip-vertical text-secondary mr-1 drag-handle no-print" style="cursor: grab;" title="Drag to reorder within {{ $catKey }}"></i>
+                                        @endif
                                         {{ $loop->iteration }}
                                     </td>
                                     <td>
@@ -268,7 +284,7 @@
                                                     <i class="fas fa-paperclip mr-1"></i> View Attachment
                                                 </a>
                                             @endif
-                                        @elseif($guard === 'employee' && $item->employee_id == $user->id)
+                                        @elseif($isEditablePeriod && $guard === 'employee' && $item->employee_id == $user->id)
                                             <button type="button" class="btn btn-xs btn-teal font-weight-bold shadow-sm mt-1" data-toggle="modal" data-target="#editAccomplishmentModal{{ $item->id }}">
                                                 <i class="fas fa-plus-circle mr-1"></i> Add Accomplishment &amp; Link
                                             </button>
@@ -291,25 +307,31 @@
 
                                     {{-- Actions Column --}}
                                     <td class="text-center align-middle">
-                                        @if($guard === 'employee' && $item->employee_id == $user->id)
-                                            <button type="button" class="btn btn-xs btn-teal font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#editAccomplishmentModal{{ $item->id }}" title="Submit or Edit Accomplishment">
-                                                <i class="fas fa-pen"></i>
-                                            </button>
-                                        @endif
-
-                                        @if($isHead || $guard === 'web')
-                                            <button type="button" class="btn btn-xs btn-warning font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#rateIpcrItemModal{{ $item->id }}" title="Rate accomplishment">
-                                                <i class="fas fa-star"></i>
-                                            </button>
-                                        @endif
-
-                                        @if(($guard === 'employee' && $item->employee_id == $user->id) || $isHead || $guard === 'web')
-                                            <form method="POST" action="{{ route('spms.ipcr.item.delete', $item->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this objective?');">
-                                                @csrf
-                                                <button type="submit" class="btn btn-xs btn-outline-danger font-weight-bold shadow-sm mb-1" title="Delete objective">
-                                                    <i class="fas fa-trash"></i>
+                                        @if($isEditablePeriod)
+                                            @if($guard === 'employee' && $item->employee_id == $user->id)
+                                                <button type="button" class="btn btn-xs btn-teal font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#editAccomplishmentModal{{ $item->id }}" title="Submit or Edit Accomplishment">
+                                                    <i class="fas fa-pen"></i>
                                                 </button>
-                                            </form>
+                                            @endif
+
+                                            @if($isHead || $guard === 'web')
+                                                <button type="button" class="btn btn-xs btn-warning font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#rateIpcrItemModal{{ $item->id }}" title="Rate accomplishment">
+                                                    <i class="fas fa-star"></i>
+                                                </button>
+                                            @endif
+
+                                            @if(($guard === 'employee' && $item->employee_id == $user->id) || $isHead || $guard === 'web')
+                                                <form method="POST" action="{{ route('spms.ipcr.item.delete', $item->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this objective?');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-xs btn-outline-danger font-weight-bold shadow-sm mb-1" title="Delete objective">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        @else
+                                            <span class="badge badge-light border text-muted px-2 py-1" title="Past rating periods are read-only">
+                                                <i class="fas fa-lock fa-xs mr-1"></i> Locked
+                                            </span>
                                         @endif
                                     </td>
                                 </tr>
@@ -467,9 +489,11 @@
                 <span class="font-weight-bold text-teal" style="font-size: 13px;">
                     <i class="fas fa-file-signature mr-1"></i> Official IPCR Signatories &amp; Approvals
                 </span>
-                <button type="button" class="btn btn-xs btn-outline-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#editIpcrSignatoriesModal">
-                    <i class="fas fa-user-edit mr-1"></i> Edit Signatories
-                </button>
+                @if($isEditablePeriod)
+                    <button type="button" class="btn btn-xs btn-outline-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#editIpcrSignatoriesModal">
+                        <i class="fas fa-user-edit mr-1"></i> Edit Signatories
+                    </button>
+                @endif
             </div>
 
             <div class="row text-dark" style="font-size: 12px;">
