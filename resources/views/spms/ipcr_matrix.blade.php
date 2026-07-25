@@ -203,11 +203,34 @@
                     <i class="fas fa-file-pdf mr-1"></i> Print Rating Form (PDF)
                 </button>
                 @if($isEditablePeriod)
-                    @if(!empty($isJoOrCos) && $isJoOrCos)
-                        <button type="button" class="btn btn-sm btn-outline-info font-weight-bold shadow-sm mr-2" data-toggle="modal" data-target="#loadCosTemplateModal" title="Load standard Job Order / Contract of Service rating form template">
-                            <i class="fas fa-file-invoice mr-1"></i> Load COS / JO Rating Template
+                    <div class="dropdown d-inline mr-2">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle font-weight-bold shadow-sm" type="button" id="ipcrTemplateDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-cog text-info mr-1"></i> Template & Options
                         </button>
-                    @endif
+                        <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="ipcrTemplateDropdown">
+                            @if(!empty($isJoOrCos) && $isJoOrCos)
+                                <button type="button" class="dropdown-item py-2" data-toggle="modal" data-target="#loadCosTemplateModal" title="Load standard Job Order / Contract of Service rating form template">
+                                    <i class="fas fa-file-invoice text-info mr-2"></i> Load COS / JO Rating Template
+                                </button>
+                            @else
+                                <button type="button" class="dropdown-item py-2" data-toggle="modal" data-target="#loadCosTemplateModal" title="Load official LGU Mabinay IPCR form template">
+                                    <i class="fas fa-file-excel text-success mr-2"></i> Load Official IPCR Template
+                                </button>
+                            @endif
+                            @if($ipcr->items->count() > 0)
+                                <div class="dropdown-divider"></div>
+                                <form method="POST" action="{{ route('spms.ipcr.clear', $ipcr->id) }}" class="d-inline">
+                                    @csrf
+                                    <button type="button" class="dropdown-item text-danger py-2 btn-delete-confirm"
+                                            data-title="Clear All IPCR Rows?"
+                                            data-text="Are you sure you want to delete ALL row items from this IPCR? This action cannot be undone."
+                                            title="Remove all IPCR rows">
+                                        <i class="fas fa-trash-alt text-danger mr-2"></i> Clear All IPCR Rows
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
                     <button type="button" class="btn btn-sm btn-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#addCustomIpcrModal">
                         <i class="fas fa-plus mr-1"></i> Add Custom Objective
                     </button>
@@ -653,13 +676,17 @@
     </div>
 </div>
 
-{{-- Load COS / Job Order Performance Rating Form Template Modal --}}
+{{-- Load Performance Rating Form Template Modal --}}
 <div class="modal fade" id="loadCosTemplateModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
             <div class="modal-header bg-white border-bottom py-2">
                 <h5 class="modal-title font-weight-bold text-info">
-                    <i class="fas fa-file-invoice text-info mr-2"></i> Load Contract of Service (COS) / Job Order Performance Rating Form
+                    @if(!empty($isJoOrCos) && $isJoOrCos)
+                        <i class="fas fa-file-invoice text-info mr-2"></i> Load Contract of Service (COS) / Job Order Performance Rating Form
+                    @else
+                        <i class="fas fa-file-excel text-success mr-2"></i> Load Official LGU Mabinay IPCR Form Template
+                    @endif
                 </h5>
                 <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -670,37 +697,64 @@
                 <input type="hidden" name="ipcr_id" value="{{ $ipcr->id }}">
 
                 <div class="modal-body text-left">
-                    <div class="alert alert-info py-2 small mb-3">
-                        <i class="fas fa-info-circle mr-1"></i> <strong>Job Order / COS Rating Form Standard:</strong> Loads default <strong>Task Descriptions</strong>, <strong>Support Functions</strong>, and <strong>Work Ethics</strong> (Punctuality, Integrity, Teamwork, Professionalism, Adaptability) tailored for Contract of Service personnel.
-                    </div>
-
-                    <div class="form-group mb-3">
-                        <label class="font-weight-bold text-dark">Select Position Rating Template:</label>
-                        <div class="custom-control custom-radio mb-2">
-                            <input type="radio" id="templateGenServices" name="template_type" value="general_services" class="custom-control-input" checked>
-                            <label class="custom-control-label font-weight-bold text-dark" for="templateGenServices">
-                                General Services Office / Maintenance &amp; Utility Personnel Rating Form
-                            </label>
-                            <small class="d-block text-muted">Includes Hallway cleanliness, Garbage gathering &amp; segregation, Daily routine tasks, Flag ceremony, LCE activities, &amp; Work Ethics evaluation.</small>
+                    @if(!empty($isJoOrCos) && $isJoOrCos)
+                        <div class="alert alert-info py-2 small mb-3">
+                            <i class="fas fa-info-circle mr-1"></i> <strong>Job Order / COS Rating Form Standard:</strong> Loads default <strong>Task Descriptions</strong>, <strong>Support Functions</strong>, and <strong>Work Ethics</strong> (Punctuality, Integrity, Teamwork, Professionalism, Adaptability) tailored for Contract of Service personnel.
                         </div>
 
-                        <div class="custom-control custom-radio">
-                            <input type="radio" id="templateAdminSupport" name="template_type" value="admin_support" class="custom-control-input">
-                            <label class="custom-control-label font-weight-bold text-dark" for="templateAdminSupport">
-                                Administrative &amp; Clerical Support Personnel Rating Form
-                            </label>
-                            <small class="d-block text-muted">Includes Document encoding &amp; filing, Records routing, Client assistance, Departmental support, &amp; Work Ethics evaluation.</small>
-                        </div>
-                    </div>
+                        <div class="form-group mb-3">
+                            <label class="font-weight-bold text-dark">Select Position Rating Template:</label>
 
-                    <div class="card border bg-light p-3 mb-0">
-                        <h6 class="font-weight-bold text-dark mb-2" style="font-size: 13px;">Included Rating Categories &amp; Work Ethics Indicators:</h6>
-                        <ul class="text-muted small mb-0 pl-3">
-                            <li><strong>Core Functions:</strong> Primary daily task descriptions &amp; operational deliverables.</li>
-                            <li><strong>Support Functions:</strong> Department assignments, Flag Ceremony, &amp; LCE sanctioned activities.</li>
-                            <li><strong>Work Ethics Evaluation:</strong> Punctuality &amp; attendance, Responsibility, Integrity, Teamwork, Professionalism, Time Management, Continuous Improvement, Respect, Adaptability, and Customer Service.</li>
-                        </ul>
-                    </div>
+                            <div class="custom-control custom-radio mb-2">
+                                <input type="radio" id="templateGenServices" name="template_type" value="general_services" class="custom-control-input" checked>
+                                <label class="custom-control-label font-weight-bold text-dark" for="templateGenServices">
+                                    General Services Office / Maintenance &amp; Utility Personnel (COS / JO)
+                                </label>
+                                <small class="d-block text-muted">Includes Hallway cleanliness, Garbage gathering &amp; segregation, Daily routine tasks, Flag ceremony, LCE activities, &amp; Work Ethics evaluation.</small>
+                            </div>
+
+                            <div class="custom-control custom-radio">
+                                <input type="radio" id="templateAdminSupport" name="template_type" value="admin_support" class="custom-control-input">
+                                <label class="custom-control-label font-weight-bold text-dark" for="templateAdminSupport">
+                                    Administrative &amp; Clerical Support Personnel (COS / JO)
+                                </label>
+                                <small class="d-block text-muted">Includes Document encoding &amp; filing, Records routing, Client assistance, Departmental support, &amp; Work Ethics evaluation.</small>
+                            </div>
+                        </div>
+
+                        <div class="card border bg-light p-3 mb-0">
+                            <h6 class="font-weight-bold text-dark mb-2" style="font-size: 13px;">Included Rating Categories &amp; Work Ethics Indicators:</h6>
+                            <ul class="text-muted small mb-0 pl-3">
+                                <li><strong>Core Functions:</strong> Primary daily task descriptions &amp; operational deliverables.</li>
+                                <li><strong>Support Functions:</strong> Department assignments, Flag Ceremony, &amp; LCE sanctioned activities.</li>
+                                <li><strong>Work Ethics Evaluation:</strong> Punctuality &amp; attendance, Responsibility, Integrity, Teamwork, Professionalism, Time Management, Continuous Improvement, Respect, Adaptability, and Customer Service.</li>
+                            </ul>
+                        </div>
+                    @else
+                        <div class="alert alert-success py-2 small mb-3">
+                            <i class="fas fa-file-excel mr-1"></i> <strong>Official LGU Mabinay IPCR Form Standard:</strong> Loads official <strong>MFO/PAPs</strong>, <strong>Subcategories</strong>, and <strong>Success Indicators</strong> from the standard LGU Mabinay IPCR form.
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label class="font-weight-bold text-dark">Select IPCR Template:</label>
+
+                            <div class="custom-control custom-radio mb-2">
+                                <input type="radio" id="templateOfficialRegular" name="template_type" value="official_regular" class="custom-control-input" checked>
+                                <label class="custom-control-label font-weight-bold text-dark text-teal" for="templateOfficialRegular">
+                                    <i class="fas fa-check-circle text-success mr-1"></i> Official LGU Mabinay IPCR Form (Regular &amp; Permanent Employees)
+                                </label>
+                                <small class="d-block text-muted">Loads official MFO/PAPs &amp; success indicators (Policy Implementation, Operations, Public Engagement, ARTA, HR &amp; Financial Management).</small>
+                            </div>
+                        </div>
+
+                        <div class="card border bg-light p-3 mb-0">
+                            <h6 class="font-weight-bold text-dark mb-2" style="font-size: 13px;">Included Functional Deliverables:</h6>
+                            <ul class="text-muted small mb-0 pl-3">
+                                <li><strong>Core Functions (90% Weight):</strong> Policy &amp; Program Implementation, Operational Management, Service Delivery &amp; Public Engagement, Personnel Management, Strategic Planning, Financial Resource Management.</li>
+                                <li><strong>Support Functions (10% Weight):</strong> Compliance &amp; Regulation, Human Resource Management, Department Meetings, Trainings, and Flag Ceremonies.</li>
+                            </ul>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="modal-footer bg-light py-2">

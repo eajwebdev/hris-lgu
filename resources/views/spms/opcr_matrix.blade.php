@@ -19,18 +19,29 @@
         font-weight: 500;
     }
     .opcr-table-header th {
-        font-size: 11px;
+        font-size: 10.5px;
         text-transform: uppercase;
         vertical-align: middle !important;
         background-color: #f8fafc;
         color: #334155;
         font-weight: 700;
+        padding: 4px 3px !important;
+    }
+    .opcr-fixed-table {
+        table-layout: fixed !important;
+        width: 100% !important;
+        font-size: 11.5px !important;
+    }
+    .opcr-fixed-table th, .opcr-fixed-table td {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        padding: 4px 4px !important;
     }
     .opcr-category-row {
         background-color: #e2e8f0 !important;
         color: #1e293b !important;
         font-weight: 700;
-        font-size: 12px;
+        font-size: 11.5px;
         letter-spacing: 0.5px;
     }
     .modal-extra-large {
@@ -172,6 +183,32 @@
             <span class="badge badge-light border text-dark px-3 py-2 mr-2 font-weight-bold">
                 {{ $opcr->semester == 1 ? '1st Half' : '2nd Half' }}
             </span>
+            <div class="dropdown d-inline mr-2">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle font-weight-bold shadow-sm" type="button" id="opcrTemplateDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-cog text-info mr-1"></i> Template & Options
+                </button>
+                <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="opcrTemplateDropdown">
+                    <form method="POST" action="{{ route('spms.opcr.template.load') }}" class="d-inline">
+                        @csrf
+                        <input type="hidden" name="opcr_id" value="{{ $opcr->id }}">
+                        <button type="submit" class="dropdown-item py-2" title="Load official OPCR template items from LGU standard">
+                            <i class="fas fa-file-excel text-success mr-2"></i> Load Official OPCR Template
+                        </button>
+                    </form>
+                    @if($opcr->items->count() > 0)
+                        <div class="dropdown-divider"></div>
+                        <form method="POST" action="{{ route('spms.opcr.clear', $opcr->id) }}" class="d-inline">
+                            @csrf
+                            <button type="button" class="dropdown-item text-danger py-2 btn-delete-confirm"
+                                    data-title="Clear All OPCR Rows?"
+                                    data-text="Are you sure you want to delete ALL row items from this OPCR? This action cannot be undone."
+                                    title="Remove all OPCR rows">
+                                <i class="fas fa-trash-alt text-danger mr-2"></i> Clear All OPCR Rows
+                            </button>
+                        </form>
+                    @endif
+                </div>
+            </div>
             <button class="btn btn-sm btn-teal font-weight-bold px-3 shadow-sm" data-toggle="modal" data-target="#addOpcrRowModal">
                 <i class="fas fa-plus mr-1"></i> Add OPCR Item
             </button>
@@ -180,24 +217,23 @@
 
     {{-- FULL-WIDTH Matrix Table Card (Light Theme) --}}
     <div class="card shadow-sm border-0 mb-4" style="border-radius: 10px; background: #ffffff;">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-bordered table-sm align-middle text-center mb-0" style="font-size: 12px;">
+            <div>
+                <table class="table table-bordered table-sm align-middle text-center mb-0 opcr-fixed-table">
                     <thead class="opcr-table-header text-center">
                         <tr>
-                            <th rowspan="2" style="width: 15%; min-width: 160px;">MFO/PAPs</th>
-                            <th rowspan="2" style="width: 18%; min-width: 180px;">Success Indicators<br><small class="text-muted">(Targets + Measures)</small></th>
-                            <th rowspan="2" style="width: 5%;">Link to Source</th>
-                            <th colspan="2" style="width: 16%;">Evidence</th>
-                            <th rowspan="2" style="width: 8%;">Allotted Budget</th>
-                            <th rowspan="2" style="width: 10%;">Division / Individuals Accountable</th>
-                            <th colspan="4" style="width: 12%;">Rating Guide / Accomplishment</th>
-                            <th rowspan="2" style="width: 12%;">Remarks / Accomplishment</th>
-                            <th rowspan="2" style="width: 4%;">Actions</th>
+                            <th rowspan="2" style="width: 17%;">MFO/PAPs</th>
+                            <th rowspan="2" style="width: 19%;">Success Indicators<br><small class="text-muted">(Targets + Measures)</small></th>
+                            <th rowspan="2" style="width: 4%;">Link</th>
+                            <th colspan="2" style="width: 17%;">Evidence</th>
+                            <th rowspan="2" style="width: 6%;">Allotted Budget</th>
+                            <th rowspan="2" style="width: 11%;">Division / Accountable</th>
+                            <th colspan="4" style="width: 12%;">Rating Guide</th>
+                            <th rowspan="2" style="width: 8%;">Remarks</th>
+                            <th rowspan="2" style="width: 6%;">Actions</th>
                         </tr>
                         <tr>
-                            <th style="font-size: 10px;">Individual Support Documents</th>
-                            <th style="font-size: 10px;">Report of Supervisor / Other Offices</th>
+                            <th style="font-size: 9.5px; width: 9%;">Individual Support</th>
+                            <th style="font-size: 9.5px; width: 8%;">Report of Supervisor</th>
                             <th style="width: 3%;">Q</th>
                             <th style="width: 3%;">E</th>
                             <th style="width: 3%;">T</th>
@@ -460,34 +496,54 @@
                                         @endif
                                     </td>
 
-                                    {{-- Rating Q, E, T, A --}}
-                                    <td class="align-middle">{{ $item->rating_q ?? '-' }}</td>
-                                    <td class="align-middle">{{ $item->rating_e ?? '-' }}</td>
-                                    <td class="align-middle">{{ $item->rating_t ?? '-' }}</td>
-                                    <td class="align-middle font-weight-bold text-success">{{ $item->rating_ave ? number_format($item->rating_ave, 2) : '-' }}</td>
+                                    {{-- Rating Q, E, T, A (Direct or Rollup from IPCR) --}}
+                                    @php
+                                        $ipcrRatings = $item->ipcrItems->whereNotNull('rating_ave');
+                                        $qVal = $item->rating_q ?? ($ipcrRatings->count() > 0 ? round($ipcrRatings->avg('rating_q'), 2) : null);
+                                        $eVal = $item->rating_e ?? ($ipcrRatings->count() > 0 ? round($ipcrRatings->avg('rating_e'), 2) : null);
+                                        $tVal = $item->rating_t ?? ($ipcrRatings->count() > 0 ? round($ipcrRatings->avg('rating_t'), 2) : null);
+                                        $aVal = $item->rating_ave ?? ($ipcrRatings->count() > 0 ? round($ipcrRatings->avg('rating_ave'), 2) : null);
+                                    @endphp
+                                    <td class="align-middle font-weight-bold">{{ $qVal ? number_format($qVal, 2) : '-' }}</td>
+                                    <td class="align-middle font-weight-bold">{{ $eVal ? number_format($eVal, 2) : '-' }}</td>
+                                    <td class="align-middle font-weight-bold">{{ $tVal ? number_format($tVal, 2) : '-' }}</td>
+                                    <td class="align-middle font-weight-bold text-success">{{ $aVal ? number_format($aVal, 2) : '-' }}</td>
 
                                     {{-- Remarks --}}
                                     <td class="text-left small">{!! nl2br(e($item->remarks ?? '')) !!}</td>
 
-                                    {{-- Row Actions (Edit, Delete, Cascade (+)) --}}
-                                    <td class="align-middle">
-                                        <div class="d-flex flex-column align-items-center">
-                                            <button class="btn btn-xs btn-success mb-1 font-weight-bold"
+                                    {{-- Row Actions (Cascade (+), Rate (★), Edit, Delete) --}}
+                                    <td class="align-middle px-1">
+                                        <div class="d-inline-grid text-center" style="display: inline-grid; grid-template-columns: repeat(2, 30px); gap: 5px; justify-content: center; align-items: center;">
+                                            <button class="btn btn-sm btn-success font-weight-bold p-0 text-center"
+                                                    style="width: 30px; height: 30px; line-height: 30px; font-size: 13px; border-radius: 6px;"
                                                     title="Cascade / Assign Row Target"
                                                     data-toggle="modal"
                                                     data-target="#cascadeModal{{ $item->id }}">
-                                                <i class="fas fa-plus fa-xs"></i>
+                                                <i class="fas fa-plus fa-sm"></i>
                                             </button>
-                                            <button class="btn btn-xs btn-info mb-1"
+                                            <button class="btn btn-sm btn-warning font-weight-bold text-dark p-0 text-center"
+                                                    style="width: 30px; height: 30px; line-height: 30px; font-size: 13px; border-radius: 6px;"
+                                                    title="Rate OPCR Row"
+                                                    data-toggle="modal"
+                                                    data-target="#rateOpcrModal{{ $item->id }}">
+                                                <i class="fas fa-star fa-sm"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-info p-0 text-center"
+                                                    style="width: 30px; height: 30px; line-height: 30px; font-size: 13px; border-radius: 6px;"
                                                     title="Edit Row"
                                                     data-toggle="modal"
                                                     data-target="#editModal{{ $item->id }}">
-                                                <i class="fas fa-edit fa-xs"></i>
+                                                <i class="fas fa-edit fa-sm"></i>
                                             </button>
-                                            <form method="POST" action="{{ route('spms.opcr.item.delete', $item->id) }}" class="d-inline">
+                                            <form method="POST" action="{{ route('spms.opcr.item.delete', $item->id) }}" class="d-inline m-0 p-0">
                                                 @csrf
-                                                <button type="button" class="btn btn-xs btn-danger btn-delete-confirm" data-title="Delete OPCR Row?" data-text="Delete this OPCR row item and all its cascaded assignments?" title="Delete Row">
-                                                    <i class="fas fa-times fa-xs"></i>
+                                                <button type="button" class="btn btn-sm btn-danger btn-delete-confirm p-0 text-center"
+                                                        style="width: 30px; height: 30px; line-height: 30px; font-size: 13px; border-radius: 6px;"
+                                                        data-title="Delete OPCR Row?"
+                                                        data-text="Delete this OPCR row item and all its cascaded assignments?"
+                                                        title="Delete Row">
+                                                    <i class="fas fa-times fa-sm"></i>
                                                 </button>
                                             </form>
                                         </div>
@@ -510,7 +566,7 @@
 
                                                 <div class="modal-body text-left">
                                                     <div class="alert alert-info py-2 small mb-3">
-                                                        <i class="fas fa-building mr-1"></i> <strong>Office Scoping Restriction:</strong> Only personnel belonging to <strong>{{ $opcr->office->office_name }}</strong> are listed.
+                                                        <i class="fas fa-building mr-1"></i> <strong>Office Scoping Restriction:</strong> Only <strong>regular & permanent personnel</strong> belonging to <strong>{{ $opcr->office->office_name }}</strong> are listed.
                                                     </div>
 
                                                     <div class="form-group mb-2">
@@ -524,15 +580,25 @@
                                                     </div>
 
                                                     <div class="form-group mb-3">
-                                                        <label class="font-weight-bold text-dark">Select Employee(s) ({{ $opcr->office->office_abbr }} Department):</label>
-                                                        <select name="employee_ids[]" class="form-control select2" multiple required style="width: 100%;">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <label class="font-weight-bold text-dark mb-0 small">
+                                                                Select Employee(s) ({{ $opcr->office->office_abbr }} Department):
+                                                                <span class="badge badge-success px-2 py-1 select-all-badge d-none ml-1" id="selectAllBadge{{ $item->id }}" style="font-size: 10px;">
+                                                                    <i class="fas fa-check-circle mr-1"></i> All Selected
+                                                                </span>
+                                                            </label>
+                                                            <button type="button" class="btn btn-xs btn-outline-primary font-weight-bold btn-select-all-office py-1 px-2" id="selectAllBtn{{ $item->id }}" data-item-id="{{ $item->id }}" style="font-size: 11px; white-space: nowrap;">
+                                                                <i class="fas fa-users fa-xs mr-1"></i> Select All Members
+                                                            </button>
+                                                        </div>
+                                                        <select name="employee_ids[]" id="employeeSelect{{ $item->id }}" class="form-control select2" multiple required style="width: 100%;">
                                                             @foreach($officeEmployees as $emp)
                                                                 <option value="{{ $emp->id }}" {{ $item->assignedEmployees->contains($emp->id) ? 'selected' : '' }}>
                                                                     {{ $emp->fname }} {{ $emp->lname }} ({{ $emp->position ?? 'Personnel' }})
                                                                 </option>
                                                             @endforeach
                                                         </select>
-                                                        <small class="form-text text-muted">Hold Ctrl to select multiple employees.</small>
+                                                        <small class="form-text text-muted" style="font-size: 11px;">Click <strong>Select All Members</strong> to assign this target to all regular & permanent personnel of {{ $opcr->office->office_name }}.</small>
                                                     </div>
                                                 </div>
 
@@ -541,6 +607,61 @@
                                                     <button type="submit" class="btn btn-success btn-sm font-weight-bold px-3">
                                                         <i class="fas fa-check-circle mr-1"></i> Assign Target
                                                     </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Rate OPCR Modal --}}
+                                <div class="modal fade" id="rateOpcrModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content shadow-lg border-0">
+                                            <div class="modal-header bg-white border-bottom py-2">
+                                                <h5 class="modal-title font-weight-bold text-warning"><i class="fas fa-star mr-2"></i> Rate OPCR Item</h5>
+                                                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
+                                            </div>
+                                            <form method="POST" action="{{ route('spms.opcr.item.rate') }}">
+                                                @csrf
+                                                <input type="hidden" name="opcr_item_id" value="{{ $item->id }}">
+
+                                                <div class="modal-body text-left">
+                                                    <div class="form-group mb-2">
+                                                        <label class="font-weight-bold text-dark">MFO / PAP Target:</label>
+                                                        <p class="text-muted small bg-light p-2 rounded border mb-0">{!! nl2br(e($item->mfo_pap)) !!}</p>
+                                                    </div>
+
+                                                    <div class="row">
+                                                        <div class="col-4">
+                                                            <div class="form-group mb-2">
+                                                                <label class="font-weight-bold text-dark">Quality (Q):</label>
+                                                                <input type="number" step="0.01" min="1" max="5" name="rating_q" class="form-control form-control-sm" value="{{ $item->rating_q }}" placeholder="1 - 5">
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <div class="form-group mb-2">
+                                                                <label class="font-weight-bold text-dark">Efficiency (E):</label>
+                                                                <input type="number" step="0.01" min="1" max="5" name="rating_e" class="form-control form-control-sm" value="{{ $item->rating_e }}" placeholder="1 - 5">
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <div class="form-group mb-2">
+                                                                <label class="font-weight-bold text-dark">Timeliness (T):</label>
+                                                                <input type="number" step="0.01" min="1" max="5" name="rating_t" class="form-control form-control-sm" value="{{ $item->rating_t }}" placeholder="1 - 5">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="form-group mb-0">
+                                                        <label class="font-weight-bold text-dark">Remarks / Evaluation Summary:</label>
+                                                        <textarea name="remarks" class="form-control form-control-sm" rows="3" placeholder="Enter evaluation remarks...">{{ $item->remarks }}</textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer bg-light py-2">
+                                                    <button type="button" class="btn btn-secondary btn-sm font-weight-bold" data-dismiss="modal">Cancel</button>
+                                                    <button type="submit" class="btn btn-warning btn-sm font-weight-bold text-dark"><i class="fas fa-check mr-1"></i> Save Rating</button>
                                                 </div>
                                             </form>
                                         </div>
@@ -806,20 +927,17 @@
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    $(function () {
-        $('[data-toggle="popover"]').popover();
-
-        // Initialize SortableJS for OPCR category row reordering
-        // NOTE: Must run inside $(function) / $(document).ready() so it fires
-        // even when placed at bottom of page (DOMContentLoaded already fired).
+    document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.opcr-sortable-body').forEach(function (tbody) {
             var reorderUrl = tbody.getAttribute('data-reorderurl');
 
             if (typeof Sortable !== 'undefined') {
                 Sortable.create(tbody, {
                     animation: 150,
-                    filter: 'a, button, input, textarea, select, .btn, .modal, [data-toggle]',
+                    draggable: 'tr.opcr-sortable-row',
+                    filter: 'button, a, input, select, textarea, .btn, [data-toggle]',
                     preventOnFilter: false,
                     ghostClass: 'sortable-ghost',
                     chosenClass: 'sortable-chosen',
@@ -852,8 +970,59 @@
         });
     });
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
+    $(function () {
+        // Initialize Select2 inside modals with dropdownParent
+        $('.modal').on('shown.bs.modal', function () {
+            if ($.fn.select2) {
+                $(this).find('.select2').select2({
+                    dropdownParent: $(this),
+                    width: '100%'
+                });
+            }
+        });
+
+        // Handle "Select All Members" button click
+        $(document).on('click', '.btn-select-all-office', function (e) {
+            e.preventDefault();
+            var $modal = $(this).closest('.modal');
+            var $select = $modal.find('select');
+            var $badge = $modal.find('.select-all-badge');
+            var $btn = $(this);
+
+            if (!$select.length) return;
+
+            var $options = $select.find('option');
+            var totalOptions = $options.length;
+
+            if (totalOptions === 0) return;
+
+            var selectedCount = $select.find('option:selected').length;
+            var shouldSelectAll = (selectedCount < totalOptions);
+
+            var allVals = [];
+            $options.each(function() {
+                var v = $(this).val();
+                if (v !== null && v !== undefined && v !== '') {
+                    allVals.push(v);
+                }
+            });
+
+            if (shouldSelectAll) {
+                $options.prop('selected', true);
+                $select.val(allVals).trigger('change');
+
+                $badge.removeClass('d-none').html('<i class="fas fa-check-circle mr-1"></i> All (' + totalOptions + ') Members Selected');
+                $btn.removeClass('btn-outline-primary').addClass('btn-success').html('<i class="fas fa-check-double fa-xs mr-1"></i> All Selected');
+            } else {
+                $options.prop('selected', false);
+                $select.val([]).trigger('change');
+
+                $badge.addClass('d-none');
+                $btn.removeClass('btn-success').addClass('btn-outline-primary').html('<i class="fas fa-users fa-xs mr-1"></i> Select All Members');
+            }
+        });
+    });
+
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('.btn-delete-confirm');
         if (btn) {
