@@ -95,7 +95,7 @@
                 </button>
                 <div class="dropdown-menu w-100 shadow border-0" aria-labelledby="driveNewBtn">
                     <a class="dropdown-item py-2" href="#" data-toggle="modal" data-target="#createOpcrModal"><i class="fas fa-folder text-warning mr-2"></i> New OPCR Document</a>
-                    <a class="dropdown-item py-2" href="{{ route('spms.ipcr') }}"><i class="fas fa-folder text-warning mr-2"></i> My IPCR Matrix</a>
+                    <a class="dropdown-item py-2" href="{{ route('spms.ipcr') }}"><i class="fas fa-folder text-warning mr-2"></i> My IPCR</a>
                 </div>
             </div>
 

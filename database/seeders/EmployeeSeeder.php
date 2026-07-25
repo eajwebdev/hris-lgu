@@ -26,71 +26,71 @@ class EmployeeSeeder extends Seeder
 
         $people = [
             [
-                'emp_ID'     => '2026-0001',
-                'fname'      => 'Juan',
-                'mname'      => 'Santos',
-                'lname'      => 'Dela Cruz',
-                'position'   => 'Municipal Mayor',
-                'emp_dept'   => 3,            // Office of the Mayor
-                'username'   => 'mayor@mabinay.gov.ph',
-                'org_email'  => 'mayor@mabinay.gov.ph',
+                'emp_ID' => '2026-0001',
+                'fname' => 'Juan',
+                'mname' => 'Santos',
+                'lname' => 'Dela Cruz',
+                'position' => 'Municipal Mayor',
+                'emp_dept' => 3,            // Office of the Mayor
+                'username' => 'mayor@mabinay.gov.ph',
+                'org_email' => 'mayor@mabinay.gov.ph',
                 'supervisor' => null,
             ],
             [
-                'emp_ID'     => '2026-0002',
-                'fname'      => 'Maria',
-                'mname'      => 'Reyes',
-                'lname'      => 'Bautista',
-                'position'   => 'Municipal Vice Mayor',
-                'emp_dept'   => 4,            // Office of the Vice Mayor
-                'username'   => 'vicemayor@mabinay.gov.ph',
-                'org_email'  => 'vicemayor@mabinay.gov.ph',
+                'emp_ID' => '2026-0002',
+                'fname' => 'Maria',
+                'mname' => 'Reyes',
+                'lname' => 'Bautista',
+                'position' => 'Municipal Vice Mayor',
+                'emp_dept' => 4,            // Office of the Vice Mayor
+                'username' => 'vicemayor@mabinay.gov.ph',
+                'org_email' => 'vicemayor@mabinay.gov.ph',
                 'supervisor' => null,
             ],
             [
-                'emp_ID'     => '2026-0003',
-                'fname'      => 'Ana',
-                'mname'      => 'Lim',
-                'lname'      => 'Villanueva',
-                'position'   => 'Human Resource Management Officer',
-                'emp_dept'   => 6,            // HRMO
-                'username'   => 'hr@mabinay.gov.ph',
-                'org_email'  => 'hr@mabinay.gov.ph',
+                'emp_ID' => '2026-0003',
+                'fname' => 'Ana',
+                'mname' => 'Lim',
+                'lname' => 'Villanueva',
+                'position' => 'Human Resource Management Officer',
+                'emp_dept' => 6,            // HRMO
+                'username' => 'hr@mabinay.gov.ph',
+                'org_email' => 'hr@mabinay.gov.ph',
                 'supervisor' => null,
             ],
             [
-                'emp_ID'     => '2026-0004',
-                'fname'      => 'Pedro',
-                'mname'      => 'Cruz',
-                'lname'      => 'Ramos',
-                'position'   => 'Administrative Aide IV',
-                'emp_dept'   => 6,            // HRMO
-                'username'   => 'employee@mabinay.gov.ph',
-                'org_email'  => 'employee@mabinay.gov.ph',
+                'emp_ID' => '2026-0004',
+                'fname' => 'Pedro',
+                'mname' => 'Cruz',
+                'lname' => 'Ramos',
+                'position' => 'Administrative Aide IV',
+                'emp_dept' => 6,            // HRMO
+                'username' => 'employee@mabinay.gov.ph',
+                'org_email' => 'employee@mabinay.gov.ph',
                 'supervisor' => null,         // set below, once HR head has an id
             ],
             [
-                'emp_ID'     => '2026-0005',
-                'fname'      => 'Anabel',
-                'mname'      => 'G.',
-                'lname'      => 'Estolonio',
-                'position'   => 'Utility Personnel (COS)',
+                'emp_ID' => '2026-0005',
+                'fname' => 'Anabel',
+                'mname' => 'G.',
+                'lname' => 'Estolonio',
+                'position' => 'Utility Personnel (COS)',
                 'emp_status' => 'Job Order',
-                'emp_dept'   => 19,           // General Services Office (GSO)
-                'username'   => 'jo_anabel',
-                'org_email'  => 'jo_anabel@mabinay.gov.ph',
+                'emp_dept' => 19,           // General Services Office (GSO)
+                'username' => 'jo_anabel',
+                'org_email' => 'jo_anabel@mabinay.gov.ph',
                 'supervisor' => null,
             ],
             [
-                'emp_ID'     => '2026-0006',
-                'fname'      => 'Carlos',
-                'mname'      => 'M.',
-                'lname'      => 'Santos',
-                'position'   => 'Administrative Aide (JO)',
+                'emp_ID' => '2026-0006',
+                'fname' => 'Carlos',
+                'mname' => 'M.',
+                'lname' => 'Santos',
+                'position' => 'Administrative Aide (JO)',
                 'emp_status' => 'Job Order',
-                'emp_dept'   => 6,            // HRMO
-                'username'   => 'jo_carlos',
-                'org_email'  => 'jo_carlos@mabinay.gov.ph',
+                'emp_dept' => 6,            // HRMO
+                'username' => 'jo_carlos',
+                'org_email' => 'jo_carlos@mabinay.gov.ph',
                 'supervisor' => null,
             ],
         ];
@@ -103,14 +103,14 @@ class EmployeeSeeder extends Seeder
             Employee::updateOrCreate(
                 ['emp_ID' => $person['emp_ID']],
                 array_merge([
-                    'role'        => 'employee',
-                    'emp_status'  => 1,       // Default Permanent
-                    'emp_salary'  => 0,
-                    'stat_1'      => 1,       // active
-                    'dpn'         => 0,       // data-privacy notice not yet accepted
-                    'profile'     => 'default.png',
-                    'vl'          => 15,
-                    'sl'          => 15,
+                    'role' => 'employee',
+                    'emp_status' => 1,       // Default Permanent
+                    'emp_salary' => 0,
+                    'stat_1' => 1,       // active
+                    'dpn' => 0,       // data-privacy notice not yet accepted
+                    'profile' => 'default.png',
+                    'vl' => 15,
+                    'sl' => 15,
                 ], $person)
             );
 

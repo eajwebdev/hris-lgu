@@ -124,7 +124,7 @@
     {{-- Breadcrumb Bar --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
         <span class="breadcrumb-drive">
-            <i class="fas fa-info-circle text-info mr-1"></i> Dashboard &nbsp;/&nbsp; Drive &nbsp;/&nbsp; IPCR Matrix
+            <i class="fas fa-info-circle text-info mr-1"></i> Dashboard &nbsp;/&nbsp; Drive &nbsp;/&nbsp; IPCR
         </span>
         <a href="{{ route('spms.drive') }}" class="btn btn-outline-secondary btn-sm font-weight-bold">
             <i class="fas fa-arrow-left mr-1"></i> Back to My Drive
@@ -155,16 +155,32 @@
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <h6 class="font-weight-bold text-dark mb-1">
-                    <i class="fas fa-id-badge text-teal mr-2"></i>IPCR Matrix &bull; {{ $employee->fname }} {{ $employee->lname }}
+                    <i class="fas fa-id-badge text-teal mr-2"></i>IPCR &bull; {{ $employee->fname }} {{ $employee->lname }}
                 </h6>
                 <small class="text-muted font-weight-bold">
                     Position: {{ $employee->position ?? 'Personnel' }} &bull; Department: {{ $office->office_name ?? 'LGU' }}
                 </small>
             </div>
-            <div>
-                <span class="badge badge-light border text-dark px-3 py-2 font-weight-bold">
-                    Year {{ $year }} ({{ $semester == 1 ? '1st Half: Jan-Jun' : '2nd Half: Jul-Dec' }})
-                </span>
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle font-weight-bold px-3 py-2 shadow-sm bg-white text-dark" type="button" id="periodDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-calendar-alt text-teal mr-1"></i> Year {{ $year }} ({{ $semester == 1 ? '1st Half: Jan-Jun' : '2nd Half: Jul-Dec' }})
+                </button>
+                <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="periodDropdown">
+                    <h6 class="dropdown-header text-uppercase font-weight-bold text-muted small">Select Rating Period</h6>
+                    <a class="dropdown-item py-2 {{ $semester == 1 ? 'active font-weight-bold' : '' }}" href="{{ route('spms.ipcr', ['id' => $employee->id, 'semester' => 1, 'year' => $year]) }}">
+                        <i class="fas fa-calendar-check mr-2 {{ $semester == 1 ? 'text-white' : 'text-teal' }}"></i> 1st Half (Jan - Jun {{ $year }})
+                    </a>
+                    <a class="dropdown-item py-2 {{ $semester == 2 ? 'active font-weight-bold' : '' }}" href="{{ route('spms.ipcr', ['id' => $employee->id, 'semester' => 2, 'year' => $year]) }}">
+                        <i class="fas fa-calendar-check mr-2 {{ $semester == 2 ? 'text-white' : 'text-teal' }}"></i> 2nd Half (Jul - Dec {{ $year }})
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <h6 class="dropdown-header text-uppercase font-weight-bold text-muted small">Switch Year</h6>
+                    @foreach([date('Y'), date('Y')-1, date('Y')+1] as $y)
+                        <a class="dropdown-item py-1 small {{ $year == $y ? 'font-weight-bold text-teal' : '' }}" href="{{ route('spms.ipcr', ['id' => $employee->id, 'semester' => $semester, 'year' => $y]) }}">
+                            <i class="fas fa-history mr-2 text-secondary"></i> Year {{ $y }}
+                        </a>
+                    @endforeach
+                </div>
             </div>
         </div>
     </div>
@@ -283,7 +299,7 @@
 
                                         @if($isHead || $guard === 'web')
                                             <button type="button" class="btn btn-xs btn-warning font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#rateIpcrItemModal{{ $item->id }}" title="Rate accomplishment">
-                                                <i class="fas fa-star mr-1"></i> Rate
+                                                <i class="fas fa-star"></i>
                                             </button>
                                         @endif
 
@@ -720,11 +736,6 @@
                                 body: JSON.stringify({ order: itemIds })
                             })
                             .then(function (res) { return res.json(); })
-                            .then(function () {
-                                if (typeof toastr !== 'undefined') {
-                                    toastr.success('Row order saved.');
-                                }
-                            })
                             .catch(function (err) {
                                 console.error('Reorder failed:', err);
                             });
@@ -733,7 +744,7 @@
                 });
             }
         });
-    });
+    }); 
 </script>
 @endpush
 

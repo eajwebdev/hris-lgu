@@ -132,7 +132,7 @@
     {{-- Breadcrumb & Navigation Bar --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
         <span class="breadcrumb-drive">
-            <i class="fas fa-info-circle text-info mr-1"></i> Dashboard &nbsp;/&nbsp; Drive &nbsp;/&nbsp; OPCR Matrix
+            <i class="fas fa-info-circle text-info mr-1"></i> Dashboard &nbsp;/&nbsp; Drive &nbsp;/&nbsp; OPCR
         </span>
         <a href="{{ route('spms.opcr') }}" class="btn btn-outline-secondary btn-sm font-weight-bold">
             <i class="fas fa-arrow-left mr-1"></i> Back to OPCR Documents
@@ -165,7 +165,7 @@
                 <i class="fas fa-user-circle mr-1"></i> {{ $opcr->head ? ($opcr->head->fname . ' ' . $opcr->head->lname) : ($opcr->office->office_name ?? 'Office Head') }}
             </button>
             <span class="ml-2 font-weight-bold text-muted small">
-                OPCR Matrix &bull; {{ $opcr->office->office_name }} ({{ $opcr->year }})
+                OPCR &bull; {{ $opcr->office->office_name }} ({{ $opcr->year }})
             </span>
         </div>
         <div class="col-md-6 text-right d-flex justify-content-end align-items-center">
@@ -842,11 +842,6 @@
                                 body: JSON.stringify({ order: itemIds })
                             })
                             .then(function (res) { return res.json(); })
-                            .then(function () {
-                                if (typeof toastr !== 'undefined') {
-                                    toastr.success('Row order saved.');
-                                }
-                            })
                             .catch(function (err) {
                                 console.error('Reorder failed:', err);
                             });

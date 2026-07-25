@@ -125,7 +125,7 @@
                     @else
                         <a class="dropdown-item py-2 text-muted" href="#" onclick="alert('Access Restricted: OPCR is reserved for Office Heads only.'); return false;"><i class="fas fa-lock text-warning mr-2"></i> OPCR Document (Locked)</a>
                     @endif
-                    <a class="dropdown-item py-2" href="{{ route('spms.ipcr') }}"><i class="fas fa-folder text-warning mr-2"></i> My IPCR Matrix</a>
+                    <a class="dropdown-item py-2" href="{{ route('spms.ipcr') }}"><i class="fas fa-folder text-warning mr-2"></i> My IPCR</a>
                 </div>
             </div>
 
