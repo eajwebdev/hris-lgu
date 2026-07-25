@@ -191,11 +191,31 @@
                     <form method="POST" action="{{ route('spms.opcr.template.load') }}" class="d-inline">
                         @csrf
                         <input type="hidden" name="opcr_id" value="{{ $opcr->id }}">
-                        <button type="submit" class="dropdown-item py-2" title="Load official OPCR template items from LGU standard">
+                        <button type="button" class="dropdown-item text-success py-2 font-weight-bold btn-delete-confirm"
+                                data-title="Load Official OPCR Template?"
+                                data-text="Are you sure you want to load all 22 official LGU OPCR targets into this OPCR document?"
+                                data-confirm-text="<i class='fas fa-file-excel mr-1'></i> Yes, Load Template"
+                                data-confirm-color="#28a745"
+                                data-btn-class="btn btn-success font-weight-bold px-3 py-2 mr-2"
+                                data-icon="question"
+                                title="Load official OPCR template items from LGU standard">
                             <i class="fas fa-file-excel text-success mr-2"></i> Load Official OPCR Template
                         </button>
                     </form>
                     @if($opcr->items->count() > 0)
+                        <form method="POST" action="{{ route('spms.opcr.cascade_all', $opcr->id) }}" class="d-inline">
+                            @csrf
+                            <button type="button" class="dropdown-item text-primary py-2 font-weight-bold btn-delete-confirm"
+                                    data-title="Cascade All OPCR Targets?"
+                                    data-text="Are you sure you want to assign ALL {{ $opcr->items->count() }} OPCR targets to ALL {{ $officeEmployees->count() }} regular & permanent personnel of {{ $opcr->office->office_name }}?"
+                                    data-confirm-text="<i class='fas fa-paper-plane mr-1'></i> Yes, Cascade All Targets"
+                                    data-confirm-color="#16a085"
+                                    data-btn-class="btn btn-teal font-weight-bold px-3 py-2 mr-2"
+                                    data-icon="question"
+                                    title="Cascade all targets to all regular office members">
+                                <i class="fas fa-paper-plane text-primary mr-2"></i> Cascade All Targets to All Regular Members
+                            </button>
+                        </form>
                         <div class="dropdown-divider"></div>
                         <form method="POST" action="{{ route('spms.opcr.clear', $opcr->id) }}" class="d-inline">
                             @csrf
@@ -1028,21 +1048,25 @@
         if (btn) {
             e.preventDefault();
             var form = btn.closest('form');
-            var title = btn.getAttribute('data-title') || 'Confirm Deletion';
-            var text = btn.getAttribute('data-text') || 'Are you sure you want to delete this item?';
+            var title = btn.getAttribute('data-title') || 'Confirm Action';
+            var text = btn.getAttribute('data-text') || 'Are you sure you want to proceed?';
+            var confirmText = btn.getAttribute('data-confirm-text') || '<i class="fas fa-trash mr-1"></i> Yes, Delete It';
+            var confirmColor = btn.getAttribute('data-confirm-color') || '#dc3545';
+            var btnClass = btn.getAttribute('data-btn-class') || 'btn btn-danger font-weight-bold px-3 py-2 mr-2';
+            var icon = btn.getAttribute('data-icon') || 'warning';
 
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
                     title: title,
                     text: text,
-                    icon: 'warning',
+                    icon: icon,
                     showCancelButton: true,
-                    confirmButtonColor: '#dc3545',
+                    confirmButtonColor: confirmColor,
                     cancelButtonColor: '#6c757d',
-                    confirmButtonText: '<i class="fas fa-trash mr-1"></i> Yes, Delete It',
+                    confirmButtonText: confirmText,
                     cancelButtonText: 'Cancel',
                     customClass: {
-                        confirmButton: 'btn btn-danger font-weight-bold px-3 py-2 mr-2',
+                        confirmButton: btnClass,
                         cancelButton: 'btn btn-secondary font-weight-bold px-3 py-2'
                     },
                     buttonsStyling: false
