@@ -433,7 +433,9 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         Route::post('/opcr/item/reorder', [SpmsController::class, 'reorderOpcrItems'])->name('spms.opcr.item.reorder');
         Route::post('/opcr/item/delete/{id}', [SpmsController::class, 'deleteOpcrItem'])->name('spms.opcr.item.delete');
         Route::post('/opcr/item/cascade', [SpmsController::class, 'cascadeOpcrItem'])->name('spms.opcr.item.cascade');
-        Route::get('/ipcr/{id?}', [SpmsController::class, 'ipcrMatrix'])->name('spms.ipcr');
+        Route::get('/ipcr', [SpmsController::class, 'ipcrList'])->name('spms.ipcr');
+        Route::get('/ipcr/view/{id?}', [SpmsController::class, 'ipcrMatrix'])->name('spms.ipcr.matrix');
+        Route::get('/ipcr/print-cos/{id}', [SpmsController::class, 'printCosRating'])->name('spms.ipcr.print.cos');
         Route::post('/ipcr/{id}/signatories', [SpmsController::class, 'updateIpcrSignatories'])->name('spms.ipcr.signatories');
         Route::post('/ipcr/accomplishment/submit', [SpmsController::class, 'submitAccomplishment'])->name('spms.ipcr.accomplishment.submit');
         Route::post('/ipcr/item/store', [SpmsController::class, 'storeIpcrItem'])->name('spms.ipcr.item.store');

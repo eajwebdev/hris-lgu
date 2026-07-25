@@ -484,9 +484,9 @@
                                                     data-target="#editModal{{ $item->id }}">
                                                 <i class="fas fa-edit fa-xs"></i>
                                             </button>
-                                            <form method="POST" action="{{ route('spms.opcr.item.delete', $item->id) }}" onsubmit="return confirm('Delete this OPCR row item and its cascaded assignments?')">
+                                            <form method="POST" action="{{ route('spms.opcr.item.delete', $item->id) }}" class="d-inline">
                                                 @csrf
-                                                <button type="submit" class="btn btn-xs btn-danger" title="Delete Row">
+                                                <button type="button" class="btn btn-xs btn-danger btn-delete-confirm" data-title="Delete OPCR Row?" data-text="Delete this OPCR row item and all its cascaded assignments?" title="Delete Row">
                                                     <i class="fas fa-times fa-xs"></i>
                                                 </button>
                                             </form>
@@ -850,6 +850,44 @@
                 });
             }
         });
+    });
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.btn-delete-confirm');
+        if (btn) {
+            e.preventDefault();
+            var form = btn.closest('form');
+            var title = btn.getAttribute('data-title') || 'Confirm Deletion';
+            var text = btn.getAttribute('data-text') || 'Are you sure you want to delete this item?';
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: title,
+                    text: text,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: '<i class="fas fa-trash mr-1"></i> Yes, Delete It',
+                    cancelButtonText: 'Cancel',
+                    customClass: {
+                        confirmButton: 'btn btn-danger font-weight-bold px-3 py-2 mr-2',
+                        cancelButton: 'btn btn-secondary font-weight-bold px-3 py-2'
+                    },
+                    buttonsStyling: false
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            } else {
+                if (confirm(text)) {
+                    form.submit();
+                }
+            }
+        }
     });
 
     function printModalIframe(iframeId) {
