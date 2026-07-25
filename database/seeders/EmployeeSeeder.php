@@ -69,6 +69,30 @@ class EmployeeSeeder extends Seeder
                 'org_email'  => 'employee@mabinay.gov.ph',
                 'supervisor' => null,         // set below, once HR head has an id
             ],
+            [
+                'emp_ID'     => '2026-0005',
+                'fname'      => 'Anabel',
+                'mname'      => 'G.',
+                'lname'      => 'Estolonio',
+                'position'   => 'Utility Personnel (COS)',
+                'emp_status' => 'Job Order',
+                'emp_dept'   => 19,           // General Services Office (GSO)
+                'username'   => 'jo_anabel',
+                'org_email'  => 'jo_anabel@mabinay.gov.ph',
+                'supervisor' => null,
+            ],
+            [
+                'emp_ID'     => '2026-0006',
+                'fname'      => 'Carlos',
+                'mname'      => 'M.',
+                'lname'      => 'Santos',
+                'position'   => 'Administrative Aide (JO)',
+                'emp_status' => 'Job Order',
+                'emp_dept'   => 6,            // HRMO
+                'username'   => 'jo_carlos',
+                'org_email'  => 'jo_carlos@mabinay.gov.ph',
+                'supervisor' => null,
+            ],
         ];
 
         // The PDS page expects one row per section to already exist — the same
@@ -78,16 +102,16 @@ class EmployeeSeeder extends Seeder
         foreach ($people as $person) {
             Employee::updateOrCreate(
                 ['emp_ID' => $person['emp_ID']],
-                array_merge($person, [
+                array_merge([
                     'role'        => 'employee',
-                    'emp_status'  => 1,       // Permanent
+                    'emp_status'  => 1,       // Default Permanent
                     'emp_salary'  => 0,
                     'stat_1'      => 1,       // active
                     'dpn'         => 0,       // data-privacy notice not yet accepted
                     'profile'     => 'default.png',
                     'vl'          => 15,
                     'sl'          => 15,
-                ])
+                ], $person)
             );
 
             // Written directly, bypassing the model's creating() hook.

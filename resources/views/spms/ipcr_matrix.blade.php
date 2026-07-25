@@ -175,11 +175,13 @@
             <h6 class="font-weight-bold text-dark mb-0">
                 <i class="fas fa-list-check text-teal mr-2"></i> My Assigned Objectives &amp; Accomplishments
             </h6>
-            <div>
+            <div class="ml-auto d-flex align-items-center">
                 <span class="badge badge-success px-3 py-2 font-weight-bold mr-2">Status: {{ $ipcr->status }}</span>
-                <button type="button" onclick="window.print()" class="btn btn-sm btn-outline-secondary font-weight-bold shadow-sm mr-2">
-                    <i class="fas fa-print mr-1"></i> Print Matrix
-                </button>
+                @if(!empty($isJoOrCos) && $isJoOrCos)
+                    <button type="button" class="btn btn-sm btn-outline-info font-weight-bold shadow-sm mr-2" data-toggle="modal" data-target="#loadCosTemplateModal" title="Load standard Job Order / Contract of Service rating form template">
+                        <i class="fas fa-file-invoice mr-1"></i> Load COS / JO Rating Template
+                    </button>
+                @endif
                 <button type="button" class="btn btn-sm btn-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#addCustomIpcrModal">
                     <i class="fas fa-plus mr-1"></i> Add Custom Objective
                 </button>
@@ -233,19 +235,65 @@
                                     </td>
                                     <td class="font-weight-bold text-dark">{!! nl2br(e($item->mfo_pap)) !!}</td>
                                     <td class="text-muted">{!! nl2br(e($item->success_indicators)) !!}</td>
-                                    <td>
+                                    <td class="align-middle">
                                         @if($item->actual_accomplishment)
                                             <p class="mb-1 text-dark">{!! nl2br(e($item->actual_accomplishment)) !!}</p>
                                         @else
-                                            <span class="text-muted font-italic small">No accomplishment entered yet.</span>
+                                            <span class="text-muted font-italic small d-block mb-1">No accomplishment entered yet.</span>
                                         @endif
 
-                                    {{-- Actions --}}
+                                        @if($item->evidence_file)
+                                            @if($item->is_evidence_url)
+                                                <button type="button" class="btn btn-xs btn-outline-teal font-weight-bold shadow-sm mt-1" data-toggle="modal" data-target="#viewEvidenceUrlModal{{ $item->id }}">
+                                                    <i class="fab fa-google-drive mr-1"></i> View Evidence Document
+                                                </button>
+                                            @else
+                                                <a href="{{ asset('storage/' . $item->evidence_file) }}" target="_blank" class="btn btn-xs btn-outline-info font-weight-bold shadow-sm mt-1">
+                                                    <i class="fas fa-paperclip mr-1"></i> View Attachment
+                                                </a>
+                                            @endif
+                                        @elseif($guard === 'employee' && $item->employee_id == $user->id)
+                                            <button type="button" class="btn btn-xs btn-teal font-weight-bold shadow-sm mt-1" data-toggle="modal" data-target="#editAccomplishmentModal{{ $item->id }}">
+                                                <i class="fas fa-plus-circle mr-1"></i> Add Accomplishment &amp; Link
+                                            </button>
+                                        @endif
+                                    </td>
+
+                                    {{-- Rating Column --}}
                                     <td class="text-center align-middle">
+                                        @if($item->rating_average)
+                                            <span class="badge badge-success font-weight-bold" style="font-size: 13px;">
+                                                {{ number_format($item->rating_average, 2) }}
+                                            </span>
+                                            <small class="d-block text-muted mt-1" style="font-size: 10px;">
+                                                Q:{{ $item->rating_q ?? '-' }} | E:{{ $item->rating_e ?? '-' }} | T:{{ $item->rating_t ?? '-' }}
+                                            </small>
+                                        @else
+                                            <span class="text-muted font-italic small">Unrated</span>
+                                        @endif
+                                    </td>
+
+                                    {{-- Actions Column --}}
+                                    <td class="text-center align-middle">
+                                        @if($guard === 'employee' && $item->employee_id == $user->id)
+                                            <button type="button" class="btn btn-xs btn-teal font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#editAccomplishmentModal{{ $item->id }}" title="Submit or Edit Accomplishment">
+                                                <i class="fas fa-pen"></i>
+                                            </button>
+                                        @endif
+
                                         @if($isHead || $guard === 'web')
-                                            <button type="button" class="btn btn-xs btn-warning font-weight-bold shadow-sm" data-toggle="modal" data-target="#rateIpcrItemModal{{ $item->id }}" title="Rate accomplishment">
+                                            <button type="button" class="btn btn-xs btn-warning font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#rateIpcrItemModal{{ $item->id }}" title="Rate accomplishment">
                                                 <i class="fas fa-star mr-1"></i> Rate
                                             </button>
+                                        @endif
+
+                                        @if(($guard === 'employee' && $item->employee_id == $user->id) || $isHead || $guard === 'web')
+                                            <form method="POST" action="{{ route('spms.ipcr.item.delete', $item->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this objective?');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-xs btn-outline-danger font-weight-bold shadow-sm mb-1" title="Delete objective">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
                                         @endif
                                     </td>
                                 </tr>
@@ -296,7 +344,7 @@
                                                         <span aria-hidden="true">&times;</span>
                                                     </button>
                                                 </div>
-                                                <form method="POST" action="{{ route('spms.ipcr.accomplishment.submit') }}">
+                                                <form method="POST" action="{{ route('spms.ipcr.accomplishment.submit') }}" enctype="multipart/form-data">
                                                     @csrf
                                                     <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
 
@@ -307,15 +355,15 @@
                                                         </div>
 
                                                         <div class="form-group mb-0">
-                                                            <label class="font-weight-bold text-dark"><i class="fab fa-google-drive text-teal mr-1"></i> Google Drive Evidence Share Link:</label>
+                                                            <label class="font-weight-bold text-dark"><i class="fab fa-google-drive text-teal mr-1"></i> Evidence Google Drive / Web Link:</label>
                                                             <input type="url" name="evidence_file" class="form-control" value="{{ $item->evidence_file }}" placeholder="https://drive.google.com/file/d/.../view?usp=sharing">
-                                                            <small class="form-text text-muted">Upload your evidence file to Google Drive and paste the public share link here.</small>
+                                                            <small class="form-text text-muted">Paste your Google Drive or web share link here.</small>
                                                         </div>
                                                     </div>
 
                                                     <div class="modal-footer bg-light py-2">
                                                         <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                                                        <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">Upload Accomplishment</button>
+                                                        <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">Save Accomplishment &amp; Evidence</button>
                                                     </div>
                                                 </form>
                                             </div>
@@ -557,6 +605,67 @@
                 <div class="modal-footer bg-light py-2">
                     <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">Save Custom Objective</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{{-- Load COS / Job Order Performance Rating Form Template Modal --}}
+<div class="modal fade" id="loadCosTemplateModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-white border-bottom py-2">
+                <h5 class="modal-title font-weight-bold text-info">
+                    <i class="fas fa-file-invoice text-info mr-2"></i> Load Contract of Service (COS) / Job Order Performance Rating Form
+                </h5>
+                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST" action="{{ route('spms.ipcr.template.cos') }}">
+                @csrf
+                <input type="hidden" name="ipcr_id" value="{{ $ipcr->id }}">
+
+                <div class="modal-body text-left">
+                    <div class="alert alert-info py-2 small mb-3">
+                        <i class="fas fa-info-circle mr-1"></i> <strong>Job Order / COS Rating Form Standard:</strong> Loads default <strong>Task Descriptions</strong>, <strong>Support Functions</strong>, and <strong>Work Ethics</strong> (Punctuality, Integrity, Teamwork, Professionalism, Adaptability) tailored for Contract of Service personnel.
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="font-weight-bold text-dark">Select Position Rating Template:</label>
+                        <div class="custom-control custom-radio mb-2">
+                            <input type="radio" id="templateGenServices" name="template_type" value="general_services" class="custom-control-input" checked>
+                            <label class="custom-control-label font-weight-bold text-dark" for="templateGenServices">
+                                General Services Office / Maintenance &amp; Utility Personnel Rating Form
+                            </label>
+                            <small class="d-block text-muted">Includes Hallway cleanliness, Garbage gathering &amp; segregation, Daily routine tasks, Flag ceremony, LCE activities, &amp; Work Ethics evaluation.</small>
+                        </div>
+
+                        <div class="custom-control custom-radio">
+                            <input type="radio" id="templateAdminSupport" name="template_type" value="admin_support" class="custom-control-input">
+                            <label class="custom-control-label font-weight-bold text-dark" for="templateAdminSupport">
+                                Administrative &amp; Clerical Support Personnel Rating Form
+                            </label>
+                            <small class="d-block text-muted">Includes Document encoding &amp; filing, Records routing, Client assistance, Departmental support, &amp; Work Ethics evaluation.</small>
+                        </div>
+                    </div>
+
+                    <div class="card border bg-light p-3 mb-0">
+                        <h6 class="font-weight-bold text-dark mb-2" style="font-size: 13px;">Included Rating Categories &amp; Work Ethics Indicators:</h6>
+                        <ul class="text-muted small mb-0 pl-3">
+                            <li><strong>Core Functions:</strong> Primary daily task descriptions &amp; operational deliverables.</li>
+                            <li><strong>Support Functions:</strong> Department assignments, Flag Ceremony, &amp; LCE sanctioned activities.</li>
+                            <li><strong>Work Ethics Evaluation:</strong> Punctuality &amp; attendance, Responsibility, Integrity, Teamwork, Professionalism, Time Management, Continuous Improvement, Respect, Adaptability, and Customer Service.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info btn-sm font-weight-bold px-4">
+                        <i class="fas fa-download mr-1"></i> Load Rating Template Items
+                    </button>
                 </div>
             </form>
         </div>

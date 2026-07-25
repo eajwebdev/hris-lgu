@@ -172,9 +172,6 @@
             <span class="badge badge-light border text-dark px-3 py-2 mr-2 font-weight-bold">
                 {{ $opcr->semester == 1 ? '1st Half' : '2nd Half' }}
             </span>
-            <button type="button" onclick="window.print()" class="btn btn-sm btn-outline-secondary font-weight-bold mr-2">
-                <i class="fas fa-print mr-1"></i> Print Matrix
-            </button>
             <button class="btn btn-sm btn-teal font-weight-bold px-3 shadow-sm" data-toggle="modal" data-target="#addOpcrRowModal">
                 <i class="fas fa-plus mr-1"></i> Add OPCR Item
             </button>

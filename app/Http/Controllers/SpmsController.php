@@ -344,40 +344,58 @@ class SpmsController extends Controller
                 ]
             );
 
+        $empStatusStr = strtolower((string) ($employee->emp_status ?? ''));
+        $positionStr = strtolower((string) ($employee->position ?? ''));
+        $combinedStr = $empStatusStr . ' ' . $positionStr;
+
+        $isJoOrCos = str_contains($combinedStr, 'job order') 
+            || str_contains($combinedStr, 'contract') 
+            || str_contains($combinedStr, 'cos') 
+            || str_contains($combinedStr, 'jo');
+
         return view('spms.ipcr_matrix', compact(
-            'guard', 'user', 'isHead', 'employee', 'office', 'officeHead', 'ipcr', 'year', 'semester'
+            'guard', 'user', 'isHead', 'employee', 'office', 'officeHead', 'ipcr', 'year', 'semester', 'isJoOrCos'
         ));
     }
 
     /**
-     * Submit Employee Accomplishment & Evidence Attachment
+     * Submit Employee Accomplishment & Evidence Attachment (Link Only)
      */
     public function submitAccomplishment(Request $request)
     {
         $request->validate([
             'ipcr_item_id' => 'required|exists:spms_ipcr_items,id',
             'actual_accomplishment' => 'required|string',
-            'evidence_file' => 'nullable|string|max:2048',
+            'evidence_file' => 'nullable|url',
         ]);
 
         $ipcrItem = SpmsIpcrItem::findOrFail($request->ipcr_item_id);
 
-        $evidence = $ipcrItem->evidence_file;
-        if ($request->hasFile('evidence_file')) {
-            $file = $request->file('evidence_file');
-            $fileName = time() . '_' . $file->getClientOriginalName();
-            $evidence = $file->storeAs('spms_evidence', $fileName, 'public');
-        } elseif ($request->filled('evidence_file')) {
-            $evidence = trim($request->input('evidence_file'));
-        }
-
         $ipcrItem->update([
             'actual_accomplishment' => $request->actual_accomplishment,
-            'evidence_file' => $evidence,
+            'evidence_file' => $request->filled('evidence_file') ? trim($request->evidence_file) : null,
             'status' => 'Submitted',
         ]);
 
         return back()->with('success', 'Accomplishment and evidence link saved successfully.');
+    }
+
+    /**
+     * Delete an IPCR item row
+     */
+    public function deleteIpcrItem($id)
+    {
+        $item = SpmsIpcrItem::findOrFail($id);
+        $guard = $this->getGuard();
+        $user = auth()->guard($guard)->user();
+
+        if ($guard === 'employee' && $item->employee_id != $user->id) {
+            return back()->with('error', 'Unauthorized access.');
+        }
+
+        $item->delete();
+
+        return back()->with('success', 'IPCR objective item deleted successfully.');
     }
 
     /**
@@ -573,5 +591,97 @@ class SpmsController extends Controller
         }
 
         return response()->json(['status' => 'success', 'message' => 'IPCR item order updated']);
+    }
+
+    /**
+     * Load Contract of Service (COS) / Job Order (JO) Performance Rating Template
+     */
+    public function loadCosTemplate(Request $request)
+    {
+        $request->validate([
+            'ipcr_id' => 'required|exists:spms_ipcrs,id',
+            'template_type' => 'nullable|string|in:general_services,admin_support,custom',
+        ]);
+
+        $ipcr = SpmsIpcr::findOrFail($request->ipcr_id);
+        $guard = $this->getGuard();
+        $user = auth()->guard($guard)->user();
+
+        if ($guard === 'employee' && $ipcr->employee_id != $user->id) {
+            return back()->with('error', 'Unauthorized access to this IPCR matrix.');
+        }
+
+        $templateType = $request->input('template_type', 'general_services');
+
+        if ($templateType === 'admin_support') {
+            $defaultItems = [
+                [
+                    'category' => 'Core Functions',
+                    'mfo_pap' => 'Administrative & Clerical Support',
+                    'success_indicators' => 'Prepares, encodes, files, and processes official office documents, communications, and records accurately and on time.',
+                ],
+                [
+                    'category' => 'Core Functions',
+                    'mfo_pap' => 'Client Service & Records Assistance',
+                    'success_indicators' => 'Receives and routes incoming/outgoing documents; assists clients courteously and resolves front-line inquiries.',
+                ],
+                [
+                    'category' => 'Support Functions',
+                    'mfo_pap' => 'Department & Executive Support Duties',
+                    'success_indicators' => 'Performs other tasks assigned by Department Head; attends Flag Raising Ceremony; participates in capacity enhancement and LCE activities.',
+                ],
+                [
+                    'category' => 'Support Functions',
+                    'mfo_pap' => 'Work Ethics & Conduct',
+                    'success_indicators' => 'Demonstrates Punctuality, Attendance, Integrity, Teamwork, Professionalism, Time Management, Respect, Adaptability, and Customer Service Skills.',
+                ],
+            ];
+        } else {
+            // General Services / Maintenance / COS Personnel Rating Form
+            $defaultItems = [
+                [
+                    'category' => 'Core Functions',
+                    'mfo_pap' => 'Hallway & Premises Maintenance',
+                    'success_indicators' => 'Maintains the cleanliness and orderliness of the hallways and assigned areas of the Government Center/Office premises.',
+                ],
+                [
+                    'category' => 'Core Functions',
+                    'mfo_pap' => 'Waste Gathering & Proper Disposal',
+                    'success_indicators' => 'Gathers garbage from landscaped/assigned areas; segregates and disposes garbage properly daily.',
+                ],
+                [
+                    'category' => 'Core Functions',
+                    'mfo_pap' => 'Operational Task Execution',
+                    'success_indicators' => 'Performs other operational tasks as directed by the immediate supervisor efficiently and on time.',
+                ],
+                [
+                    'category' => 'Support Functions',
+                    'mfo_pap' => 'Departmental & LCE Activities',
+                    'success_indicators' => 'Does other tasks assigned by Department Head; attends Flag Raising Ceremony; participates in capacity enhancement and LCE sanctioned activities.',
+                ],
+                [
+                    'category' => 'Support Functions',
+                    'mfo_pap' => 'Work Ethics & Rating Standard',
+                    'success_indicators' => 'Demonstrates Punctuality, Attendance, Responsibility, Integrity, Teamwork, Professionalism, Time Management, Continuous Improvement, Respect, Accountability, Adaptability, and Customer Service Skills.',
+                ],
+            ];
+        }
+
+        $orderStart = (int) ($ipcr->items()->max('sort_order') ?? 0);
+
+        foreach ($defaultItems as $idx => $itemData) {
+            SpmsIpcrItem::create([
+                'ipcr_id' => $ipcr->id,
+                'employee_id' => $ipcr->employee_id,
+                'assigned_by' => $user->id,
+                'category' => $itemData['category'],
+                'mfo_pap' => $itemData['mfo_pap'],
+                'success_indicators' => $itemData['success_indicators'],
+                'sort_order' => $orderStart + $idx + 1,
+                'status' => 'Assigned',
+            ]);
+        }
+
+        return back()->with('success', 'Contract of Service / Job Order Performance Rating template loaded successfully.');
     }
 }

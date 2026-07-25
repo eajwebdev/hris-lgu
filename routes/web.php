@@ -452,7 +452,9 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         Route::post('/ipcr/accomplishment/submit', [SpmsController::class, 'submitAccomplishment'])->name('spms.ipcr.accomplishment.submit');
         Route::post('/ipcr/item/store', [SpmsController::class, 'storeIpcrItem'])->name('spms.ipcr.item.store');
         Route::post('/ipcr/item/reorder', [SpmsController::class, 'reorderIpcrItems'])->name('spms.ipcr.item.reorder');
+        Route::post('/ipcr/item/delete/{id}', [SpmsController::class, 'deleteIpcrItem'])->name('spms.ipcr.item.delete');
         Route::post('/ipcr/item/rate', [SpmsController::class, 'rateIpcrItem'])->name('spms.ipcr.item.rate');
+        Route::post('/ipcr/template/cos', [SpmsController::class, 'loadCosTemplate'])->name('spms.ipcr.template.cos');
         Route::get('/evidence/{id}', [SpmsController::class, 'viewEvidence'])->name('spms.evidence.view');
     });
 });
