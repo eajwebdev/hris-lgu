@@ -240,168 +240,141 @@
                                             <span class="text-muted font-italic small">No accomplishment entered yet.</span>
                                         @endif
 
-                                        @if($item->evidence_file)
-                                            @if($item->is_evidence_url)
-                                                @php
-                                                    $iframeUrl = $item->evidence_file;
-                                                    if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)/i', $item->evidence_file, $matches)) {
-                                                        $iframeUrl = "https://drive.google.com/file/d/" . $matches[1] . "/preview";
-                                                    }
-                                                @endphp
-                                                <div class="mt-2">
-                                                    <button type="button" class="btn btn-xs btn-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#viewEvidenceUrlModal{{ $item->id }}">
-                                                        <i class="fab fa-google-drive mr-1"></i> View Evidence Link
-                                                    </button>
-                                                </div>
-
-                                                {{-- Large Evidence Link Preview Modal --}}
-                                                <div class="modal fade" id="viewEvidenceUrlModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                                                    <div class="modal-dialog modal-extra-large modal-dialog-centered">
-                                                        <div class="modal-content shadow-lg border-0">
-                                                            <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
-                                                                <h5 class="modal-title font-weight-bold text-teal" style="font-size: 15px;">
-                                                                    <i class="fab fa-google-drive text-teal mr-2"></i> Evidence Document Preview
-                                                                </h5>
-                                                                <div>
-                                                                    <button type="button" onclick="window.print()" class="btn btn-xs btn-outline-dark font-weight-bold mr-2">
-                                                                        <i class="fas fa-print mr-1"></i> Print Document
-                                                                    </button>
-                                                                    <a href="{{ $item->evidence_file }}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline-teal font-weight-bold mr-2">
-                                                                        <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
-                                                                    </a>
-                                                                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                                                                        <span aria-hidden="true">&times;</span>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            <div class="modal-body p-0 bg-dark text-center" style="overflow: hidden;">
-                                                                <iframe id="evidenceIframe{{ $item->id }}" src="{{ $iframeUrl }}" style="width: 100%; height: 100%; border: none;" allow="autoplay; encrypted-media" loading="lazy"></iframe>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            @endif
-                                        @endif
-
-                                        {{-- Accomplishment Edit Modal / Button for Ratee --}}
-                                        @if($guard === 'employee' && $item->employee_id == $user->id)
-                                            <div class="mt-2">
-                                                <button type="button" class="btn btn-xs btn-outline-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#editAccomplishmentModal{{ $item->id }}">
-                                                    <i class="fas fa-edit mr-1"></i> {{ $item->actual_accomplishment ? 'Edit' : 'Upload' }} Accomplishment &amp; Evidence
-                                                </button>
-                                            </div>
-
-                                            <div class="modal fade" id="editAccomplishmentModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content shadow-lg border-0">
-                                                        <div class="modal-header bg-white border-bottom py-2">
-                                                            <h5 class="modal-title font-weight-bold text-teal" style="font-size: 15px;"><i class="fas fa-file-upload mr-2"></i> Submit Accomplishment &amp; Evidence</h5>
-                                                            <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                                                                <span aria-hidden="true">&times;</span>
-                                                            </button>
-                                                        </div>
-                                                        <form method="POST" action="{{ route('spms.ipcr.accomplishment.submit') }}">
-                                                            @csrf
-                                                            <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
-
-                                                            <div class="modal-body text-left">
-                                                                <div class="form-group mb-3">
-                                                                    <label class="font-weight-bold text-dark">Actual Accomplishment Description:</label>
-                                                                    <textarea name="actual_accomplishment" class="form-control" rows="3" placeholder="Describe your actual performance, target output achieved..." required>{{ $item->actual_accomplishment }}</textarea>
-                                                                </div>
-
-                                                                <div class="form-group mb-0">
-                                                                    <label class="font-weight-bold text-dark"><i class="fab fa-google-drive text-teal mr-1"></i> Google Drive Evidence Share Link:</label>
-                                                                    <input type="url" name="evidence_file" class="form-control" value="{{ $item->evidence_file }}" placeholder="https://drive.google.com/file/d/.../view?usp=sharing">
-                                                                    <small class="form-text text-muted">Upload your evidence file to Google Drive and paste the public share link here.</small>
-                                                                </div>
-                                                            </div>
-
-                                                            <div class="modal-footer bg-light py-2">
-                                                                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                                                                <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">Upload Accomplishment</button>
-                                                            </div>
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endif
-                                    </td>
-
-                                    {{-- Ratings --}}
-                                    <td class="text-center align-middle">
-                                        @if($item->rating_ave)
-                                            <span class="badge badge-primary px-2 py-1 font-weight-bold" style="font-size: 13px;">
-                                                {{ number_format($item->rating_ave, 2) }}
-                                            </span>
-                                            <small class="d-block text-muted mt-1" style="font-size: 10px;">
-                                                Q:{{ $item->rating_q ?? '-' }} | E:{{ $item->rating_e ?? '-' }} | T:{{ $item->rating_t ?? '-' }}
-                                            </small>
-                                        @else
-                                            <span class="badge badge-light border text-muted">Not Rated</span>
-                                        @endif
-                                    </td>
-
                                     {{-- Actions --}}
                                     <td class="text-center align-middle">
                                         @if($isHead || $guard === 'web')
                                             <button type="button" class="btn btn-xs btn-warning font-weight-bold shadow-sm" data-toggle="modal" data-target="#rateIpcrItemModal{{ $item->id }}" title="Rate accomplishment">
                                                 <i class="fas fa-star mr-1"></i> Rate
                                             </button>
-
-                                            {{-- Rating Modal --}}
-                                            <div class="modal fade" id="rateIpcrItemModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content shadow-lg border-0">
-                                                        <div class="modal-header bg-white border-bottom py-2">
-                                                            <h5 class="modal-title font-weight-bold text-dark" style="font-size: 15px;"><i class="fas fa-star text-warning mr-2"></i> Rate Employee Accomplishment</h5>
-                                                            <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                                                                <span aria-hidden="true">&times;</span>
-                                                            </button>
-                                                        </div>
-                                                        <form method="POST" action="{{ route('spms.ipcr.item.rate') }}">
-                                                            @csrf
-                                                            <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
-
-                                                            <div class="modal-body text-left">
-                                                                <div class="form-group mb-3">
-                                                                    <label class="font-weight-bold text-dark">Employee Accomplishment:</label>
-                                                                    <p class="text-muted small bg-light p-2 rounded border mb-0">{!! nl2br(e($item->actual_accomplishment ?? 'No accomplishment description provided')) !!}</p>
-                                                                </div>
-
-                                                                <h6 class="font-weight-bold text-dark mb-2">Rating (1 to 5 Scale):</h6>
-                                                                <div class="row">
-                                                                    <div class="col-4">
-                                                                        <label class="small font-weight-bold">Quality (Q):</label>
-                                                                        <input type="number" step="0.1" min="1" max="5" name="rating_q" class="form-control form-control-sm" value="{{ $item->rating_q }}">
-                                                                    </div>
-                                                                    <div class="col-4">
-                                                                        <label class="small font-weight-bold">Efficiency (E):</label>
-                                                                        <input type="number" step="0.1" min="1" max="5" name="rating_e" class="form-control form-control-sm" value="{{ $item->rating_e }}">
-                                                                    </div>
-                                                                    <div class="col-4">
-                                                                        <label class="small font-weight-bold">Timeliness (T):</label>
-                                                                        <input type="number" step="0.1" min="1" max="5" name="rating_t" class="form-control form-control-sm" value="{{ $item->rating_t }}">
-                                                                    </div>
-                                                                </div>
-
-                                                                <div class="form-group mt-3 mb-0">
-                                                                    <label class="font-weight-bold text-dark">Remarks:</label>
-                                                                    <textarea name="remarks" class="form-control" rows="2">{{ $item->remarks }}</textarea>
-                                                                </div>
-                                                            </div>
-
-                                                            <div class="modal-footer bg-light py-2">
-                                                                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                                                                <button type="submit" class="btn btn-warning btn-sm font-weight-bold px-3">Save Rating</button>
-                                                            </div>
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                            </div>
                                         @endif
                                     </td>
                                 </tr>
+
+                                {{-- Large Evidence Link Preview Modal --}}
+                                @if($item->evidence_file && $item->is_evidence_url)
+                                    @php
+                                        $iframeUrl = $item->evidence_file;
+                                        if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)/i', $item->evidence_file, $matches)) {
+                                            $iframeUrl = "https://drive.google.com/file/d/" . $matches[1] . "/preview";
+                                        }
+                                    @endphp
+                                    <div class="modal fade" id="viewEvidenceUrlModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                        <div class="modal-dialog modal-extra-large modal-dialog-centered">
+                                            <div class="modal-content shadow-lg border-0">
+                                                <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
+                                                    <h5 class="modal-title font-weight-bold text-teal" style="font-size: 15px;">
+                                                        <i class="fab fa-google-drive text-teal mr-2"></i> Evidence Document Preview
+                                                    </h5>
+                                                    <div>
+                                                        <button type="button" onclick="window.print()" class="btn btn-xs btn-outline-dark font-weight-bold mr-2">
+                                                            <i class="fas fa-print mr-1"></i> Print Document
+                                                        </button>
+                                                        <a href="{{ $item->evidence_file }}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline-teal font-weight-bold mr-2">
+                                                            <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
+                                                        </a>
+                                                        <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                                                            <span aria-hidden="true">&times;</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-body p-0 bg-dark text-center" style="overflow: hidden;">
+                                                    <iframe id="evidenceIframe{{ $item->id }}" src="{{ $iframeUrl }}" style="width: 100%; height: 100%; border: none;" allow="autoplay; encrypted-media" loading="lazy"></iframe>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                {{-- Accomplishment Edit Modal for Ratee --}}
+                                @if($guard === 'employee' && $item->employee_id == $user->id)
+                                    <div class="modal fade" id="editAccomplishmentModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content shadow-lg border-0">
+                                                <div class="modal-header bg-white border-bottom py-2">
+                                                    <h5 class="modal-title font-weight-bold text-teal" style="font-size: 15px;"><i class="fas fa-file-upload mr-2"></i> Submit Accomplishment &amp; Evidence</h5>
+                                                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                                                        <span aria-hidden="true">&times;</span>
+                                                    </button>
+                                                </div>
+                                                <form method="POST" action="{{ route('spms.ipcr.accomplishment.submit') }}">
+                                                    @csrf
+                                                    <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
+
+                                                    <div class="modal-body text-left">
+                                                        <div class="form-group mb-3">
+                                                            <label class="font-weight-bold text-dark">Actual Accomplishment Description:</label>
+                                                            <textarea name="actual_accomplishment" class="form-control" rows="3" placeholder="Describe your actual performance, target output achieved..." required>{{ $item->actual_accomplishment }}</textarea>
+                                                        </div>
+
+                                                        <div class="form-group mb-0">
+                                                            <label class="font-weight-bold text-dark"><i class="fab fa-google-drive text-teal mr-1"></i> Google Drive Evidence Share Link:</label>
+                                                            <input type="url" name="evidence_file" class="form-control" value="{{ $item->evidence_file }}" placeholder="https://drive.google.com/file/d/.../view?usp=sharing">
+                                                            <small class="form-text text-muted">Upload your evidence file to Google Drive and paste the public share link here.</small>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="modal-footer bg-light py-2">
+                                                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">Upload Accomplishment</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                {{-- Rating Modal --}}
+                                @if($isHead || $guard === 'web')
+                                    <div class="modal fade" id="rateIpcrItemModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content shadow-lg border-0">
+                                                <div class="modal-header bg-white border-bottom py-2">
+                                                    <h5 class="modal-title font-weight-bold text-dark" style="font-size: 15px;"><i class="fas fa-star text-warning mr-2"></i> Rate Employee Accomplishment</h5>
+                                                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                                                        <span aria-hidden="true">&times;</span>
+                                                    </button>
+                                                </div>
+                                                <form method="POST" action="{{ route('spms.ipcr.item.rate') }}">
+                                                    @csrf
+                                                    <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
+
+                                                    <div class="modal-body text-left">
+                                                        <div class="form-group mb-3">
+                                                            <label class="font-weight-bold text-dark">Employee Accomplishment:</label>
+                                                            <p class="text-muted small bg-light p-2 rounded border mb-0">{!! nl2br(e($item->actual_accomplishment ?? 'No accomplishment description provided')) !!}</p>
+                                                        </div>
+
+                                                        <h6 class="font-weight-bold text-dark mb-2">Rating (1 to 5 Scale):</h6>
+                                                        <div class="row">
+                                                            <div class="col-4">
+                                                                <label class="small font-weight-bold">Quality (Q):</label>
+                                                                <input type="number" step="0.1" min="1" max="5" name="rating_q" class="form-control form-control-sm" value="{{ $item->rating_q }}">
+                                                            </div>
+                                                            <div class="col-4">
+                                                                <label class="small font-weight-bold">Efficiency (E):</label>
+                                                                <input type="number" step="0.1" min="1" max="5" name="rating_e" class="form-control form-control-sm" value="{{ $item->rating_e }}">
+                                                            </div>
+                                                            <div class="col-4">
+                                                                <label class="small font-weight-bold">Timeliness (T):</label>
+                                                                <input type="number" step="0.1" min="1" max="5" name="rating_t" class="form-control form-control-sm" value="{{ $item->rating_t }}">
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="form-group mt-3 mb-0">
+                                                            <label class="font-weight-bold text-dark">Remarks:</label>
+                                                            <textarea name="remarks" class="form-control" rows="2">{{ $item->remarks }}</textarea>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="modal-footer bg-light py-2">
+                                                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-warning btn-sm font-weight-bold px-3">Save Rating</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
                             @empty
                                 <tr>
                                     <td colspan="7" class="text-center py-3 text-muted small font-italic">
@@ -590,6 +563,9 @@
     </div>
 </div>
 
+@endsection
+
+@push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script>
     function printModalIframe(iframeId) {
@@ -604,8 +580,6 @@
         }
     }
 
-    // Use $(function) instead of DOMContentLoaded — works correctly even when
-    // the script runs at bottom of page (after DOMContentLoaded already fired).
     $(function () {
         document.querySelectorAll('.ipcr-sortable-body').forEach(function (tbody) {
             var reorderUrl = tbody.getAttribute('data-reorderurl');
@@ -613,6 +587,7 @@
             if (typeof Sortable !== 'undefined') {
                 Sortable.create(tbody, {
                     animation: 150,
+                    draggable: 'tr.ipcr-sortable-row',
                     filter: 'a, button, input, textarea, select, .btn, .modal, [data-toggle]',
                     preventOnFilter: false,
                     ghostClass: 'sortable-ghost',
@@ -629,7 +604,9 @@
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                    'X-Requested-With': 'XMLHttpRequest'
                                 },
                                 body: JSON.stringify({ order: itemIds })
                             })
@@ -649,4 +626,5 @@
         });
     });
 </script>
-@endsection
+@endpush
+
