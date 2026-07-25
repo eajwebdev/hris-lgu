@@ -166,6 +166,24 @@ class SpmsController extends Controller
     }
 
     /**
+     * Print Printable OPCR Form for Office Head / Department (Landscape Layout matching CSC standard)
+     */
+    public function printOpcr(Request $request, $id)
+    {
+        $guard = $this->getGuard();
+        $user = auth()->guard($guard)->user();
+        $isHead = $this->isOfficeHead($guard, $user);
+
+        $opcr = SpmsOpcr::with(['items.assignedEmployees', 'office.head', 'head'])->findOrFail($id);
+        $office = $opcr->office;
+        $officeHead = $opcr->head ?: $office?->head;
+
+        return view('spms.print_opcr', compact(
+            'guard', 'user', 'isHead', 'opcr', 'office', 'officeHead'
+        ));
+    }
+
+    /**
      * Store / Update OPCR Row Item
      */
     public function storeOpcrItem(Request $request)
