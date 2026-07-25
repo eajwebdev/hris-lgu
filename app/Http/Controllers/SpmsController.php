@@ -319,9 +319,19 @@ class SpmsController extends Controller
         }
 
         $employee = Employee::findOrFail($employeeId);
-        $office = Office::find($employee->emp_dept);
+        $office = Office::with('head')->find($employee->emp_dept);
+        $officeHead = $office?->head;
+        if (!$officeHead && $office) {
+            $officeHead = Employee::where('emp_dept', $office->id)
+                ->where(function($q) {
+                    $q->where('position', 'like', '%Head%')
+                      ->orWhere('position', 'like', '%Chief%')
+                      ->orWhere('position', 'like', '%Director%')
+                      ->orWhere('position', 'like', '%Manager%');
+                })->first();
+        }
 
-        $ipcr = SpmsIpcr::with(['items.opcrItem', 'items.assigner'])
+        $ipcr = SpmsIpcr::with(['items.opcrItem', 'items.assigner', 'office.head'])
             ->firstOrCreate(
                 [
                     'employee_id' => $employee->id,
@@ -335,7 +345,7 @@ class SpmsController extends Controller
             );
 
         return view('spms.ipcr_matrix', compact(
-            'guard', 'user', 'isHead', 'employee', 'office', 'ipcr', 'year', 'semester'
+            'guard', 'user', 'isHead', 'employee', 'office', 'officeHead', 'ipcr', 'year', 'semester'
         ));
     }
 
@@ -347,25 +357,27 @@ class SpmsController extends Controller
         $request->validate([
             'ipcr_item_id' => 'required|exists:spms_ipcr_items,id',
             'actual_accomplishment' => 'required|string',
-            'evidence_file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png,zip|max:10240', // Max 10MB
+            'evidence_file' => 'nullable|string|max:2048',
         ]);
 
         $ipcrItem = SpmsIpcrItem::findOrFail($request->ipcr_item_id);
 
-        $filePath = $ipcrItem->evidence_file;
+        $evidence = $ipcrItem->evidence_file;
         if ($request->hasFile('evidence_file')) {
             $file = $request->file('evidence_file');
             $fileName = time() . '_' . $file->getClientOriginalName();
-            $filePath = $file->storeAs('spms_evidence', $fileName, 'public');
+            $evidence = $file->storeAs('spms_evidence', $fileName, 'public');
+        } elseif ($request->filled('evidence_file')) {
+            $evidence = trim($request->input('evidence_file'));
         }
 
         $ipcrItem->update([
             'actual_accomplishment' => $request->actual_accomplishment,
-            'evidence_file' => $filePath,
+            'evidence_file' => $evidence,
             'status' => 'Submitted',
         ]);
 
-        return back()->with('success', 'Accomplishment and evidence uploaded successfully.');
+        return back()->with('success', 'Accomplishment and evidence link saved successfully.');
     }
 
     /**
@@ -473,5 +485,93 @@ class SpmsController extends Controller
         }
 
         return back()->with('success', $msg);
+    }
+
+    /**
+     * Update OPCR Footer Signatories (Prepared by, PMT Members, Approved by)
+     */
+    public function updateSignatories(Request $request, $id)
+    {
+        $request->validate([
+            'prepared_by_name' => 'required|string|max:255',
+            'prepared_by_position' => 'required|string|max:255',
+            'pmt_members' => 'nullable|string',
+            'approved_by_name' => 'required|string|max:255',
+            'approved_by_position' => 'required|string|max:255',
+        ]);
+
+        $opcr = SpmsOpcr::findOrFail($id);
+
+        $opcr->update([
+            'prepared_by_name' => $request->prepared_by_name,
+            'prepared_by_position' => $request->prepared_by_position,
+            'pmt_members' => $request->pmt_members,
+            'approved_by_name' => $request->approved_by_name,
+            'approved_by_position' => $request->approved_by_position,
+        ]);
+
+        return back()->with('success', 'OPCR signatories updated successfully.');
+    }
+
+    /**
+     * Update IPCR Footer Signatories (Ratee, Assessed by, Approved by)
+     */
+    public function updateIpcrSignatories(Request $request, $id)
+    {
+        $request->validate([
+            'ratee_name' => 'required|string|max:255',
+            'ratee_position' => 'required|string|max:255',
+            'assessed_by_name' => 'required|string|max:255',
+            'assessed_by_position' => 'required|string|max:255',
+            'approved_by_name' => 'required|string|max:255',
+            'approved_by_position' => 'required|string|max:255',
+        ]);
+
+        $ipcr = SpmsIpcr::findOrFail($id);
+
+        $ipcr->update([
+            'ratee_name' => $request->ratee_name,
+            'ratee_position' => $request->ratee_position,
+            'assessed_by_name' => $request->assessed_by_name,
+            'assessed_by_position' => $request->assessed_by_position,
+            'approved_by_name' => $request->approved_by_name,
+            'approved_by_position' => $request->approved_by_position,
+        ]);
+
+        return back()->with('success', 'IPCR signatories updated successfully.');
+    }
+
+    /**
+     * Reorder OPCR items within a category
+     */
+    public function reorderOpcrItems(Request $request)
+    {
+        $request->validate([
+            'order' => 'required|array',
+            'order.*' => 'integer|exists:spms_opcr_items,id',
+        ]);
+
+        foreach ($request->order as $index => $itemId) {
+            SpmsOpcrItem::where('id', $itemId)->update(['sort_order' => $index + 1]);
+        }
+
+        return response()->json(['status' => 'success', 'message' => 'OPCR item order updated']);
+    }
+
+    /**
+     * Reorder IPCR items within a category
+     */
+    public function reorderIpcrItems(Request $request)
+    {
+        $request->validate([
+            'order' => 'required|array',
+            'order.*' => 'integer|exists:spms_ipcr_items,id',
+        ]);
+
+        foreach ($request->order as $index => $itemId) {
+            SpmsIpcrItem::where('id', $itemId)->update(['sort_order' => $index + 1]);
+        }
+
+        return response()->json(['status' => 'success', 'message' => 'IPCR item order updated']);
     }
 }

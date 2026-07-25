@@ -36,6 +36,88 @@
         height: calc(90vh - 60px) !important;
         overflow-y: auto;
     }
+    .sortable-ghost {
+        background-color: #e6fffa !important;
+        border: 2px dashed #16a085 !important;
+        opacity: 0.5;
+    }
+    .sortable-chosen {
+        background: #f0fdfa !important;
+        box-shadow: 0 4px 14px rgba(22, 160, 133, 0.25) !important;
+    }
+    .sortable-drag {
+        opacity: 0.9;
+    }
+    .ipcr-sortable-row {
+        cursor: grab;
+        transition: background-color 0.15s ease;
+    }
+    .ipcr-sortable-row:active {
+        cursor: grabbing;
+    }
+    .drag-handle {
+        cursor: grab !important;
+    }
+    .drag-handle:active {
+        cursor: grabbing !important;
+    }
+    @media print {
+        /* Default print: Hide navigation, sidebar, and buttons */
+        .main-header, .main-sidebar, .breadcrumb-drive, .btn, .alert, footer, .no-print {
+            display: none !important;
+        }
+        body:not(.modal-open) .modal {
+            display: none !important;
+        }
+        body, .content-wrapper, .container-fluid {
+            background: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .card {
+            border: 1px solid #000000 !important;
+            box-shadow: none !important;
+        }
+        .table-bordered, .table-bordered th, .table-bordered td {
+            border: 1px solid #000000 !important;
+            color: #000000 !important;
+        }
+
+        /* Modal active print mode: Print ONLY the active modal & iframe content */
+        body.modal-open .container-fluid > *:not(.modal) {
+            display: none !important;
+        }
+        body.modal-open .modal.show {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 99999 !important;
+            background: #ffffff !important;
+            display: block !important;
+        }
+        body.modal-open .modal-dialog {
+            max-width: 100vw !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+        }
+        body.modal-open .modal-content {
+            height: 100vh !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        body.modal-open .modal-header {
+            background: #ffffff !important;
+            color: #000000 !important;
+        }
+        body.modal-open .modal-header .btn,
+        body.modal-open .modal-header .close {
+            display: none !important;
+        }
+    }
 </style>
 
 <div class="container-fluid py-2">
@@ -95,6 +177,9 @@
             </h6>
             <div>
                 <span class="badge badge-success px-3 py-2 font-weight-bold mr-2">Status: {{ $ipcr->status }}</span>
+                <button type="button" onclick="window.print()" class="btn btn-sm btn-outline-secondary font-weight-bold shadow-sm mr-2">
+                    <i class="fas fa-print mr-1"></i> Print Matrix
+                </button>
                 <button type="button" class="btn btn-sm btn-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#addCustomIpcrModal">
                     <i class="fas fa-plus mr-1"></i> Add Custom Objective
                 </button>
@@ -115,219 +200,348 @@
                             <th style="width: 6%">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @forelse($ipcr->items as $index => $item)
-                            <tr>
-                                <td class="text-center font-weight-bold">{{ $index + 1 }}</td>
-                                <td>
-                                    <span class="badge {{ $item->category == 'Core Functions' ? 'badge-success' : 'badge-secondary' }}">
-                                        {{ $item->category }}
-                                    </span>
-                                    @if($item->opcr_item_id)
-                                        <small class="d-block text-teal font-weight-bold mt-1">
-                                            <i class="fas fa-sitemap mr-1"></i> Cascaded from OPCR Row #{{ $item->opcr_item_id }}
-                                        </small>
-                                    @endif
+                    @foreach(['Core Functions' => 'CORE FUNCTIONS (60%)', 'Strategic Functions' => 'STRATEGIC FUNCTIONS (20%)', 'Support Functions' => 'SUPPORT FUNCTIONS (20%)'] as $catKey => $catLabel)
+                        <tbody class="bg-light">
+                            <tr class="table-secondary font-weight-bold text-left">
+                                <td colspan="7" class="py-2 px-3">
+                                    <i class="fas fa-folder text-warning mr-2"></i> {{ $catLabel }}
+                                    <small class="text-muted font-weight-normal ml-2 font-italic">(Drag rows below to reorder within this function)</small>
                                 </td>
-                                <td class="font-weight-bold text-dark">{!! nl2br(e($item->mfo_pap)) !!}</td>
-                                <td class="text-muted">{!! nl2br(e($item->success_indicators)) !!}</td>
-                                <td>
-                                    @if($item->actual_accomplishment)
-                                        <p class="mb-1 text-dark">{!! nl2br(e($item->actual_accomplishment)) !!}</p>
-                                    @else
-                                        <span class="text-muted font-italic small">No accomplishment entered yet.</span>
-                                    @endif
+                            </tr>
+                        </tbody>
 
-                                    @if($item->evidence_file)
-                                        @php
-                                            $ext = strtolower(pathinfo($item->evidence_file, PATHINFO_EXTENSION));
-                                            $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']);
-                                            $isPdf = ($ext === 'pdf');
-                                        @endphp
-                                        <div class="mt-2">
-                                            <button type="button" class="btn btn-xs btn-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#viewEvidenceModal{{ $item->id }}">
-                                                <i class="fas fa-eye mr-1"></i> View Attachment
-                                            </button>
-                                        </div>
+                        @php
+                            $categoryItems = $ipcr->items->where('category', $catKey);
+                        @endphp
 
-                                        {{-- Inline Document Preview Modal --}}
-                                        <div class="modal fade" id="viewEvidenceModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                                            <div class="modal-dialog modal-extra-large modal-dialog-centered">
-                                                <div class="modal-content shadow-lg border-0">
-                                                    <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
-                                                        <h5 class="modal-title font-weight-bold text-teal" style="font-size: 15px;">
-                                                            <i class="fas fa-file-alt text-teal mr-2"></i> Evidence Attachment &bull; {{ basename($item->evidence_file) }}
-                                                        </h5>
-                                                        <div>
-                                                            <a href="{{ route('spms.evidence.view', ['id' => $item->id, 'download' => 1]) }}" class="btn btn-xs btn-outline-primary mr-2 font-weight-bold">
-                                                                <i class="fas fa-download mr-1"></i> Download File
-                                                            </a>
+                        <tbody class="ipcr-sortable-body" data-category="{{ $catKey }}" data-reorderurl="{{ route('spms.ipcr.item.reorder') }}">
+                            @forelse($categoryItems as $index => $item)
+                                <tr class="ipcr-sortable-row" data-id="{{ $item->id }}">
+                                    <td class="text-center font-weight-bold align-middle">
+                                        <i class="fas fa-grip-vertical text-secondary mr-1 drag-handle no-print" style="cursor: grab;" title="Drag to reorder within {{ $catKey }}"></i>
+                                        {{ $loop->iteration }}
+                                    </td>
+                                    <td>
+                                        <span class="badge {{ $item->category == 'Core Functions' ? 'badge-success' : 'badge-secondary' }}">
+                                            {{ $item->category }}
+                                        </span>
+                                        @if($item->opcr_item_id)
+                                            <small class="d-block text-teal font-weight-bold mt-1">
+                                                <i class="fas fa-sitemap mr-1"></i> Cascaded from OPCR Row #{{ $item->opcr_item_id }}
+                                            </small>
+                                        @endif
+                                    </td>
+                                    <td class="font-weight-bold text-dark">{!! nl2br(e($item->mfo_pap)) !!}</td>
+                                    <td class="text-muted">{!! nl2br(e($item->success_indicators)) !!}</td>
+                                    <td>
+                                        @if($item->actual_accomplishment)
+                                            <p class="mb-1 text-dark">{!! nl2br(e($item->actual_accomplishment)) !!}</p>
+                                        @else
+                                            <span class="text-muted font-italic small">No accomplishment entered yet.</span>
+                                        @endif
+
+                                        @if($item->evidence_file)
+                                            @if($item->is_evidence_url)
+                                                @php
+                                                    $iframeUrl = $item->evidence_file;
+                                                    if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)/i', $item->evidence_file, $matches)) {
+                                                        $iframeUrl = "https://drive.google.com/file/d/" . $matches[1] . "/preview";
+                                                    }
+                                                @endphp
+                                                <div class="mt-2">
+                                                    <button type="button" class="btn btn-xs btn-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#viewEvidenceUrlModal{{ $item->id }}">
+                                                        <i class="fab fa-google-drive mr-1"></i> View Evidence Link
+                                                    </button>
+                                                </div>
+
+                                                {{-- Large Evidence Link Preview Modal --}}
+                                                <div class="modal fade" id="viewEvidenceUrlModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                                    <div class="modal-dialog modal-extra-large modal-dialog-centered">
+                                                        <div class="modal-content shadow-lg border-0">
+                                                            <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
+                                                                <h5 class="modal-title font-weight-bold text-teal" style="font-size: 15px;">
+                                                                    <i class="fab fa-google-drive text-teal mr-2"></i> Evidence Document Preview
+                                                                </h5>
+                                                                <div>
+                                                                    <button type="button" onclick="window.print()" class="btn btn-xs btn-outline-dark font-weight-bold mr-2">
+                                                                        <i class="fas fa-print mr-1"></i> Print Document
+                                                                    </button>
+                                                                    <a href="{{ $item->evidence_file }}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline-teal font-weight-bold mr-2">
+                                                                        <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
+                                                                    </a>
+                                                                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                                                                        <span aria-hidden="true">&times;</span>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-body p-0 bg-dark text-center" style="overflow: hidden;">
+                                                                <iframe id="evidenceIframe{{ $item->id }}" src="{{ $iframeUrl }}" style="width: 100%; height: 100%; border: none;" allow="autoplay; encrypted-media" loading="lazy"></iframe>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        @endif
+
+                                        {{-- Accomplishment Edit Modal / Button for Ratee --}}
+                                        @if($guard === 'employee' && $item->employee_id == $user->id)
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-xs btn-outline-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#editAccomplishmentModal{{ $item->id }}">
+                                                    <i class="fas fa-edit mr-1"></i> {{ $item->actual_accomplishment ? 'Edit' : 'Upload' }} Accomplishment &amp; Evidence
+                                                </button>
+                                            </div>
+
+                                            <div class="modal fade" id="editAccomplishmentModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered">
+                                                    <div class="modal-content shadow-lg border-0">
+                                                        <div class="modal-header bg-white border-bottom py-2">
+                                                            <h5 class="modal-title font-weight-bold text-teal" style="font-size: 15px;"><i class="fas fa-file-upload mr-2"></i> Submit Accomplishment &amp; Evidence</h5>
                                                             <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
                                                                 <span aria-hidden="true">&times;</span>
                                                             </button>
                                                         </div>
-                                                    </div>
-                                                    <div class="modal-body p-3 bg-light text-center">
-                                                        @if($isPdf)
-                                                            <object data="{{ route('spms.evidence.view', $item->id) }}#toolbar=0" type="application/pdf" style="width: 100%; height: 100%; min-height: calc(90vh - 100px); border: none; border-radius: 6px;">
-                                                                <embed src="{{ route('spms.evidence.view', $item->id) }}" type="application/pdf" style="width: 100%; height: 100%; min-height: calc(90vh - 100px);" />
-                                                            </object>
-                                                        @elseif($isImage)
-                                                            <img src="{{ route('spms.evidence.view', $item->id) }}" class="img-fluid rounded shadow-sm d-block mx-auto" style="max-height: calc(90vh - 100px);" alt="Evidence Attachment">
-                                                        @else
-                                                            <div class="py-5">
-                                                                <i class="fas fa-file-archive fa-4x text-secondary mb-3"></i>
-                                                                <h6 class="font-weight-bold text-dark mb-1">{{ basename($item->evidence_file) }}</h6>
-                                                                <p class="text-muted small">This file type cannot be previewed inline.</p>
-                                                                <a href="{{ route('spms.evidence.view', ['id' => $item->id, 'download' => 1]) }}" class="btn btn-teal font-weight-bold px-4 py-2 mt-2">
-                                                                    <i class="fas fa-download mr-1"></i> Download Original File
-                                                                </a>
+                                                        <form method="POST" action="{{ route('spms.ipcr.accomplishment.submit') }}">
+                                                            @csrf
+                                                            <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
+
+                                                            <div class="modal-body text-left">
+                                                                <div class="form-group mb-3">
+                                                                    <label class="font-weight-bold text-dark">Actual Accomplishment Description:</label>
+                                                                    <textarea name="actual_accomplishment" class="form-control" rows="3" placeholder="Describe your actual performance, target output achieved..." required>{{ $item->actual_accomplishment }}</textarea>
+                                                                </div>
+
+                                                                <div class="form-group mb-0">
+                                                                    <label class="font-weight-bold text-dark"><i class="fab fa-google-drive text-teal mr-1"></i> Google Drive Evidence Share Link:</label>
+                                                                    <input type="url" name="evidence_file" class="form-control" value="{{ $item->evidence_file }}" placeholder="https://drive.google.com/file/d/.../view?usp=sharing">
+                                                                    <small class="form-text text-muted">Upload your evidence file to Google Drive and paste the public share link here.</small>
+                                                                </div>
                                                             </div>
-                                                        @endif
+
+                                                            <div class="modal-footer bg-light py-2">
+                                                                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                                                                <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">Upload Accomplishment</button>
+                                                            </div>
+                                                        </form>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    @endif
-                                </td>
-                                <td class="text-center">
-                                    @if($item->rating_ave)
-                                        <span class="badge badge-success px-2 py-1 font-weight-bold d-block mb-1">
-                                            Average: {{ number_format($item->rating_ave, 2) }}
-                                        </span>
-                                        <small class="text-muted">
-                                            Q:{{ $item->rating_q ?? '-' }} | E:{{ $item->rating_e ?? '-' }} | T:{{ $item->rating_t ?? '-' }}
-                                        </small>
-                                    @else
-                                        <span class="text-muted small">Not Rated</span>
-                                    @endif
-                                </td>
-                                <td class="text-center align-middle">
-                                    <button class="btn btn-xs btn-teal font-weight-bold px-2 mb-1"
-                                            title="Update Accomplishment & Upload Evidence"
-                                            data-toggle="modal"
-                                            data-target="#updateAccomplishmentModal{{ $item->id }}">
-                                        <i class="fas fa-upload mr-1"></i> Submit
-                                    </button>
+                                        @endif
+                                    </td>
 
-                                    @if($isHead)
-                                        <button class="btn btn-xs btn-warning font-weight-bold px-2"
-                                                title="Rate Employee Target"
-                                                data-toggle="modal"
-                                                data-target="#rateModal{{ $item->id }}">
-                                            <i class="fas fa-star mr-1"></i> Rate
-                                        </button>
-                                    @endif
-                                </td>
-                            </tr>
+                                    {{-- Ratings --}}
+                                    <td class="text-center align-middle">
+                                        @if($item->rating_ave)
+                                            <span class="badge badge-primary px-2 py-1 font-weight-bold" style="font-size: 13px;">
+                                                {{ number_format($item->rating_ave, 2) }}
+                                            </span>
+                                            <small class="d-block text-muted mt-1" style="font-size: 10px;">
+                                                Q:{{ $item->rating_q ?? '-' }} | E:{{ $item->rating_e ?? '-' }} | T:{{ $item->rating_t ?? '-' }}
+                                            </small>
+                                        @else
+                                            <span class="badge badge-light border text-muted">Not Rated</span>
+                                        @endif
+                                    </td>
 
-                            {{-- Accomplishment & Evidence Modal (Light Header) --}}
-                            <div class="modal fade" id="updateAccomplishmentModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered">
-                                    <div class="modal-content shadow-lg border-0">
-                                        <div class="modal-header bg-white border-bottom py-2">
-                                            <h5 class="modal-title font-weight-bold text-teal"><i class="fas fa-edit mr-2"></i> Submit Accomplishment &amp; Evidence</h5>
-                                            <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                                                <span aria-hidden="true">&times;</span>
+                                    {{-- Actions --}}
+                                    <td class="text-center align-middle">
+                                        @if($isHead || $guard === 'web')
+                                            <button type="button" class="btn btn-xs btn-warning font-weight-bold shadow-sm" data-toggle="modal" data-target="#rateIpcrItemModal{{ $item->id }}" title="Rate accomplishment">
+                                                <i class="fas fa-star mr-1"></i> Rate
                                             </button>
-                                        </div>
-                                        <form method="POST" action="{{ route('spms.ipcr.accomplishment.submit') }}" enctype="multipart/form-data">
-                                            @csrf
-                                            <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
 
-                                            <div class="modal-body text-left">
-                                                <div class="form-group mb-3">
-                                                    <label class="font-weight-bold text-dark">Objective (MFO / PAP):</label>
-                                                    <p class="text-muted small bg-light p-2 rounded border mb-0">{!! nl2br(e($item->mfo_pap)) !!}</p>
-                                                </div>
-
-                                                <div class="form-group mb-3">
-                                                    <label class="font-weight-bold text-dark">Actual Accomplishment Description:</label>
-                                                    <textarea name="actual_accomplishment" class="form-control" rows="3" placeholder="Describe actual achievements, percentages, or deliverables..." required>{{ $item->actual_accomplishment }}</textarea>
-                                                </div>
-
-                                                <div class="form-group mb-3">
-                                                    <label class="font-weight-bold text-dark">Upload Supporting Evidence File (PDF, DOC, JPG, PNG, ZIP):</label>
-                                                    <input type="file" name="evidence_file" class="form-control-file border p-1 rounded w-100">
-                                                    <small class="form-text text-muted">Max file size: 10MB.</small>
-                                                </div>
-                                            </div>
-
-                                            <div class="modal-footer bg-light py-2">
-                                                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                                                <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-3">
-                                                    <i class="fas fa-save mr-1"></i> Save &amp; Submit
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {{-- Office Head Rating Modal (Light Header) --}}
-                            @if($isHead)
-                                <div class="modal fade" id="rateModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered">
-                                        <div class="modal-content shadow-lg border-0">
-                                            <div class="modal-header bg-white border-bottom py-2">
-                                                <h5 class="modal-title font-weight-bold text-dark"><i class="fas fa-star text-warning mr-2"></i> Evaluate Employee IPCR Item</h5>
-                                                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                                                    <span aria-hidden="true">&times;</span>
-                                                </button>
-                                            </div>
-                                            <form method="POST" action="{{ route('spms.ipcr.item.rate') }}">
-                                                @csrf
-                                                <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
-
-                                                <div class="modal-body text-left">
-                                                    <div class="form-group mb-3">
-                                                        <label class="font-weight-bold text-dark">Employee Accomplishment:</label>
-                                                        <p class="text-muted small bg-light p-2 rounded border mb-0">{!! nl2br(e($item->actual_accomplishment ?? 'No accomplishment description provided')) !!}</p>
-                                                    </div>
-
-                                                    <h6 class="font-weight-bold text-dark mb-2">Rating (1 to 5 Scale):</h6>
-                                                    <div class="row">
-                                                        <div class="col-4">
-                                                            <label class="small font-weight-bold">Quality (Q):</label>
-                                                            <input type="number" step="0.1" min="1" max="5" name="rating_q" class="form-control form-control-sm" value="{{ $item->rating_q }}">
+                                            {{-- Rating Modal --}}
+                                            <div class="modal fade" id="rateIpcrItemModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered">
+                                                    <div class="modal-content shadow-lg border-0">
+                                                        <div class="modal-header bg-white border-bottom py-2">
+                                                            <h5 class="modal-title font-weight-bold text-dark" style="font-size: 15px;"><i class="fas fa-star text-warning mr-2"></i> Rate Employee Accomplishment</h5>
+                                                            <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                                                                <span aria-hidden="true">&times;</span>
+                                                            </button>
                                                         </div>
-                                                        <div class="col-4">
-                                                            <label class="small font-weight-bold">Efficiency (E):</label>
-                                                            <input type="number" step="0.1" min="1" max="5" name="rating_e" class="form-control form-control-sm" value="{{ $item->rating_e }}">
-                                                        </div>
-                                                        <div class="col-4">
-                                                            <label class="small font-weight-bold">Timeliness (T):</label>
-                                                            <input type="number" step="0.1" min="1" max="5" name="rating_t" class="form-control form-control-sm" value="{{ $item->rating_t }}">
-                                                        </div>
-                                                    </div>
+                                                        <form method="POST" action="{{ route('spms.ipcr.item.rate') }}">
+                                                            @csrf
+                                                            <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
 
-                                                    <div class="form-group mt-3 mb-0">
-                                                        <label class="font-weight-bold text-dark">Remarks:</label>
-                                                        <textarea name="remarks" class="form-control" rows="2">{{ $item->remarks }}</textarea>
+                                                            <div class="modal-body text-left">
+                                                                <div class="form-group mb-3">
+                                                                    <label class="font-weight-bold text-dark">Employee Accomplishment:</label>
+                                                                    <p class="text-muted small bg-light p-2 rounded border mb-0">{!! nl2br(e($item->actual_accomplishment ?? 'No accomplishment description provided')) !!}</p>
+                                                                </div>
+
+                                                                <h6 class="font-weight-bold text-dark mb-2">Rating (1 to 5 Scale):</h6>
+                                                                <div class="row">
+                                                                    <div class="col-4">
+                                                                        <label class="small font-weight-bold">Quality (Q):</label>
+                                                                        <input type="number" step="0.1" min="1" max="5" name="rating_q" class="form-control form-control-sm" value="{{ $item->rating_q }}">
+                                                                    </div>
+                                                                    <div class="col-4">
+                                                                        <label class="small font-weight-bold">Efficiency (E):</label>
+                                                                        <input type="number" step="0.1" min="1" max="5" name="rating_e" class="form-control form-control-sm" value="{{ $item->rating_e }}">
+                                                                    </div>
+                                                                    <div class="col-4">
+                                                                        <label class="small font-weight-bold">Timeliness (T):</label>
+                                                                        <input type="number" step="0.1" min="1" max="5" name="rating_t" class="form-control form-control-sm" value="{{ $item->rating_t }}">
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="form-group mt-3 mb-0">
+                                                                    <label class="font-weight-bold text-dark">Remarks:</label>
+                                                                    <textarea name="remarks" class="form-control" rows="2">{{ $item->remarks }}</textarea>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="modal-footer bg-light py-2">
+                                                                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                                                                <button type="submit" class="btn btn-warning btn-sm font-weight-bold px-3">Save Rating</button>
+                                                            </div>
+                                                        </form>
                                                     </div>
                                                 </div>
-
-                                                <div class="modal-footer bg-light py-2">
-                                                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                                                    <button type="submit" class="btn btn-warning btn-sm font-weight-bold px-3">Save Rating</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endif
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center py-5 text-muted">
-                                    <i class="fas fa-folder-open fa-3x text-secondary mb-3 d-block"></i>
-                                    <p class="mb-0 font-weight-bold">No objectives assigned to you for this period yet.</p>
-                                    <small>Your Office Head can cascade specific OPCR row targets directly to your IPCR.</small>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
+                                            </div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center py-3 text-muted small font-italic">
+                                        No items assigned under {{ $catLabel }} yet.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    @endforeach
                 </table>
             </div>
+        </div>
+
+        {{-- Sign-off Footer Section (Official CSC IPCR Signatories) --}}
+        @php
+            $rateeDefaultName = $employee->fname . ' ' . $employee->lname;
+            $rateeDefaultPos = $employee->position ?? 'Personnel';
+            $resolvedHead = isset($officeHead) && $officeHead ? $officeHead : ($ipcr->office?->head ?: ($office?->head ?? null));
+            $assessedDefaultName = $resolvedHead ? ($resolvedHead->fname . ' ' . $resolvedHead->lname) : 'OFFICE HEAD NAME';
+            $assessedDefaultPos = $resolvedHead?->position ?: ('Head, ' . ($office->office_name ?? $ipcr->office?->office_name ?? 'Department'));
+            $approvedDefaultName = 'LUCRECIA C. NICOLAS, MAEd';
+            $approvedDefaultPos = 'MGDH-I (GSO)/HRMO-Designate';
+        @endphp
+        <div class="card-footer bg-white pt-4 pb-3 border-top">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="font-weight-bold text-teal" style="font-size: 13px;">
+                    <i class="fas fa-file-signature mr-1"></i> Official IPCR Signatories &amp; Approvals
+                </span>
+                <button type="button" class="btn btn-xs btn-outline-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#editIpcrSignatoriesModal">
+                    <i class="fas fa-user-edit mr-1"></i> Edit Signatories
+                </button>
+            </div>
+
+            <div class="row text-dark" style="font-size: 12px;">
+                {{-- Column 1: Ratee / Employee --}}
+                <div class="col-md-4 mb-3 border-right">
+                    <p class="font-weight-bold text-muted mb-4">Discussed with (Ratee):</p>
+                    <u class="d-block font-weight-bold text-uppercase" style="font-size: 13px;">
+                        {{ $ipcr->ratee_name ?? $rateeDefaultName }}
+                    </u>
+                    <small class="text-muted d-block font-weight-bold">
+                        {{ $ipcr->ratee_position ?? $rateeDefaultPos }}
+                    </small>
+                    <small class="text-muted mt-3 d-block">Date: ________________________</small>
+                </div>
+
+                {{-- Column 2: Assessed by (Supervisor) --}}
+                <div class="col-md-4 mb-3 border-right">
+                    <p class="font-weight-bold text-muted mb-4">Assessed by (Supervisor):</p>
+                    <u class="d-block font-weight-bold text-uppercase" style="font-size: 13px;">
+                        {{ $ipcr->assessed_by_name ?? $assessedDefaultName }}
+                    </u>
+                    <small class="text-muted d-block font-weight-bold">
+                        {{ $ipcr->assessed_by_position ?? $assessedDefaultPos }}
+                    </small>
+                    <small class="text-muted mt-3 d-block">Date: ________________________</small>
+                </div>
+
+                {{-- Column 3: Final Rating by --}}
+                <div class="col-md-4 mb-3">
+                    <p class="font-weight-bold text-muted mb-4">Final Rating by:</p>
+                    <u class="d-block font-weight-bold text-uppercase" style="font-size: 13px;">
+                        {{ $ipcr->approved_by_name ?? $approvedDefaultName }}
+                    </u>
+                    <small class="text-muted d-block font-weight-bold">
+                        {{ $ipcr->approved_by_position ?? $approvedDefaultPos }}
+                    </small>
+                    <small class="text-muted mt-3 d-block">Date: ________________________</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Edit IPCR Signatories Modal --}}
+<div class="modal fade" id="editIpcrSignatoriesModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-white border-bottom py-2">
+                <h5 class="modal-title font-weight-bold text-teal"><i class="fas fa-user-edit mr-2"></i> Edit IPCR Footer Signatories</h5>
+                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST" action="{{ route('spms.ipcr.signatories', $ipcr->id) }}">
+                @csrf
+                <div class="modal-body text-left">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold text-dark">Ratee / Employee (Name &amp; Title):</label>
+                                <input type="text" name="ratee_name" class="form-control" value="{{ $ipcr->ratee_name ?? $rateeDefaultName }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold text-dark">Ratee Position:</label>
+                                <input type="text" name="ratee_position" class="form-control" value="{{ $ipcr->ratee_position ?? $rateeDefaultPos }}" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold text-dark">Assessed By / Supervisor (Name):</label>
+                                <input type="text" name="assessed_by_name" class="form-control" value="{{ $ipcr->assessed_by_name ?? $assessedDefaultName }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold text-dark">Supervisor Position:</label>
+                                <input type="text" name="assessed_by_position" class="form-control" value="{{ $ipcr->assessed_by_position ?? $assessedDefaultPos }}" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold text-dark">Final Rating By (Name &amp; Title):</label>
+                                <input type="text" name="approved_by_name" class="form-control" value="{{ $ipcr->approved_by_name ?? $approvedDefaultName }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold text-dark">Final Rating By (Position/Office):</label>
+                                <input type="text" name="approved_by_position" class="form-control" value="{{ $ipcr->approved_by_position ?? $approvedDefaultPos }}" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">
+                        <i class="fas fa-save mr-1"></i> Save Signatories
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -375,4 +589,64 @@
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+    function printModalIframe(iframeId) {
+        var iframe = document.getElementById(iframeId);
+        if (iframe) {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (e) {
+                window.open(iframe.src, '_blank');
+            }
+        }
+    }
+
+    // Use $(function) instead of DOMContentLoaded — works correctly even when
+    // the script runs at bottom of page (after DOMContentLoaded already fired).
+    $(function () {
+        document.querySelectorAll('.ipcr-sortable-body').forEach(function (tbody) {
+            var reorderUrl = tbody.getAttribute('data-reorderurl');
+
+            if (typeof Sortable !== 'undefined') {
+                Sortable.create(tbody, {
+                    animation: 150,
+                    filter: 'a, button, input, textarea, select, .btn, .modal, [data-toggle]',
+                    preventOnFilter: false,
+                    ghostClass: 'sortable-ghost',
+                    chosenClass: 'sortable-chosen',
+                    dragClass: 'sortable-drag',
+                    onEnd: function () {
+                        var itemIds = [];
+                        tbody.querySelectorAll('tr.ipcr-sortable-row').forEach(function (row) {
+                            itemIds.push(row.getAttribute('data-id'));
+                        });
+
+                        if (itemIds.length && reorderUrl) {
+                            fetch(reorderUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                },
+                                body: JSON.stringify({ order: itemIds })
+                            })
+                            .then(function (res) { return res.json(); })
+                            .then(function () {
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.success('Row order saved.');
+                                }
+                            })
+                            .catch(function (err) {
+                                console.error('Reorder failed:', err);
+                            });
+                        }
+                    }
+                });
+            }
+        });
+    });
+</script>
 @endsection

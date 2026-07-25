@@ -44,6 +44,88 @@
         height: calc(90vh - 60px) !important;
         overflow-y: auto;
     }
+    .sortable-ghost {
+        background-color: #e6fffa !important;
+        border: 2px dashed #16a085 !important;
+        opacity: 0.5;
+    }
+    .sortable-chosen {
+        background: #f0fdfa !important;
+        box-shadow: 0 4px 14px rgba(22, 160, 133, 0.25) !important;
+    }
+    .sortable-drag {
+        opacity: 0.9;
+    }
+    .opcr-sortable-row {
+        cursor: grab;
+        transition: background-color 0.15s ease;
+    }
+    .opcr-sortable-row:active {
+        cursor: grabbing;
+    }
+    .drag-handle {
+        cursor: grab !important;
+    }
+    .drag-handle:active {
+        cursor: grabbing !important;
+    }
+    @media print {
+        /* Default print: Hide navigation, sidebar, and buttons */
+        .main-header, .main-sidebar, .breadcrumb-drive, .btn, .alert, footer, .no-print {
+            display: none !important;
+        }
+        body:not(.modal-open) .modal {
+            display: none !important;
+        }
+        body, .content-wrapper, .container-fluid {
+            background: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .card {
+            border: 1px solid #000000 !important;
+            box-shadow: none !important;
+        }
+        .table-bordered, .table-bordered th, .table-bordered td {
+            border: 1px solid #000000 !important;
+            color: #000000 !important;
+        }
+
+        /* Modal active print mode: Print ONLY the active modal & iframe content */
+        body.modal-open .container-fluid > *:not(.modal) {
+            display: none !important;
+        }
+        body.modal-open .modal.show {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 99999 !important;
+            background: #ffffff !important;
+            display: block !important;
+        }
+        body.modal-open .modal-dialog {
+            max-width: 100vw !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+        }
+        body.modal-open .modal-content {
+            height: 100vh !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        body.modal-open .modal-header {
+            background: #ffffff !important;
+            color: #000000 !important;
+        }
+        body.modal-open .modal-header .btn,
+        body.modal-open .modal-header .close {
+            display: none !important;
+        }
+    }
 </style>
 
 <div class="container-fluid py-2">
@@ -90,6 +172,9 @@
             <span class="badge badge-light border text-dark px-3 py-2 mr-2 font-weight-bold">
                 {{ $opcr->semester == 1 ? '1st Half' : '2nd Half' }}
             </span>
+            <button type="button" onclick="window.print()" class="btn btn-sm btn-outline-secondary font-weight-bold mr-2">
+                <i class="fas fa-print mr-1"></i> Print Matrix
+            </button>
             <button class="btn btn-sm btn-teal font-weight-bold px-3 shadow-sm" data-toggle="modal" data-target="#addOpcrRowModal">
                 <i class="fas fa-plus mr-1"></i> Add OPCR Item
             </button>
@@ -122,22 +207,28 @@
                             <th style="width: 3%;">A</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @foreach(['Core Functions' => 'CORE FUNCTIONS (60%)', 'Strategic Functions' => 'STRATEGIC FUNCTIONS (20%)', 'Support Functions' => 'SUPPORT FUNCTIONS (20%)'] as $catKey => $catLabel)
+                    @foreach(['Core Functions' => 'CORE FUNCTIONS (60%)', 'Strategic Functions' => 'STRATEGIC FUNCTIONS (20%)', 'Support Functions' => 'SUPPORT FUNCTIONS (20%)'] as $catKey => $catLabel)
+                        <tbody class="bg-light">
                             <tr class="opcr-category-row text-left">
-                                <td colspan="14" class="py-2 px-3">
+                                <td colspan="14" class="py-2 px-3 font-weight-bold">
                                     <i class="fas fa-folder text-warning mr-2"></i> {{ $catLabel }}
+                                    <small class="text-muted font-weight-normal ml-2 font-italic">(Drag rows below to reorder within this function)</small>
                                 </td>
                             </tr>
+                        </tbody>
 
-                            @php
-                                $categoryItems = $opcr->items->where('category', $catKey);
-                            @endphp
+                        @php
+                            $categoryItems = $opcr->items->where('category', $catKey);
+                        @endphp
 
+                        <tbody class="opcr-sortable-body" data-category="{{ $catKey }}" data-reorderurl="{{ route('spms.opcr.item.reorder') }}">
                             @forelse($categoryItems as $item)
-                                <tr>
+                                <tr class="opcr-sortable-row" data-id="{{ $item->id }}">
                                     {{-- MFO / PAP --}}
-                                    <td class="text-left font-weight-bold text-dark">{!! nl2br(e($item->mfo_pap)) !!}</td>
+                                    <td class="text-left font-weight-bold text-dark align-middle">
+                                        <i class="fas fa-grip-vertical text-secondary mr-2 drag-handle no-print" style="cursor: grab;" title="Drag to reorder within {{ $catKey }}"></i>
+                                        {!! nl2br(e($item->mfo_pap)) !!}
+                                    </td>
 
                                     {{-- Success Indicators --}}
                                     <td class="text-left text-muted">{!! nl2br(e($item->success_indicators)) !!}</td>
@@ -207,12 +298,16 @@
                                                                                 </td>
                                                                                 <td class="align-middle">
                                                                                     @if($ipcrRow->evidence_file)
-                                                                                        <span class="badge badge-success px-2 py-1"><i class="fas fa-paperclip mr-1"></i> {{ basename($ipcrRow->evidence_file) }}</span>
+                                                                                        @if($ipcrRow->is_evidence_url)
+                                                                                            <a href="{{ $ipcrRow->evidence_file }}" target="_blank" rel="noopener noreferrer" class="badge badge-info px-2 py-1"><i class="fab fa-google-drive mr-1"></i> Drive Link</a>
+                                                                                        @else
+                                                                                            <span class="badge badge-success px-2 py-1"><i class="fas fa-paperclip mr-1"></i> {{ basename($ipcrRow->evidence_file) }}</span>
+                                                                                        @endif
                                                                                     @else
-                                                                                        <span class="badge badge-light border text-muted">No File</span>
+                                                                                        <span class="badge badge-light border text-muted">No Link</span>
                                                                                     @endif
-                                                                                </td>
-                                                                                <td class="text-center align-middle">
+                                                                                 </td>
+                                                                                 <td class="text-center align-middle">
                                                                                     @if($ipcrRow->evidence_file)
                                                                                         <button type="button" class="btn btn-xs btn-teal font-weight-bold" data-toggle="modal" data-target="#opcrEvModal{{ $ipcrRow->id }}">
                                                                                             <i class="fas fa-eye mr-1"></i> Preview
@@ -220,7 +315,7 @@
                                                                                     @else
                                                                                         <span class="text-muted small">-</span>
                                                                                     @endif
-                                                                                </td>
+                                                                                 </td>
                                                                             </tr>
                                                                         @endforeach
                                                                     </tbody>
@@ -243,28 +338,45 @@
                                                         <div class="modal-content shadow-lg border-0">
                                                             <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
                                                                 <h5 class="modal-title font-weight-bold text-teal" style="font-size: 15px;">
-                                                                    <i class="fas fa-file-alt text-teal mr-2"></i> Evidence Attachment &bull; {{ $evItem->employee->fname ?? 'Staff' }} {{ $evItem->employee->lname ?? '' }}
+                                                                    <i class="{{ $evItem->is_evidence_url ? 'fab fa-google-drive' : 'fas fa-file-alt' }} text-teal mr-2"></i> Evidence &bull; {{ $evItem->employee->fname ?? 'Staff' }} {{ $evItem->employee->lname ?? '' }}
                                                                 </h5>
-                                                                <div>
-                                                                    <a href="{{ route('spms.evidence.view', ['id' => $evItem->id, 'download' => 1]) }}" class="btn btn-xs btn-outline-primary mr-2 font-weight-bold">
-                                                                        <i class="fas fa-download mr-1"></i> Download File
-                                                                    </a>
+                                                                 <div>
+                                                                    @if($evItem->is_evidence_url)
+                                                                        <button type="button" onclick="window.print()" class="btn btn-xs btn-outline-dark font-weight-bold mr-2">
+                                                                            <i class="fas fa-print mr-1"></i> Print Document
+                                                                        </button>
+                                                                        <a href="{{ $evItem->evidence_file }}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline-primary mr-2 font-weight-bold">
+                                                                            <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
+                                                                        </a>
+                                                                    @else
+                                                                        <a href="{{ route('spms.evidence.view', ['id' => $evItem->id, 'download' => 1]) }}" class="btn btn-xs btn-outline-primary mr-2 font-weight-bold">
+                                                                            <i class="fas fa-download mr-1"></i> Download File
+                                                                        </a>
+                                                                    @endif
                                                                     <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
                                                                         <span aria-hidden="true">&times;</span>
                                                                     </button>
                                                                 </div>
                                                             </div>
-                                                            <div class="modal-body p-3 bg-light text-center">
-                                                                @if($evIsPdf)
+                                                            <div class="modal-body p-0 bg-dark text-center" style="overflow: hidden;">
+                                                                @if($evItem->is_evidence_url)
+                                                                    @php
+                                                                        $iframeUrl = $evItem->evidence_file;
+                                                                        if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)/i', $evItem->evidence_file, $matches)) {
+                                                                            $iframeUrl = "https://drive.google.com/file/d/" . $matches[1] . "/preview";
+                                                                        }
+                                                                    @endphp
+                                                                    <iframe id="opcrEvIframe{{ $evItem->id }}" src="{{ $iframeUrl }}" style="width: 100%; height: 100%; border: none;" allow="autoplay; encrypted-media" loading="lazy"></iframe>
+                                                                @elseif($evIsPdf)
                                                                     <object data="{{ route('spms.evidence.view', $evItem->id) }}#toolbar=0" type="application/pdf" style="width: 100%; height: 100%; min-height: calc(90vh - 100px); border: none; border-radius: 6px;">
                                                                         <embed src="{{ route('spms.evidence.view', $evItem->id) }}" type="application/pdf" style="width: 100%; height: 100%; min-height: calc(90vh - 100px);" />
                                                                     </object>
                                                                 @elseif($evIsImg)
                                                                     <img src="{{ route('spms.evidence.view', $evItem->id) }}" class="img-fluid rounded shadow-sm d-block mx-auto" style="max-height: calc(90vh - 100px);" alt="Evidence Attachment">
                                                                 @else
-                                                                    <div class="py-5">
+                                                                    <div class="py-5 text-white">
                                                                         <i class="fas fa-file-archive fa-4x text-secondary mb-3"></i>
-                                                                        <h6 class="font-weight-bold text-dark mb-1">{{ basename($evItem->evidence_file) }}</h6>
+                                                                        <h6 class="font-weight-bold text-white mb-1">{{ basename($evItem->evidence_file) }}</h6>
                                                                         <p class="text-muted small">This file type cannot be previewed inline.</p>
                                                                         <a href="{{ route('spms.evidence.view', ['id' => $evItem->id, 'download' => 1]) }}" class="btn btn-teal font-weight-bold px-4 py-2 mt-2">
                                                                             <i class="fas fa-download mr-1"></i> Download Original File
@@ -504,36 +616,127 @@
                                     </td>
                                 </tr>
                             @endforelse
+                            </tbody>
                         @endforeach
-                    </tbody>
-                </table>
+                    </table>
             </div>
         </div>
 
-        {{-- Sign-off Footer Section --}}
+        {{-- Sign-off Footer Section (Official LGU Mabinay OPCR Signatories) --}}
+        @php
+            $defaultPmt = "LUCRECIA C. NICOLAS\nMARY ANN Y. ACASO\nDINDO M. AMORGANDA\nELAN D. CADAYDAY\nBRIAN D. AUSEJO";
+            $pmtRaw = $opcr->pmt_members ?: $defaultPmt;
+            $pmtList = array_filter(array_map('trim', explode("\n", $pmtRaw)));
+        @endphp
         <div class="card-footer bg-white pt-4 pb-3 border-top">
-            <div class="row text-center font-weight-bold text-dark" style="font-size: 12px;">
-                <div class="col-md-3 mb-3">
-                    <p class="text-muted mb-4 font-italic">Discussed with:</p>
-                    <u class="d-block text-uppercase">{{ $opcr->head ? ($opcr->head->fname . ' ' . $opcr->head->lname) : 'OFFICE HEAD NAME' }}</u>
-                    <small class="text-muted">Head, {{ $opcr->office->office_name }}</small>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="font-weight-bold text-teal" style="font-size: 13px;">
+                    <i class="fas fa-file-signature mr-1"></i> Official OPCR Signatories &amp; Approvals
+                </span>
+                <button type="button" class="btn btn-xs btn-outline-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#editSignatoriesModal">
+                    <i class="fas fa-user-edit mr-1"></i> Edit Signatories
+                </button>
+            </div>
+
+            <div class="row text-dark" style="font-size: 12px;">
+                {{-- Column 1: Prepared by --}}
+                <div class="col-md-4 mb-3 border-right">
+                    <p class="font-weight-bold text-muted mb-4">Prepared by:</p>
+                    <u class="d-block font-weight-bold text-uppercase" style="font-size: 13px;">
+                        {{ $opcr->prepared_by_name ?? 'LUCRECIA C. NICOLAS, MAEd' }}
+                    </u>
+                    <small class="text-muted d-block font-weight-bold">
+                        {{ $opcr->prepared_by_position ?? 'MGDH-I (GSO)/HRMO-Designate' }}
+                    </small>
+                    <small class="text-muted mt-3 d-block">Date: ________________________</small>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <p class="text-muted mb-4 font-italic">Assessed by:</p>
-                    <u class="d-block text-uppercase">MARC ALEXEI CAESAR B. BADAJOS</u>
-                    <small class="text-muted">Vice President For Administration And Finance Office</small>
+
+                {{-- Column 2: Reviewed by (PMT Members) --}}
+                <div class="col-md-4 mb-3 border-right">
+                    <p class="font-weight-bold text-muted mb-2">Reviewed by (PMT Members):</p>
+                    <div class="pl-2">
+                        @foreach($pmtList as $member)
+                            <div class="font-weight-bold text-uppercase mb-1" style="font-size: 12px;">
+                                <u>{{ $member }}</u>
+                            </div>
+                        @endforeach
+                    </div>
+                    <small class="text-muted mt-3 d-block">Date: ________________________</small>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <p class="text-muted mb-4 font-italic">Reviewed by:</p>
-                    <u class="d-block text-uppercase">ROSE ANN G. JOCSON, Ph.D.</u>
-                    <small class="text-muted">Performance Management Team</small>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <p class="text-muted mb-4 font-italic">Final Rating by:</p>
-                    <u class="d-block text-uppercase">ERNIE T. UY, RN, JD</u>
-                    <small class="text-muted">Municipal Mayor / Head of Agency</small>
+
+                {{-- Column 3: Final Rating by --}}
+                <div class="col-md-4 mb-3">
+                    <p class="font-weight-bold text-muted mb-4">Final Rating by:</p>
+                    <u class="d-block font-weight-bold text-uppercase" style="font-size: 13px;">
+                        {{ $opcr->approved_by_name ?? 'ERNIE T. UY, RN, JD' }}
+                    </u>
+                    <small class="text-muted d-block font-weight-bold">
+                        {{ $opcr->approved_by_position ?? 'Municipal Mayor / Head of Agency' }}
+                    </small>
+                    <small class="text-muted mt-3 d-block">Date: ________________________</small>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+{{-- Edit Signatories Modal --}}
+<div class="modal fade" id="editSignatoriesModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-white border-bottom py-2">
+                <h5 class="modal-title font-weight-bold text-teal"><i class="fas fa-user-edit mr-2"></i> Edit OPCR Footer Signatories</h5>
+                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="POST" action="{{ route('spms.opcr.signatories', $opcr->id) }}">
+                @csrf
+                <div class="modal-body text-left">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold text-dark">Prepared By (Name &amp; Title):</label>
+                                <input type="text" name="prepared_by_name" class="form-control" value="{{ $opcr->prepared_by_name ?? 'LUCRECIA C. NICOLAS, MAEd' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold text-dark">Prepared By (Position/Office):</label>
+                                <input type="text" name="prepared_by_position" class="form-control" value="{{ $opcr->prepared_by_position ?? 'MGDH-I (GSO)/HRMO-Designate' }}" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="font-weight-bold text-dark"><i class="fas fa-users text-teal mr-1"></i> PMT Members (Reviewed by - One name per line):</label>
+                        <textarea name="pmt_members" class="form-control" rows="5" placeholder="Enter PMT member names, one per line..." required>{{ $opcr->pmt_members ?: $defaultPmt }}</textarea>
+                        <small class="form-text text-muted">Each line will be displayed as a PMT reviewer in the official signatures table.</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold text-dark">Final Rating By (Name &amp; Title):</label>
+                                <input type="text" name="approved_by_name" class="form-control" value="{{ $opcr->approved_by_name ?? 'ERNIE T. UY, RN, JD' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold text-dark">Final Rating By (Position/Office):</label>
+                                <input type="text" name="approved_by_position" class="form-control" value="{{ $opcr->approved_by_position ?? 'Municipal Mayor / Head of Agency' }}" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">
+                        <i class="fas fa-save mr-1"></i> Save Signatories
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -605,9 +808,66 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script>
     $(function () {
         $('[data-toggle="popover"]').popover();
+
+        // Initialize SortableJS for OPCR category row reordering
+        // NOTE: Must run inside $(function) / $(document).ready() so it fires
+        // even when placed at bottom of page (DOMContentLoaded already fired).
+        document.querySelectorAll('.opcr-sortable-body').forEach(function (tbody) {
+            var reorderUrl = tbody.getAttribute('data-reorderurl');
+
+            if (typeof Sortable !== 'undefined') {
+                Sortable.create(tbody, {
+                    animation: 150,
+                    filter: 'a, button, input, textarea, select, .btn, .modal, [data-toggle]',
+                    preventOnFilter: false,
+                    ghostClass: 'sortable-ghost',
+                    chosenClass: 'sortable-chosen',
+                    dragClass: 'sortable-drag',
+                    onEnd: function () {
+                        var itemIds = [];
+                        tbody.querySelectorAll('tr.opcr-sortable-row').forEach(function (row) {
+                            itemIds.push(row.getAttribute('data-id'));
+                        });
+
+                        if (itemIds.length && reorderUrl) {
+                            fetch(reorderUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                },
+                                body: JSON.stringify({ order: itemIds })
+                            })
+                            .then(function (res) { return res.json(); })
+                            .then(function () {
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.success('Row order saved.');
+                                }
+                            })
+                            .catch(function (err) {
+                                console.error('Reorder failed:', err);
+                            });
+                        }
+                    }
+                });
+            }
+        });
     });
+
+    function printModalIframe(iframeId) {
+        var iframe = document.getElementById(iframeId);
+        if (iframe) {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (e) {
+                window.open(iframe.src, '_blank');
+            }
+        }
+    }
 </script>
 @endpush

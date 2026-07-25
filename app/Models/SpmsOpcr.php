@@ -22,6 +22,11 @@ class SpmsOpcr extends Model
         'final_numerical_rating',
         'final_adjectival_rating',
         'remarks',
+        'prepared_by_name',
+        'prepared_by_position',
+        'pmt_members',
+        'approved_by_name',
+        'approved_by_position',
     ];
 
     public function office()
@@ -36,6 +41,6 @@ class SpmsOpcr extends Model
 
     public function items()
     {
-        return $this->hasMany(SpmsOpcrItem::class, 'opcr_id');
+        return $this->hasMany(SpmsOpcrItem::class, 'opcr_id')->orderBy('sort_order', 'asc')->orderBy('id', 'asc');
     }
 }

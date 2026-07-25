@@ -28,6 +28,7 @@ class SpmsIpcrItem extends Model
         'rating_ave',
         'remarks',
         'status',
+        'sort_order',
     ];
 
     public function ipcr()
@@ -48,5 +49,13 @@ class SpmsIpcrItem extends Model
     public function assigner()
     {
         return $this->belongsTo(Employee::class, 'assigned_by');
+    }
+
+    /**
+     * Check if the evidence_file contains an external URL (e.g. Google Drive link).
+     */
+    public function getIsEvidenceUrlAttribute(): bool
+    {
+        return !empty($this->evidence_file) && \Illuminate\Support\Str::startsWith($this->evidence_file, ['http://', 'https://']);
     }
 }

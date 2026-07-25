@@ -106,23 +106,8 @@
                 <a href="{{ route('spms.opcr') }}" class="drive-nav-item active rounded mb-1">
                     <i class="fas fa-file-alt text-primary mr-3"></i> OPCR Documents
                 </a>
-                <a href="{{ route('spms.ipcr') }}" class="drive-nav-item rounded mb-3">
+                <a href="{{ route('spms.ipcr') }}" class="drive-nav-item rounded">
                     <i class="fas fa-id-badge text-secondary mr-3"></i> My IPCR
-                </a>
-
-                <div class="dropdown-divider my-2"></div>
-
-                <a href="#" class="drive-nav-item rounded mb-1">
-                    <i class="fas fa-user text-secondary mr-3"></i> PMT
-                </a>
-                <a href="#" class="drive-nav-item rounded mb-1">
-                    <i class="fas fa-user text-secondary mr-3"></i> Personnel
-                </a>
-
-                <div class="dropdown-divider my-2"></div>
-
-                <a href="#" class="drive-nav-item rounded">
-                    <i class="fas fa-cog text-secondary mr-3"></i> MFO Settings
                 </a>
             </div>
         </div>

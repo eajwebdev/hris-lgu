@@ -477,5 +477,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 @endif
+@stack('scripts')
+@yield('scripts')
 </body>
 </html>

@@ -28,4 +28,9 @@ class Office extends Model
 
         return $value; // original office_abbr
     }
+
+    public function head()
+    {
+        return $this->belongsTo(Employee::class, 'office_head_id');
+    }
 }

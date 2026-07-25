@@ -25,6 +25,7 @@ class SpmsOpcrItem extends Model
         'rating_e',
         'rating_t',
         'rating_ave',
+        'sort_order',
         'remarks',
     ];
 

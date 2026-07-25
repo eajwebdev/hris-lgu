@@ -23,6 +23,12 @@ class SpmsIpcr extends Model
         'final_numerical_rating',
         'final_adjectival_rating',
         'comments_recommendations',
+        'ratee_name',
+        'ratee_position',
+        'assessed_by_name',
+        'assessed_by_position',
+        'approved_by_name',
+        'approved_by_position',
     ];
 
     public function employee()
@@ -42,6 +48,6 @@ class SpmsIpcr extends Model
 
     public function items()
     {
-        return $this->hasMany(SpmsIpcrItem::class, 'ipcr_id');
+        return $this->hasMany(SpmsIpcrItem::class, 'ipcr_id')->orderBy('sort_order', 'asc')->orderBy('id', 'asc');
     }
 }

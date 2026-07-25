@@ -48,7 +48,7 @@
   </p>
 
   <div style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px; text-align: center; font-size: 13px; color: #718096;">
-    &copy; 2026 Municipality of Mabinay. All rights reserved.
+    &copy; {{ date('Y') }} Municipality of Mabinay. All rights reserved.
   </div>
 
 </div>

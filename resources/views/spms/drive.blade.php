@@ -146,23 +146,8 @@
                     </a>
                 @endif
 
-                <a href="{{ route('spms.ipcr') }}" class="drive-nav-item rounded mb-3">
+                <a href="{{ route('spms.ipcr') }}" class="drive-nav-item rounded">
                     <i class="fas fa-id-badge text-secondary mr-3"></i> My IPCR
-                </a>
-
-                <div class="dropdown-divider my-2"></div>
-
-                <a href="#" class="drive-nav-item rounded mb-1">
-                    <i class="fas fa-user text-secondary mr-3"></i> PMT
-                </a>
-                <a href="#" class="drive-nav-item rounded mb-1">
-                    <i class="fas fa-user text-secondary mr-3"></i> Personnel
-                </a>
-
-                <div class="dropdown-divider my-2"></div>
-
-                <a href="#" class="drive-nav-item rounded">
-                    <i class="fas fa-cog text-secondary mr-3"></i> MFO Settings
                 </a>
             </div>
         </div>
@@ -172,7 +157,7 @@
             <div class="card shadow-sm border-0 p-4" style="border-radius: 10px; min-height: 420px; background: #ffffff;">
                 <div class="row">
                     {{-- OPCR Folder (Locked for Regular Employees) --}}
-                    <div class="col-sm-6 col-md-4 col-lg-4 mb-4">
+                    <div class="col-sm-6 col-md-6 col-lg-6 mb-4">
                         @if($isHead)
                             <a href="{{ route('spms.opcr') }}" class="folder-card">
                                 <svg class="folder-icon-img" viewBox="0 0 24 24" fill="#f59e0b" xmlns="http://www.w3.org/2000/svg">
@@ -193,18 +178,8 @@
                         @endif
                     </div>
 
-                    {{-- DPCR Folder --}}
-                    <div class="col-sm-6 col-md-4 col-lg-4 mb-4">
-                        <a href="#" class="folder-card" onclick="alert('DPCR (Division Performance Commitment) Folder.'); return false;">
-                            <svg class="folder-icon-img" viewBox="0 0 24 24" fill="#f59e0b" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M19.5 21a2.5 2.5 0 002.5-2.5V9a2.5 2.5 0 00-2.5-2.5h-7.172a2 2 0 01-1.414-.586l-1.828-1.828A2 2 0 007.172 3.5H4.5A2.5 2.5 0 002 6v12.5A2.5 2.5 0 004.5 21h15z"/>
-                            </svg>
-                            <h6 class="folder-title">DPCR</h6>
-                        </a>
-                    </div>
-
                     {{-- IPCR Folder (Open for All Employees) --}}
-                    <div class="col-sm-6 col-md-4 col-lg-4 mb-4">
+                    <div class="col-sm-6 col-md-6 col-lg-6 mb-4">
                         <a href="{{ route('spms.ipcr') }}" class="folder-card">
                             <svg class="folder-icon-img" viewBox="0 0 24 24" fill="#f59e0b" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M19.5 21a2.5 2.5 0 002.5-2.5V9a2.5 2.5 0 00-2.5-2.5h-7.172a2 2 0 01-1.414-.586l-1.828-1.828A2 2 0 007.172 3.5H4.5A2.5 2.5 0 002 6v12.5A2.5 2.5 0 004.5 21h15z"/>
