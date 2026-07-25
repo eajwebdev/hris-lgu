@@ -132,8 +132,8 @@
         <span class="breadcrumb-drive">
             <i class="fas fa-info-circle text-info mr-1"></i> Dashboard &nbsp;/&nbsp; Drive &nbsp;/&nbsp; IPCR
         </span>
-        <a href="{{ route('spms.drive') }}" class="btn btn-outline-secondary btn-sm font-weight-bold">
-            <i class="fas fa-arrow-left mr-1"></i> Back to My Drive
+        <a href="{{ route('spms.ipcr') }}" class="btn btn-outline-secondary btn-sm font-weight-bold">
+            <i class="fas fa-arrow-left mr-1"></i> Back to IPCR Documents
         </a>
     </div>
 
@@ -173,16 +173,16 @@
                 </button>
                 <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="periodDropdown">
                     <h6 class="dropdown-header text-uppercase font-weight-bold text-muted small">Select Rating Period</h6>
-                    <a class="dropdown-item py-2 {{ $semester == 1 ? 'active font-weight-bold' : '' }}" href="{{ route('spms.ipcr', ['id' => $employee->id, 'semester' => 1, 'year' => $year]) }}">
+                    <a class="dropdown-item py-2 {{ $semester == 1 ? 'active font-weight-bold' : '' }}" href="{{ route('spms.ipcr.matrix', ['id' => $employee->id, 'semester' => 1, 'year' => $year]) }}">
                         <i class="fas fa-calendar-check mr-2 {{ $semester == 1 ? 'text-white' : 'text-teal' }}"></i> 1st Half (Jan - Jun {{ $year }})
                     </a>
-                    <a class="dropdown-item py-2 {{ $semester == 2 ? 'active font-weight-bold' : '' }}" href="{{ route('spms.ipcr', ['id' => $employee->id, 'semester' => 2, 'year' => $year]) }}">
+                    <a class="dropdown-item py-2 {{ $semester == 2 ? 'active font-weight-bold' : '' }}" href="{{ route('spms.ipcr.matrix', ['id' => $employee->id, 'semester' => 2, 'year' => $year]) }}">
                         <i class="fas fa-calendar-check mr-2 {{ $semester == 2 ? 'text-white' : 'text-teal' }}"></i> 2nd Half (Jul - Dec {{ $year }})
                     </a>
                     <div class="dropdown-divider"></div>
                     <h6 class="dropdown-header text-uppercase font-weight-bold text-muted small">Switch Year</h6>
                     @foreach(range(2026, max(2026, (int)date('Y'))) as $y)
-                        <a class="dropdown-item py-1 small {{ $year == $y ? 'font-weight-bold text-teal' : '' }}" href="{{ route('spms.ipcr', ['id' => $employee->id, 'semester' => $semester, 'year' => $y]) }}">
+                        <a class="dropdown-item py-1 small {{ $year == $y ? 'font-weight-bold text-teal' : '' }}" href="{{ route('spms.ipcr.matrix', ['id' => $employee->id, 'semester' => $semester, 'year' => $y]) }}">
                             <i class="fas fa-history mr-2 text-secondary"></i> Year {{ $y }}
                         </a>
                     @endforeach
@@ -199,6 +199,9 @@
             </h6>
             <div class="ml-auto d-flex align-items-center">
                 <span class="badge badge-success px-3 py-2 font-weight-bold mr-2">Status: {{ $ipcr->status }}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold shadow-sm mr-2" data-toggle="modal" data-target="#previewCosRatingModal" title="Preview & Print Performance Rating Form (PDF)">
+                    <i class="fas fa-file-pdf mr-1"></i> Print Rating Form (PDF)
+                </button>
                 @if($isEditablePeriod)
                     @if(!empty($isJoOrCos) && $isJoOrCos)
                         <button type="button" class="btn btn-sm btn-outline-info font-weight-bold shadow-sm mr-2" data-toggle="modal" data-target="#loadCosTemplateModal" title="Load standard Job Order / Contract of Service rating form template">
@@ -293,9 +296,12 @@
 
                                     {{-- Rating Column --}}
                                     <td class="text-center align-middle">
-                                        @if($item->rating_average)
+                                        @php
+                                            $itemRating = $item->rating_ave ?? $item->rating_average;
+                                        @endphp
+                                        @if($itemRating)
                                             <span class="badge badge-success font-weight-bold" style="font-size: 13px;">
-                                                {{ number_format($item->rating_average, 2) }}
+                                                {{ number_format($itemRating, 2) }}
                                             </span>
                                             <small class="d-block text-muted mt-1" style="font-size: 10px;">
                                                 Q:{{ $item->rating_q ?? '-' }} | E:{{ $item->rating_e ?? '-' }} | T:{{ $item->rating_t ?? '-' }}
@@ -314,16 +320,14 @@
                                                 </button>
                                             @endif
 
-                                            @if($isHead || $guard === 'web')
-                                                <button type="button" class="btn btn-xs btn-warning font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#rateIpcrItemModal{{ $item->id }}" title="Rate accomplishment">
-                                                    <i class="fas fa-star"></i>
-                                                </button>
-                                            @endif
+                                            <button type="button" class="btn btn-xs btn-warning font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#rateIpcrItemModal{{ $item->id }}" title="Rate accomplishment">
+                                                <i class="fas fa-star"></i>
+                                            </button>
 
                                             @if(($guard === 'employee' && $item->employee_id == $user->id) || $isHead || $guard === 'web')
-                                                <form method="POST" action="{{ route('spms.ipcr.item.delete', $item->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this objective?');">
+                                                <form method="POST" action="{{ route('spms.ipcr.item.delete', $item->id) }}" class="d-inline">
                                                     @csrf
-                                                    <button type="submit" class="btn btn-xs btn-outline-danger font-weight-bold shadow-sm mb-1" title="Delete objective">
+                                                    <button type="button" class="btn btn-xs btn-outline-danger font-weight-bold shadow-sm mb-1 btn-delete-confirm" data-title="Delete Objective?" data-text="Are you sure you want to delete this IPCR objective?" title="Delete objective">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
                                                 </form>
@@ -410,8 +414,7 @@
                                 @endif
 
                                 {{-- Rating Modal --}}
-                                @if($isHead || $guard === 'web')
-                                    <div class="modal fade" id="rateIpcrItemModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                <div class="modal fade" id="rateIpcrItemModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
                                         <div class="modal-dialog modal-dialog-centered">
                                             <div class="modal-content shadow-lg border-0">
                                                 <div class="modal-header bg-white border-bottom py-2">
@@ -460,7 +463,6 @@
                                             </div>
                                         </div>
                                     </div>
-                                @endif
                             @empty
                                 <tr>
                                     <td colspan="7" class="text-center py-3 text-muted small font-italic">
@@ -716,7 +718,44 @@
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.btn-delete-confirm');
+        if (btn) {
+            e.preventDefault();
+            var form = btn.closest('form');
+            var title = btn.getAttribute('data-title') || 'Confirm Deletion';
+            var text = btn.getAttribute('data-text') || 'Are you sure you want to delete this item?';
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: title,
+                    text: text,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: '<i class="fas fa-trash mr-1"></i> Yes, Delete It',
+                    cancelButtonText: 'Cancel',
+                    customClass: {
+                        confirmButton: 'btn btn-danger font-weight-bold px-3 py-2 mr-2',
+                        cancelButton: 'btn btn-secondary font-weight-bold px-3 py-2'
+                    },
+                    buttonsStyling: false
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            } else {
+                if (confirm(text)) {
+                    form.submit();
+                }
+            }
+        }
+    });
+
     function printModalIframe(iframeId) {
         var iframe = document.getElementById(iframeId);
         if (iframe) {
@@ -729,7 +768,15 @@
         }
     }
 
-    $(function () {
+    function printCosIframe(iframeId) {
+        var iframe = document.getElementById(iframeId);
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.ipcr-sortable-body').forEach(function (tbody) {
             var reorderUrl = tbody.getAttribute('data-reorderurl');
 
@@ -737,7 +784,7 @@
                 Sortable.create(tbody, {
                     animation: 150,
                     draggable: 'tr.ipcr-sortable-row',
-                    filter: 'a, button, input, textarea, select, .btn, .modal, [data-toggle]',
+                    filter: 'button, a, input, select, textarea, .btn, [data-toggle]',
                     preventOnFilter: false,
                     ghostClass: 'sortable-ghost',
                     chosenClass: 'sortable-chosen',
@@ -768,7 +815,34 @@
                 });
             }
         });
-    }); 
+    });
 </script>
+
+{{-- Performance Rating Form Preview Modal --}}
+<div class="modal fade" id="previewCosRatingModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
+                <h5 class="modal-title font-weight-bold text-danger" style="font-size: 15px;">
+                    <i class="fas fa-file-pdf text-danger mr-2"></i> Performance Rating Form Preview &bull; {{ $employee->fname }} {{ $employee->lname }}
+                </h5>
+                <div>
+                    <button type="button" onclick="printCosIframe('matrixCosIframe')" class="btn btn-xs btn-outline-dark font-weight-bold mr-2">
+                        <i class="fas fa-print mr-1"></i> Print Document
+                    </button>
+                    <a href="{{ route('spms.ipcr.print.cos', ['id' => $employee->id, 'semester' => $semester, 'year' => $year]) }}" target="_blank" class="btn btn-xs btn-outline-teal font-weight-bold mr-2">
+                        <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
+                    </a>
+                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body p-0 bg-dark text-center" style="overflow: hidden;">
+                <iframe id="matrixCosIframe" src="{{ route('spms.ipcr.print.cos', ['id' => $employee->id, 'semester' => $semester, 'year' => $year, 'embed' => 1]) }}" style="width: 100%; height: 75vh; border: none;" loading="lazy"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
 @endpush
 
