@@ -433,6 +433,9 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         Route::post('/opcr/item/reorder', [SpmsController::class, 'reorderOpcrItems'])->name('spms.opcr.item.reorder');
         Route::post('/opcr/item/delete/{id}', [SpmsController::class, 'deleteOpcrItem'])->name('spms.opcr.item.delete');
         Route::post('/opcr/item/cascade', [SpmsController::class, 'cascadeOpcrItem'])->name('spms.opcr.item.cascade');
+        Route::post('/opcr/item/rate', [SpmsController::class, 'rateOpcrItem'])->name('spms.opcr.item.rate');
+        Route::post('/opcr/template/load', [SpmsController::class, 'loadOpcrTemplate'])->name('spms.opcr.template.load');
+        Route::post('/opcr/clear/{id}', [SpmsController::class, 'clearOpcrItems'])->name('spms.opcr.clear');
         Route::get('/ipcr', [SpmsController::class, 'ipcrList'])->name('spms.ipcr');
         Route::get('/ipcr/view/{id?}', [SpmsController::class, 'ipcrMatrix'])->name('spms.ipcr.matrix');
         Route::get('/ipcr/print-cos/{id}', [SpmsController::class, 'printCosRating'])->name('spms.ipcr.print.cos');
@@ -441,6 +444,7 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         Route::post('/ipcr/item/store', [SpmsController::class, 'storeIpcrItem'])->name('spms.ipcr.item.store');
         Route::post('/ipcr/item/reorder', [SpmsController::class, 'reorderIpcrItems'])->name('spms.ipcr.item.reorder');
         Route::post('/ipcr/item/delete/{id}', [SpmsController::class, 'deleteIpcrItem'])->name('spms.ipcr.item.delete');
+        Route::post('/ipcr/clear/{id}', [SpmsController::class, 'clearIpcrItems'])->name('spms.ipcr.clear');
         Route::post('/ipcr/item/rate', [SpmsController::class, 'rateIpcrItem'])->name('spms.ipcr.item.rate');
         Route::post('/ipcr/template/cos', [SpmsController::class, 'loadCosTemplate'])->name('spms.ipcr.template.cos');
         Route::get('/evidence/{id}', [SpmsController::class, 'viewEvidence'])->name('spms.evidence.view');
