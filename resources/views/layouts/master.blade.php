@@ -64,8 +64,13 @@
         background-color: #28a745 !important;
         border-color: #28a745 !important;
     }
-    body.modal-open {
-        overflow: hidden;   
+    body.modal-open,
+    body.modal-open html,
+    body.modal-open .wrapper,
+    body.modal-open .content-wrapper {
+        overflow: hidden !important;   
+        height: 100vh !important;
+        touch-action: none !important;
     }
     .privacy-container h3 {
         margin-top: 1.5rem;
@@ -271,28 +276,33 @@
         <!-- /.content-wrapper -->
 
         @if($guard == "employee" && auth()->guard($guard)->user()->dpn == 0)
-            <div class="modal fade show" id="dpnModal" tabindex="-1" aria-modal="true" role="dialog" style="display: block; background: rgba(0,0,0,0.5);">
-                <div class="modal-dialog modal-dialog-scrollable modal-lg">
-                    <div class="modal-content shadow">
-                        <div class="modal-body px-4 py-3">
+            <div class="modal fade show" id="dpnModal" tabindex="-1" aria-modal="true" role="dialog" style="display: block; background: rgba(0,0,0,0.6); z-index: 1050;">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+                    <div class="modal-content shadow border-0" style="max-height: 85vh;">
+                        <div class="modal-header bg-white border-bottom py-2">
+                            <h5 class="modal-title font-weight-bold text-teal">
+                                <i class="fas fa-user-shield text-teal mr-2"></i> LGU Mabinay Data Privacy Notice &amp; Consent
+                            </h5>
+                        </div>
+                        <div class="modal-body px-4 py-3" style="max-height: calc(85vh - 120px); overflow-y: auto;">
                             @include('data-privacy') 
                         </div>
 
-                        <div class="modal-footer justify-content-between px-4 py-3">
-                            <small class="text-muted">Municipality of Mabinay &copy; {{ now()->year }}</small>
+                        <div class="modal-footer justify-content-between px-4 py-3 bg-light">
+                            <small class="text-muted font-weight-bold">Municipality of Mabinay &copy; {{ now()->year }}</small>
 
                             <div class="d-flex gap-2">
                                 <form method="POST" action="{{ route('dataPrivacyNotice') }}">
                                     @csrf
-                                    <button type="submit" class="btn btn-success px-4 mr-1">
-                                        I Accept
+                                    <button type="submit" class="btn btn-success px-4 mr-2 font-weight-bold">
+                                        <i class="fas fa-check-circle mr-1"></i> I Accept
                                     </button>
                                 </form>
 
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
-                                    <button type="submit" class="btn btn-outline-danger px-4">
-                                        Decline
+                                    <button type="submit" class="btn btn-outline-danger px-4 font-weight-bold">
+                                        <i class="fas fa-times-circle mr-1"></i> Decline
                                     </button>
                                 </form>
                             </div>
@@ -303,18 +313,28 @@
 
             <script>
                 document.body.classList.add('modal-open');
+                document.body.style.overflow = 'hidden';
             </script>
         @endif
 
         <div id="dataPrivacyModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="dataPrivacyModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content shadow">
-                    <div class="modal-body px-4 py-3">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" role="document">
+                <div class="modal-content shadow border-0" style="max-height: 85vh;">
+                    <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
+                        <h5 class="modal-title font-weight-bold text-teal" id="dataPrivacyModalLabel">
+                            <i class="fas fa-user-shield text-teal mr-2"></i> LGU Mabinay Data Privacy Policy
+                        </h5>
+                        <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body px-4 py-3" style="max-height: calc(85vh - 120px); overflow-y: auto;">
                         @include('data-privacy') 
                     </div>
 
-                    <div class="modal-footer justify-content-between px-4 py-3">
-                        <small class="text-muted">Municipality of Mabinay &copy; {{ now()->year }}</small>
+                    <div class="modal-footer justify-content-between px-4 py-2 bg-light">
+                        <small class="text-muted font-weight-bold">Municipality of Mabinay &copy; {{ now()->year }}</small>
+                        <button type="button" class="btn btn-secondary btn-sm font-weight-bold px-3" data-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
@@ -473,7 +493,24 @@ document.addEventListener('DOMContentLoaded', function () {
             refreshInterviewRatingNav();
         }
     });
-    setInterval(refreshInterviewRatingNav, 1000);
+    // Lock background scrolling on all modal open events
+    $(document).on('show.bs.modal shown.bs.modal', '.modal', function () {
+        $('body, html, .wrapper, .content-wrapper').css({
+            'overflow': 'hidden',
+            'height': '100vh'
+        });
+        $('body').addClass('modal-open');
+    });
+
+    $(document).on('hidden.bs.modal', '.modal', function () {
+        if ($('.modal.show').length === 0) {
+            $('body, html, .wrapper, .content-wrapper').css({
+                'overflow': '',
+                'height': ''
+            });
+            $('body').removeClass('modal-open');
+        }
+    });
 });
 </script>
 @endif
