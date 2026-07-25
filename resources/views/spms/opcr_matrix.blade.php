@@ -183,6 +183,9 @@
             <span class="badge badge-light border text-dark px-3 py-2 mr-2 font-weight-bold">
                 {{ $opcr->semester == 1 ? '1st Half' : '2nd Half' }}
             </span>
+            <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold shadow-sm mr-2" data-toggle="modal" data-target="#previewOpcrModal" title="Preview & Print Official OPCR Form (PDF)">
+                <i class="fas fa-file-pdf mr-1"></i> Print OPCR Form (PDF)
+            </button>
             <div class="dropdown d-inline mr-2">
                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle font-weight-bold shadow-sm" type="button" id="opcrTemplateDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <i class="fas fa-cog text-info mr-1"></i> Template & Options
@@ -1094,5 +1097,40 @@
             }
         }
     }
+
+    function printOpcrIframe(iframeId) {
+        var iframe = document.getElementById(iframeId);
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        }
+    }
 </script>
+
+{{-- OPCR Form Preview Modal --}}
+<div class="modal fade" id="previewOpcrModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
+                <h5 class="modal-title font-weight-bold text-danger" style="font-size: 15px;">
+                    <i class="fas fa-file-pdf text-danger mr-2"></i> OPCR Form Preview &bull; {{ $opcr->office->office_name }} ({{ $opcr->year }})
+                </h5>
+                <div>
+                    <button type="button" onclick="printOpcrIframe('matrixOpcrIframe')" class="btn btn-xs btn-outline-dark font-weight-bold mr-2">
+                        <i class="fas fa-print mr-1"></i> Print Document
+                    </button>
+                    <a href="{{ route('spms.opcr.print', $opcr->id) }}" target="_blank" class="btn btn-xs btn-outline-teal font-weight-bold mr-2">
+                        <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
+                    </a>
+                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body p-0 bg-dark text-center" style="overflow: hidden;">
+                <iframe id="matrixOpcrIframe" src="{{ route('spms.opcr.print', ['id' => $opcr->id, 'embed' => 1]) }}" style="width: 100%; height: 75vh; border: none;" loading="lazy"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
 @endpush

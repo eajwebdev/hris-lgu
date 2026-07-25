@@ -57,6 +57,47 @@
         color: #64748b;
         font-weight: 500;
     }
+    .pdf-hover-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #fee2e2;
+        color: #dc2626;
+        border: 1px solid #fca5a5;
+        border-radius: 20px;
+        padding: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.25s ease-in-out;
+        white-space: nowrap;
+        overflow: hidden;
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+    }
+    .pdf-hover-btn .btn-text {
+        max-width: 0;
+        opacity: 0;
+        margin-left: 0;
+        transition: max-width 0.3s ease, opacity 0.25s ease, margin-left 0.25s ease;
+        display: inline-block;
+        white-space: nowrap;
+        font-size: 12px;
+    }
+    .pdf-hover-btn:hover {
+        width: auto;
+        padding: 6px 12px;
+        background-color: #dc2626;
+        color: #ffffff;
+        border-color: #dc2626;
+        box-shadow: 0 4px 10px rgba(220, 38, 38, 0.25);
+    }
+    .pdf-hover-btn:hover .btn-text {
+        max-width: 100px;
+        opacity: 1;
+        margin-left: 6px;
+    }
 </style>
 
 <div class="container-fluid py-2">
@@ -135,31 +176,39 @@
                 {{-- OPCR List Table Matching Screenshot 2 --}}
                 <div class="list-group list-group-flush border-top">
                     @forelse($opcrs as $opcr)
-                        <a href="{{ route('spms.opcr.matrix', $opcr->id) }}" class="opcr-row-item list-group-item py-3 px-3">
+                        <div class="opcr-row-item list-group-item py-3 px-3">
                             <div class="row align-items-center">
                                 {{-- Left User Icon & Name --}}
-                                <div class="col-md-4 d-flex align-items-center">
-                                    <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center mr-3" style="width: 38px; height: 38px; min-width: 38px;">
-                                        <i class="fas fa-user"></i>
-                                    </div>
-                                    <div>
-                                        <h6 class="font-weight-bold text-dark mb-0 text-uppercase" style="font-size: 13px;">
-                                            {{ $opcr->head ? ($opcr->head->fname . ' ' . $opcr->head->lname) : ($opcr->office->office_name ?? 'OFFICE HEAD') }}
-                                        </h6>
-                                        <small class="text-muted font-weight-bold">
-                                            OPCR FOR {{ $opcr->year }} (Semester {{ $opcr->semester }})
-                                        </small>
-                                    </div>
+                                <div class="col-md-5 d-flex align-items-center">
+                                    <a href="{{ route('spms.opcr.matrix', $opcr->id) }}" class="d-flex align-items-center text-decoration-none">
+                                        <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center mr-3" style="width: 38px; height: 38px; min-width: 38px;">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="font-weight-bold text-dark mb-0 text-uppercase" style="font-size: 13px;">
+                                                {{ $opcr->head ? ($opcr->head->fname . ' ' . $opcr->head->lname) : ($opcr->office->office_name ?? 'OFFICE HEAD') }}
+                                            </h6>
+                                            <small class="text-muted font-weight-bold">
+                                                OPCR FOR {{ $opcr->year }} (Semester {{ $opcr->semester }})
+                                            </small>
+                                        </div>
+                                    </a>
                                 </div>
 
-                                {{-- Weight Badges Matching Screenshot 2 --}}
-                                <div class="col-md-8 d-flex justify-content-end align-items-center flex-wrap">
-                                    <span class="badge-weight-red mr-4">CORE FUNCTIONS (60%)</span>
-                                    <span class="badge-weight-red mr-4">STRATEGIC FUNCTIONS (20%)</span>
-                                    <span class="badge-weight-red mr-2">SUPPORT FUNCTIONS (20%)</span>
+                                {{-- Weight Badges & Far-Right PDF Hover Button --}}
+                                <div class="col-md-7 d-flex justify-content-end align-items-center flex-wrap">
+                                    <a href="{{ route('spms.opcr.matrix', $opcr->id) }}" class="d-flex align-items-center text-decoration-none mr-3">
+                                        <span class="badge-weight-red mr-4">CORE FUNCTIONS (60%)</span>
+                                        <span class="badge-weight-red mr-4">STRATEGIC FUNCTIONS (20%)</span>
+                                        <span class="badge-weight-red">SUPPORT FUNCTIONS (20%)</span>
+                                    </a>
+                                    <button type="button" class="pdf-hover-btn ml-2" data-toggle="modal" data-target="#printOpcrModal{{ $opcr->id }}" title="Preview &amp; Print OPCR Form (PDF)">
+                                        <i class="fas fa-file-pdf"></i>
+                                        <span class="btn-text">Print OPCR</span>
+                                    </button>
                                 </div>
                             </div>
-                        </a>
+                        </div>
                     @empty
                         <div class="text-center py-5 text-muted">
                             <i class="fas fa-folder-open fa-3x text-warning mb-3 d-block"></i>
@@ -225,4 +274,44 @@
         </div>
     </div>
 </div>
+
+@foreach($opcrs as $opcr)
+    <div class="modal fade" id="printOpcrModal{{ $opcr->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
+                    <h5 class="modal-title font-weight-bold text-danger" style="font-size: 15px;">
+                        <i class="fas fa-file-pdf text-danger mr-2"></i> OPCR Form Preview &bull; {{ $opcr->office->office_name }} ({{ $opcr->year }})
+                    </h5>
+                    <div>
+                        <button type="button" onclick="printOpcrListIframe('opcrListIframe{{ $opcr->id }}')" class="btn btn-xs btn-outline-dark font-weight-bold mr-2">
+                            <i class="fas fa-print mr-1"></i> Print Document
+                        </button>
+                        <a href="{{ route('spms.opcr.print', $opcr->id) }}" target="_blank" class="btn btn-xs btn-outline-teal font-weight-bold mr-2">
+                            <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
+                        </a>
+                        <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-body p-0 bg-dark text-center" style="overflow: hidden;">
+                    <iframe id="opcrListIframe{{ $opcr->id }}" src="{{ route('spms.opcr.print', ['id' => $opcr->id, 'embed' => 1]) }}" style="width: 100%; height: 75vh; border: none;" loading="lazy"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+@endforeach
+
+@push('scripts')
+<script>
+    function printOpcrListIframe(iframeId) {
+        var iframe = document.getElementById(iframeId);
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        }
+    }
+</script>
+@endpush
 @endsection

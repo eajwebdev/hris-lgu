@@ -427,6 +427,7 @@ Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], functio
         Route::get('/', [SpmsController::class, 'drive'])->name('spms.drive');
         Route::get('/opcr', [SpmsController::class, 'opcrList'])->name('spms.opcr');
         Route::get('/opcr/{id}', [SpmsController::class, 'opcrMatrix'])->name('spms.opcr.matrix');
+        Route::get('/opcr/print/{id}', [SpmsController::class, 'printOpcr'])->name('spms.opcr.print');
         Route::post('/opcr/{id}/signatories', [SpmsController::class, 'updateSignatories'])->name('spms.opcr.signatories');
         Route::post('/opcr/create', [SpmsController::class, 'createOpcr'])->name('spms.opcr.create');
         Route::post('/opcr/item/store', [SpmsController::class, 'storeOpcrItem'])->name('spms.opcr.item.store');
