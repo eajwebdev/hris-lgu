@@ -58,4 +58,12 @@ class SpmsIpcrItem extends Model
     {
         return !empty($this->evidence_file) && \Illuminate\Support\Str::startsWith($this->evidence_file, ['http://', 'https://']);
     }
+
+    /**
+     * Accessor for rating_average mapping to DB column rating_ave
+     */
+    public function getRatingAverageAttribute()
+    {
+        return $this->attributes['rating_ave'] ?? null;
+    }
 }

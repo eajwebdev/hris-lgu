@@ -301,6 +301,52 @@ class SpmsController extends Controller
     }
 
     /**
+     * IPCR List View (Matching Screenshot & OPCR List layout)
+     */
+    public function ipcrList(Request $request)
+    {
+        $guard = $this->getGuard();
+        $user = auth()->guard($guard)->user();
+        $isHead = $this->isOfficeHead($guard, $user);
+
+        $year = $request->input('year', date('Y'));
+        $semester = $request->input('semester', (date('n') <= 6 ? 1 : 2));
+        $search = trim((string)$request->input('search', ''));
+
+        if ($guard === 'web') {
+            $managedOffices = Office::where('id', '>', 2)->get();
+            $selectedOfficeId = $request->input('office_id', $managedOffices->first()?->id ?? 3);
+        } else {
+            $selectedOfficeId = $user->emp_dept ?? 3;
+            $managedOffices = Office::where('id', $selectedOfficeId)->get();
+        }
+
+        $activeOffice = Office::find($selectedOfficeId);
+
+        if (!$isHead && $guard === 'employee') {
+            // STRICT PRIVACY: Regular employees only see THEIR OWN IPCR document!
+            $query = Employee::where('id', $user->id);
+        } else {
+            // Office Heads / Admins see their office employees' IPCR documents for evaluation
+            $query = Employee::where('emp_dept', $selectedOfficeId)->where('stat_1', 1);
+        }
+
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('fname', 'like', "%{$search}%")
+                  ->orWhere('lname', 'like', "%{$search}%")
+                  ->orWhere('position', 'like', "%{$search}%");
+            });
+        }
+
+        $officeEmployees = $query->orderBy('lname', 'asc')->get();
+
+        return view('spms.ipcr_list', compact(
+            'guard', 'user', 'isHead', 'managedOffices', 'activeOffice', 'officeEmployees', 'year', 'semester', 'search'
+        ));
+    }
+
+    /**
      * IPCR Matrix View for Logged-In Employee or Requested Employee
      */
     public function ipcrMatrix(Request $request, $id = null)
@@ -308,6 +354,11 @@ class SpmsController extends Controller
         $guard = $this->getGuard();
         $user = auth()->guard($guard)->user();
         $isHead = $this->isOfficeHead($guard, $user);
+
+        if ($guard === 'employee' && !$isHead && $id && $id != $user->id) {
+            return redirect()->route('spms.ipcr')
+                ->with('error', 'Unauthorized access: You can only view your own IPCR.');
+        }
 
         $year = $request->input('year', date('Y'));
         $semester = $request->input('semester', (date('n') <= 6 ? 1 : 2));
@@ -428,6 +479,29 @@ class SpmsController extends Controller
             'remarks' => $request->input('remarks', $item->remarks),
             'status' => 'Evaluated',
         ]);
+
+        // Recalculate parent IPCR overall ratings
+        $ipcr = SpmsIpcr::find($item->ipcr_id);
+        if ($ipcr) {
+            $allRated = SpmsIpcrItem::where('ipcr_id', $ipcr->id)->whereNotNull('rating_ave')->get();
+            if ($allRated->count() > 0) {
+                $finalScore = round($allRated->avg('rating_ave'), 2);
+                $adjectival = 'Needs Improvement';
+                if ($finalScore >= 4.5) {
+                    $adjectival = 'Outstanding';
+                } elseif ($finalScore >= 3.5) {
+                    $adjectival = 'Very Satisfactory';
+                } elseif ($finalScore >= 2.5) {
+                    $adjectival = 'Satisfactory';
+                }
+
+                $ipcr->update([
+                    'final_numerical_rating' => $finalScore,
+                    'final_adjectival_rating' => $adjectival,
+                    'status' => 'Evaluated',
+                ]);
+            }
+        }
 
         return back()->with('success', 'IPCR item evaluation updated successfully.');
     }
@@ -683,5 +757,43 @@ class SpmsController extends Controller
         }
 
         return back()->with('success', 'Contract of Service / Job Order Performance Rating template loaded successfully.');
+    }
+
+    /**
+     * Print Printable Performance Rating Form for COS / JO / Part-timer (Matching Image 1 format)
+     */
+    public function printCosRating(Request $request, $id)
+    {
+        $guard = $this->getGuard();
+        $user = auth()->guard($guard)->user();
+        $isHead = $this->isOfficeHead($guard, $user);
+
+        if ($guard === 'employee' && !$isHead && $id != $user->id) {
+            return back()->with('error', 'Unauthorized access to another employee rating form.');
+        }
+
+        $year = $request->input('year', date('Y'));
+        $semester = $request->input('semester', (date('n') <= 6 ? 1 : 2));
+
+        $employee = Employee::findOrFail($id);
+        $office = Office::with('head')->find($employee->emp_dept);
+        $officeHead = $office?->head;
+
+        $ipcr = SpmsIpcr::with(['items.opcrItem', 'items.assigner', 'office.head'])
+            ->firstOrCreate(
+                [
+                    'employee_id' => $employee->id,
+                    'year' => $year,
+                    'semester' => $semester,
+                ],
+                [
+                    'office_id' => $employee->emp_dept ?? 3,
+                    'status' => 'Draft',
+                ]
+            );
+
+        return view('spms.print_cos_rating', compact(
+            'guard', 'user', 'isHead', 'employee', 'office', 'officeHead', 'ipcr', 'year', 'semester'
+        ));
     }
 }
