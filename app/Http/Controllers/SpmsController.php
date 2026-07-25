@@ -328,6 +328,90 @@ class SpmsController extends Controller
     }
 
     /**
+     * CASCADE ALL OPCR Items in an OPCR Matrix to ALL Regular Office Members
+     */
+    public function cascadeAllOpcrTargets(Request $request, $id)
+    {
+        $opcr = SpmsOpcr::with(['items', 'office'])->findOrFail($id);
+
+        if ($opcr->items->isEmpty()) {
+            return back()->with('error', 'There are no OPCR targets to cascade. Please load or add OPCR items first.');
+        }
+
+        // Get active office employees
+        $allOfficeEmployees = Employee::where('emp_dept', $opcr->office_id)
+            ->where('stat_1', 1)
+            ->get();
+
+        // Filter to include ONLY regular & permanent personnel (exclude JO, COS, Part-time)
+        $regularEmployees = $allOfficeEmployees->reject(function ($emp) {
+            $empStatusStr = strtolower((string) ($emp->emp_status ?? ''));
+            $positionStr = strtolower((string) ($emp->position ?? ''));
+            $combinedStr = $empStatusStr . ' ' . $positionStr;
+
+            return str_contains($combinedStr, 'job order')
+                || str_contains($combinedStr, 'contract')
+                || str_contains($combinedStr, 'cos')
+                || str_contains($combinedStr, 'jo')
+                || str_contains($combinedStr, 'part');
+        });
+
+        if ($regularEmployees->isEmpty()) {
+            return back()->with('error', 'No regular or permanent personnel found in this office to cascade targets to.');
+        }
+
+        $guard = $this->getGuard();
+        $user = auth()->guard($guard)->user();
+        $assignerId = $user ? $user->id : null;
+
+        $targetCount = 0;
+        $employeeCount = $regularEmployees->count();
+
+        foreach ($opcr->items as $opcrItem) {
+            foreach ($regularEmployees as $employee) {
+                // Check if already assigned
+                $alreadyAssigned = SpmsIpcrItem::where('opcr_item_id', $opcrItem->id)
+                    ->where('employee_id', $employee->id)
+                    ->exists();
+
+                if ($alreadyAssigned) {
+                    continue;
+                }
+
+                // Get or Create the Employee's IPCR
+                $ipcr = SpmsIpcr::firstOrCreate(
+                    [
+                        'employee_id' => $employee->id,
+                        'year' => $opcr->year,
+                        'semester' => $opcr->semester,
+                    ],
+                    [
+                        'office_id' => $employee->emp_dept,
+                        'opcr_id' => $opcr->id,
+                        'status' => 'Draft',
+                    ]
+                );
+
+                // Create IPCR Item
+                SpmsIpcrItem::create([
+                    'ipcr_id' => $ipcr->id,
+                    'employee_id' => $employee->id,
+                    'opcr_item_id' => $opcrItem->id,
+                    'assigned_by' => $assignerId,
+                    'category' => $opcrItem->category,
+                    'subcategory' => $opcrItem->subcategory,
+                    'mfo_pap' => $opcrItem->mfo_pap,
+                    'success_indicators' => $opcrItem->success_indicators,
+                    'status' => 'Assigned',
+                ]);
+            }
+            $targetCount++;
+        }
+
+        return back()->with('success', "Successfully cascaded all {$targetCount} OPCR targets to {$employeeCount} regular office members!");
+    }
+
+    /**
      * OPCR Item Rating Entry
      */
     public function rateOpcrItem(Request $request)
@@ -593,6 +677,16 @@ class SpmsController extends Controller
     public function clearIpcrItems(Request $request, $id)
     {
         $ipcr = SpmsIpcr::findOrFail($id);
+        $guard = $this->getGuard();
+        $user = auth()->guard($guard)->user();
+        $isHead = $this->isOfficeHead($guard, $user);
+
+        if ($guard === 'employee' && !$isHead) {
+            // Delete ONLY custom items created directly by the employee (opcr_item_id == null)
+            $deletedCount = $ipcr->items()->whereNull('opcr_item_id')->delete();
+            return back()->with('success', "Cleared {$deletedCount} custom IPCR objectives. Official cascaded OPCR targets were preserved.");
+        }
+
         $ipcr->items()->delete();
 
         return back()->with('success', 'All IPCR rows cleared successfully.');
@@ -737,9 +831,15 @@ class SpmsController extends Controller
         $item = SpmsIpcrItem::findOrFail($id);
         $guard = $this->getGuard();
         $user = auth()->guard($guard)->user();
+        $isHead = $this->isOfficeHead($guard, $user);
 
-        if ($guard === 'employee' && $item->employee_id != $user->id) {
+        if ($guard === 'employee' && $item->employee_id != $user->id && !$isHead) {
             return back()->with('error', 'Unauthorized access.');
+        }
+
+        // STRICT CSC RULE: Cascaded OPCR targets can ONLY be deleted/unassigned by the Office Head or HR Admin!
+        if ($item->opcr_item_id && $guard === 'employee' && !$isHead) {
+            return back()->with('error', 'Cascaded OPCR targets are assigned by the Office Head and cannot be deleted by employees.');
         }
 
         $item->delete();

@@ -348,12 +348,18 @@
                                             </button>
 
                                             @if(($guard === 'employee' && $item->employee_id == $user->id) || $isHead || $guard === 'web')
-                                                <form method="POST" action="{{ route('spms.ipcr.item.delete', $item->id) }}" class="d-inline">
-                                                    @csrf
-                                                    <button type="button" class="btn btn-xs btn-outline-danger font-weight-bold shadow-sm mb-1 btn-delete-confirm" data-title="Delete Objective?" data-text="Are you sure you want to delete this IPCR objective?" title="Delete objective">
-                                                        <i class="fas fa-trash"></i>
+                                                @if($item->opcr_item_id && $guard === 'employee' && !$isHead)
+                                                    <button type="button" class="btn btn-xs btn-light text-muted border shadow-sm mb-1" disabled title="Official Cascaded Target: Assigned by Office Head via OPCR (Cannot be deleted by staff)">
+                                                        <i class="fas fa-lock text-secondary"></i>
                                                     </button>
-                                                </form>
+                                                @else
+                                                    <form method="POST" action="{{ route('spms.ipcr.item.delete', $item->id) }}" class="d-inline">
+                                                        @csrf
+                                                        <button type="button" class="btn btn-xs btn-outline-danger font-weight-bold shadow-sm mb-1 btn-delete-confirm" data-title="Delete Custom Objective?" data-text="Are you sure you want to delete this custom IPCR objective?" title="Delete objective">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                @endif
                                             @endif
                                         @else
                                             <span class="badge badge-light border text-muted px-2 py-1" title="Past rating periods are read-only">
