@@ -149,14 +149,13 @@ return [
         // barely moves it. Kept modest so a subtle but real turn still passes.
         'min_pose_shift' => 0.05,
 
-        // Upper bound on the whole payload, so the endpoint cannot be used to
-        // ship megabytes of vectors. Must stay at least min_neutral_frames +
-        // count(pose_pool) + flash_count, or a worst-case attempt (every pose,
-        // full flash sequence) is rejected by this cap before liveness ever
-        // gets to judge it — 5 + 4 + 3 = 12 at the pool's full extent, so 16
-        // leaves headroom without another config touch if pose_count or
-        // flash_count is raised later.
-        'max_frames' => 16,
+        // Upper bound on the face captures in a payload, so the endpoint
+        // cannot be used to ship megabytes of vectors. Must stay at least
+        // min_neutral_frames + count(pose_pool) — 5 + 4 = 9 at the pool's full
+        // extent. The flash samples are NOT counted here: they are light
+        // readings rather than embeddings, and are capped separately in the
+        // controller's 'flash.samples' rule.
+        'max_frames' => 12,
 
         // The frames must span at least this long — a human takes time to
         // perform two gestures; a payload assembled in one instant does not.
@@ -172,46 +171,85 @@ return [
         // and the anti-spoof model. Kept low so it never rejects a live employee.
         'min_variation' => 0.02,
 
-        // Server-randomised bright/dark full-screen sequence, verified against
-        // the captured frames' face-crop luma (brightnessOf(), the same helper
-        // the framing gate above already uses). A live, nearby face measurably
-        // brightens under the kiosk's own bright flash and dims under the dark
-        // segment — physical reflectance. A phone or monitor replaying a
-        // pre-recorded clip or a live video call is self-luminous: its
-        // displayed brightness is whatever was recorded, and does not react to
-        // the KIOSK's screen at all, so the captured luma stays flat regardless
-        // of the sequence. Same "random server-issued sequence + verify the
-        // frames obey it" architecture as the pose challenge above, on an
-        // orthogonal signal (reflectance, not shape).
+        /*
+        | ACTIVE ILLUMINATION ("flash") CHALLENGE
+        |
+        | The kiosk turns its own screen into a light source: it paints a
+        | server-chosen sequence of full-screen colours and measures what comes
+        | back off the subject. This is the same principle commercial passive
+        | liveness uses, and it is what closes the gap the pose challenge leaves
+        | open — a coached video replay can follow spoken instructions, but it
+        | cannot make a recording react to a light that was never shining when
+        | the recording was made.
+        |
+        | THREE independent things are verified, because any one of them alone
+        | has a plausible way around it:
+        |
+        |   1. Brightness ('min_flash_delta'). The face is brighter under the
+        |      white segment than under the dark one. Beaten by: an attacker
+        |      who happens to be waving the phone, or ambient flicker.
+        |
+        |   2. Face-vs-background differential ('min_face_bg_delta'). Light
+        |      falls off with distance, so the kiosk's own screen lights the
+        |      face much more than it lights the wall behind. When the "face"
+        |      is really a phone held to the lens, the whole frame IS that
+        |      phone's display: face region and surrounding region carry the
+        |      same emitted light and move together, so the differential
+        |      collapses toward zero. This is the check that a replay device
+        |      cannot satisfy by any amount of coaching, and it is the strongest
+        |      signal here.
+        |
+        |   3. Colour response ('min_chroma_shift'). Under a red segment a real
+        |      face reflects proportionally more red; under green, more green.
+        |      A screen showing a recording keeps whatever colour balance was
+        |      recorded. Measured as a ratio between channels, not an absolute,
+        |      so it survives white balance and exposure drifting.
+        |
+        | 'flash_count' is how many segments are drawn. 0 is the kill switch —
+        | checkFlash() treats an empty sequence as nothing to verify, exactly as
+        | checkPoses() no-ops on an empty pose list.
+        */
+
+        'flash_count' => 4,
+
+        // Segments the sequence is drawn from. 'white'/'dark' carry the
+        // brightness and differential checks; the colours carry the chroma
+        // check. issueFlash() always includes at least one white, one dark and
+        // one colour, then fills the rest at random — so every attempt tests
+        // all three properties in an order the client cannot predict.
+        'flash_palette' => ['white', 'dark', 'red', 'green', 'blue'],
+
+        // Face luma (0-255) under 'white' minus under 'dark'. Same scale as
+        // 'min_brightness' below. Kept low: in a bright hall the screen adds
+        // little next to daylight, and this check is not carrying the weight
+        // on its own.
+        'min_flash_delta' => 8,
+
+        // How much more the FACE must respond than the background does, in the
+        // same luma units. The one number worth tuning first if a real screen
+        // spoof ever gets through — raise it. Lower it only if employees at a
+        // kiosk mounted very close to a wall are being turned away, since a
+        // wall right behind the head shrinks the natural gap.
+        'min_face_bg_delta' => 4,
+
+        // Rise in a colour's share of the face's total RGB under that colour's
+        // segment, versus that share averaged across the whole sequence.
+        // Dimensionless (a ratio of ratios), so exposure and white balance
+        // drift do not move it. 0.03 is roughly a 3-point shift on a channel
+        // that normally sits near a third of the total.
+        'min_chroma_shift' => 0.03,
+
+        // Milliseconds the screen holds each colour before the sample is taken:
+        // enough for the panel to repaint and the camera's auto-exposure to
+        // start reacting.
         //
-        // 'flash_count' is how many segments the sequence has. 0 is the kill
-        // switch — checkFlash() treats an empty sequence as nothing to verify,
-        // exactly like checkPoses() already no-ops on an empty pose list. Any
-        // nonzero value is raised to at least 2 internally: with only one
-        // segment there is no dark reading to compare a bright one against.
-        'flash_count' => 3,
-
-        // Minimum by which the mean face-crop luma (0-255, brightnessOf()
-        // scale — see 'min_brightness' below, 55 on the same scale) during
-        // 'bright' segments must exceed the mean during 'dark' segments.
-        // Deliberately a heuristic threshold, not a guarantee — like
-        // min_pose_shift and min_variation above, it needs field tuning.
-        // Started conservative: low enough that a kiosk in an already-bright
-        // hallway (where the screen's own contribution to the subject's face
-        // is small next to ambient light) still passes a real employee, high
-        // enough to require an actual rising/falling trend rather than
-        // ordinary frame-to-frame sensor noise. Watch rejected attempts in the
-        // field and raise or lower it.
-        'min_flash_delta' => 12,
-
-        // Milliseconds the client waits after switching the screen to a
-        // segment's colour before it trusts a captured frame — lets the
-        // display actually repaint and lets any camera auto-exposure begin
-        // reacting, so the frame reflects that segment and not a
-        // mid-transition blend of both. Client-side pacing only; unlike
-        // min_flash_delta this is not itself a verifying threshold, so it is
-        // safe to hand to the browser via portalConfig.
-        'flash_settle_ms' => 220,
+        // ALSO A SAFETY FLOOR, not only a timing one. Full-screen flashing
+        // between roughly 3 Hz and 30 Hz can provoke seizures in people with
+        // photosensitive epilepsy. At 320ms per segment the screen changes at
+        // about 2.5 Hz — deliberately under that band. Do not lower this below
+        // ~340ms without re-checking that arithmetic; the security value of a
+        // faster sequence is not worth the risk.
+        'flash_settle_ms' => 320,
     ],
 
     /*

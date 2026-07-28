@@ -212,30 +212,62 @@ class AttendancePortalTest extends TestCase
             $t += 600;
         }
 
-        foreach (($challenge['flash'] ?? []) as $seg) {
-            $frames[] = $this->flashFrame($person, $seg, $t);
-
-            $t += 500;
-        }
-
         return $frames;
     }
 
     /**
-     * One flash frame: a face lit by the kiosk's own screen. The luma pair is
-     * fixed rather than derived from the threshold so the fixture keeps working
-     * if min_flash_delta is retuned — 210 vs 45 clears any plausible value.
+     * The illumination samples a real face in front of the kiosk produces.
+     *
+     * Modelled rather than hand-waved, so the fixture exercises what the server
+     * actually reads: the face tracks the screen colour, the background barely
+     * does (it is metres further from the panel), and under a coloured segment
+     * the matching channel dominates what the face sends back.
      */
-    private function flashFrame(int $person, string $seg, int $t, ?float $luma = null): array
+    private function flashPayload(int $person, array $challenge, array $overrides = []): ?array
     {
+        $sequence = $challenge['flash'] ?? [];
+
+        if (! $sequence) {
+            return null;
+        }
+
+        $samples = [];
+        $t       = 6000;
+
+        foreach ($sequence as $seg) {
+            $samples[] = [
+                'seg'  => $seg,
+                't'    => $t,
+                'face' => $overrides['face'][$seg] ?? $this->litFace($seg),
+                'bg'   => $overrides['bg'][$seg]   ?? $this->litBackground($seg),
+            ];
+
+            $t += 400;
+        }
+
         return [
-            'stage'      => 'flash',
-            'pose'       => null,
-            'seg'        => $seg,
-            't'          => $t,
-            'descriptor' => $this->frame($person, null, $person + 700 + $t, 0.02),
-            'faceLuma'   => $luma ?? ($seg === 'bright' ? 210.0 : 45.0),
+            'samples'    => $overrides['samples'] ?? $samples,
+            'descriptor' => $overrides['descriptor'] ?? $this->frame($person, null, $person + 700, 0.02),
         ];
+    }
+
+    /** What a real face reflects under each screen colour. */
+    private function litFace(string $seg): array
+    {
+        return match ($seg) {
+            'white' => [180.0, 180.0, 180.0],
+            'dark'  => [40.0, 40.0, 40.0],
+            'red'   => [190.0, 60.0, 55.0],
+            'green' => [60.0, 190.0, 60.0],
+            'blue'  => [55.0, 60.0, 190.0],
+            default => [120.0, 120.0, 120.0],
+        };
+    }
+
+    /** The wall behind: far enough from the panel that it hardly moves. */
+    private function litBackground(string $seg): array
+    {
+        return $seg === 'white' ? [52.0, 52.0, 52.0] : [46.0, 46.0, 46.0];
     }
 
     /** A full, valid live payload for a given challenge (frames + spoof scores). */
@@ -246,6 +278,7 @@ class AttendancePortalTest extends TestCase
             'action'         => $action,
             'nonce'          => $challenge['nonce'],
             'frames'         => $this->challengedFrames($person, $challenge),
+            'flash'          => $this->flashPayload($person, $challenge),
             // The browser's anti-spoof scores. A live face scores high on both
             // the average and the worst frame; the server enforces both floors.
             'liveness_score' => 0.97,
@@ -300,6 +333,7 @@ class AttendancePortalTest extends TestCase
      * The flash sequence is the server's to choose, like the poses. Answering a
      * different one — even a well-formed one — is not a capture, it is a guess.
      */
+    /** The sequence is the server's to choose; answering a different one is a guess. */
     public function test_a_flash_sequence_in_the_wrong_order_is_rejected(): void
     {
         $this->enrol($this->alice, 110);
@@ -307,16 +341,20 @@ class AttendancePortalTest extends TestCase
         $challenge = $this->challenge();
         $payload   = $this->livePayload(110, $challenge, 'in');
 
-        // Invert each segment rather than reversing the list: a reversal of a
-        // palindromic sequence would still match.
-        $payload['frames'] = array_map(function (array $frame) {
-            if ($frame['stage'] === 'flash') {
-                $frame['seg']      = $frame['seg'] === 'bright' ? 'dark' : 'bright';
-                $frame['faceLuma'] = $frame['seg'] === 'bright' ? 210.0 : 45.0;
-            }
+        $payload['flash']['samples'] = array_reverse($payload['flash']['samples']);
 
-            return $frame;
-        }, $payload['frames']);
+        // Reversing the list alone would still match a palindrome; re-stamp the
+        // timestamps so the order the server sorts by is genuinely different.
+        $t = 6000;
+
+        foreach ($payload['flash']['samples'] as $i => $sample) {
+            $payload['flash']['samples'][$i]['t'] = $t;
+            $t += 400;
+        }
+
+        if (array_column($payload['flash']['samples'], 'seg') === $challenge['flash']) {
+            $this->markTestSkipped('Palindromic sequence drawn; nothing to reorder.');
+        }
 
         $this->punch($payload)->assertStatus(403);
 
@@ -324,33 +362,120 @@ class AttendancePortalTest extends TestCase
     }
 
     /**
-     * The headline new requirement: a screen replaying a recording — a video
-     * call, a saved clip — is self-luminous. It does not brighten when the
-     * kiosk's own screen flashes white, so its luma stays flat across segments
-     * no matter how convincing the face on it looks.
+     * The headline requirement: a screen replaying a recording — a saved clip,
+     * a live video call — is self-luminous. Its brightness is whatever was
+     * recorded, so it does not rise when the kiosk paints its own screen white.
      */
-    public function test_a_face_that_does_not_react_to_the_flash_is_rejected(): void
+    public function test_a_face_that_does_not_react_to_the_light_is_rejected(): void
     {
         $this->enrol($this->alice, 120);
 
         $challenge = $this->challenge();
-        $payload   = $this->livePayload(120, $challenge, 'in');
 
-        $payload['frames'] = array_map(function (array $frame) {
-            if ($frame['stage'] === 'flash') {
-                $frame['faceLuma'] = 128.0;   // identical under bright and dark
-            }
+        $flat = [];
 
-            return $frame;
-        }, $payload['frames']);
+        foreach (['white', 'dark', 'red', 'green', 'blue'] as $seg) {
+            $flat[$seg] = [128.0, 128.0, 128.0];   // identical under every colour
+        }
+
+        $this->punch($this->livePayload(120, $challenge, 'in', [
+            'flash' => $this->flashPayload(120, $challenge, ['face' => $flat]),
+        ]))->assertStatus(403);
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /**
+     * The check a replay device cannot pass however bright it is. A phone held
+     * to the lens fills the frame with its own display, so the region beside
+     * the face carries the same emitted light and rises with it. On a real
+     * person the wall behind is metres further from the panel and barely moves.
+     */
+    public function test_a_background_that_brightens_with_the_face_is_rejected(): void
+    {
+        $this->enrol($this->alice, 121);
+
+        $challenge = $this->challenge();
+
+        // Background tracking the face exactly — the signature of a screen.
+        $bg = [];
+
+        foreach (['white', 'dark', 'red', 'green', 'blue'] as $seg) {
+            $bg[$seg] = $this->litFace($seg);
+        }
+
+        $this->punch($this->livePayload(121, $challenge, 'in', [
+            'flash' => $this->flashPayload(121, $challenge, ['bg' => $bg]),
+        ]))->assertStatus(403);
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /**
+     * Brightness alone is not enough: a screen bright enough to clear the luma
+     * floor still cannot change its colour balance to match a hue it was never
+     * showing.
+     */
+    public function test_a_face_that_does_not_take_on_the_colour_is_rejected(): void
+    {
+        $this->enrol($this->alice, 122);
+
+        $challenge = $this->challenge();
+
+        // Tracks brightness convincingly, but stays grey under every colour.
+        $greyish = [
+            'white' => [190.0, 190.0, 190.0],
+            'dark'  => [35.0, 35.0, 35.0],
+            'red'   => [120.0, 120.0, 120.0],
+            'green' => [120.0, 120.0, 120.0],
+            'blue'  => [120.0, 120.0, 120.0],
+        ];
+
+        $payload = $this->livePayload(122, $challenge, 'in', [
+            'flash' => $this->flashPayload(122, $challenge, ['face' => $greyish]),
+        ]);
+
+        // Only meaningful when the drawn sequence actually contains a colour —
+        // issueFlash() guarantees one, but assert rather than assume.
+        $this->assertNotEmpty(array_intersect($challenge['flash'], ['red', 'green', 'blue']));
 
         $this->punch($payload)->assertStatus(403);
 
         $this->assertNull($this->todayFor($this->alice));
     }
 
+    /** Omitting the samples entirely must not skip the check. */
+    public function test_a_punch_with_no_illumination_samples_is_rejected(): void
+    {
+        $this->enrol($this->alice, 123);
+
+        $challenge = $this->challenge();
+
+        $this->punch($this->livePayload(123, $challenge, 'in', ['flash' => null]))
+            ->assertStatus(403);
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /** The samples must belong to the employee the poses identified. */
+    public function test_illumination_samples_from_another_face_are_rejected(): void
+    {
+        $this->enrol($this->alice, 124);
+        $this->enrol($this->bob, 126);
+
+        $challenge = $this->challenge();
+
+        $this->punch($this->livePayload(124, $challenge, 'in', [
+            'flash' => $this->flashPayload(124, $challenge, [
+                'descriptor' => $this->frame(126, null, 999, 0.02),   // Bob's face
+            ]),
+        ]))->assertStatus(403);
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
     /** flash_count = 0 turns the whole check off, poses and all else unchanged. */
-    public function test_the_flash_check_can_be_disabled(): void
+    public function test_the_illumination_check_can_be_disabled(): void
     {
         config(['face.liveness.flash_count' => 0]);
 
@@ -363,6 +488,28 @@ class AttendancePortalTest extends TestCase
         $this->punch($this->livePayload(125, $challenge, 'in'))
             ->assertOk()
             ->assertJsonPath('recorded', true);
+    }
+
+    /**
+     * Every attempt must be able to test all three properties, so the draw is
+     * seeded rather than uniform. Exercised against the service directly: the
+     * HTTP endpoint is rate-limited to 20/min and this needs more draws than
+     * that to be worth anything.
+     */
+    public function test_every_issued_sequence_contains_white_dark_and_a_colour(): void
+    {
+        $liveness = app(\App\Services\LivenessVerifier::class);
+
+        for ($i = 0; $i < 50; $i++) {
+            $flash = $liveness->issue('127.0.0.1')['flash'];
+
+            $this->assertContains('white', $flash, 'no white segment to measure brightness against');
+            $this->assertContains('dark', $flash, 'no dark segment to measure brightness against');
+            $this->assertNotEmpty(
+                array_intersect($flash, ['red', 'green', 'blue']),
+                'no colour segment, so the chroma check would never run'
+            );
+        }
     }
 
     /** A captured payload cannot be sent twice: the challenge is burned on use. */

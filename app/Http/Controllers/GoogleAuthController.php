@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\EnsurePasswordChanged;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
 use App\Models\User;
@@ -64,7 +65,8 @@ class GoogleAuthController extends Controller
 
             if ($user) {
                 Auth::login($user);
-                return redirect()->route('dashboard')->with('success', 'Login Successfully');
+
+                return $this->afterLogin($user);
             }
 
             if ($employee->stat_1 != 1) {
@@ -72,13 +74,33 @@ class GoogleAuthController extends Controller
             }
 
             Auth::guard('employee')->login($employee);
-            return redirect()->route('dashboard')->with('success', 'Login Successfully');
+
+            return $this->afterLogin($employee);
 
         } catch (\Exception $e) {
             Log::error('Google OAuth Error: ' . $e->getMessage());
             return redirect()->route('getLogin')
                 ->with('error', 'There was an issue with Google OAuth. Please try again.');
         }
+    }
+
+    /**
+     * Google vouched for who they are, which says nothing about the password
+     * sitting on the record. An account still carrying the issued one is held
+     * on the change screen exactly as it would be after a password sign-in —
+     * otherwise "Continue with Google" would be a way around it.
+     */
+    private function afterLogin($account)
+    {
+        session()->regenerate();
+
+        if (EnsurePasswordChanged::isDefault($account->password)) {
+            session()->put(EnsurePasswordChanged::SESSION_KEY, true);
+
+            return redirect()->route('password.change');
+        }
+
+        return redirect()->route('dashboard')->with('success', 'Login Successfully');
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\EnsurePasswordChanged;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -51,7 +52,7 @@ class LoginAuthController extends Controller
         $user = User::where('username', $login)->first();
 
         if ($user && auth()->guard('web')->attempt(['username' => $user->username, 'password' => $password])) {
-            return redirect()->route('dashboard')->with('success', 'Login Successfully');
+            return $this->afterLogin($request, $user);
         }
 
         // Employees may use their username or their organisational email.
@@ -65,11 +66,30 @@ class LoginAuthController extends Controller
             }
 
             if (auth()->guard('employee')->attempt(['username' => $employee->username, 'password' => $password])) {
-                return redirect()->route('dashboard')->with('success', 'Login Successfully');
+                return $this->afterLogin($request, $employee);
             }
         }
 
         return redirect()->back()->with('error', 'Invalid Credentials');
     }
-    
+
+    /**
+     * Where a successful sign-in lands.
+     *
+     * The "is this still the issued password" question is answered once, here,
+     * and carried in the session: asking it on every request would mean a
+     * bcrypt comparison per page load. EnsurePasswordChanged reads the flag.
+     */
+    private function afterLogin(Request $request, $account)
+    {
+        $request->session()->regenerate();
+
+        if (EnsurePasswordChanged::isDefault($account->password)) {
+            $request->session()->put(EnsurePasswordChanged::SESSION_KEY, true);
+
+            return redirect()->route('password.change');
+        }
+
+        return redirect()->route('dashboard')->with('success', 'Login Successfully');
+    }
 }

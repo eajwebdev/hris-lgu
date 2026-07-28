@@ -67,6 +67,7 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'login_auth' => \App\Http\Middleware\LoginAuth::class,
         'role' => \App\Http\Middleware\LoginAuth::class,
+        'password.changed' => \App\Http\Middleware\EnsurePasswordChanged::class,
         'face.registrar' => \App\Http\Middleware\EnsureFaceRegistrar::class,
         'face.self' => \App\Http\Middleware\EnsureFaceSelfOrRegistrar::class,
         'event.passcode' => \App\Http\Middleware\VerifyEventApiPasscode::class,

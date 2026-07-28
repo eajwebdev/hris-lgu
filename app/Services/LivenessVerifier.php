@@ -67,26 +67,37 @@ class LivenessVerifier
     }
 
     /**
-     * Random bright/dark screen-flash sequence, drawn WITH replacement —
-     * unlike issue()'s pose draw, there are only two possible segments, so a
-     * distinct draw caps at two no matter what the config asks for. 0 is the
-     * kill switch; any nonzero count is raised to at least 2 so the sequence
-     * always contains one of each — with only one segment there is nothing to
-     * compare a delta against.
+     * The screen-colour sequence for this attempt.
+     *
+     * Seeded rather than drawn purely at random: every attempt must contain at
+     * least one white, one dark and one colour, because those three carry the
+     * three different checks in checkFlash(). A uniform random draw would now
+     * and then produce an all-white sequence that tests almost nothing. The
+     * remainder is filled at random and the whole thing shuffled, so the ORDER
+     * — the part an attacker would have to predict — stays unguessable.
+     *
+     * 0 is the kill switch; any nonzero count is raised to 3 so the seeded
+     * trio always fits.
      */
     private function issueFlash(): array
     {
-        $count = (int) config('face.liveness.flash_count', 3);
+        $count = (int) config('face.liveness.flash_count', 4);
 
         if ($count <= 0) {
             return [];
         }
 
-        $count = max(2, $count);
-        $flash = ['bright', 'dark'];
+        $palette = array_values((array) config('face.liveness.flash_palette', ['white', 'dark', 'red', 'green', 'blue']));
+        $colours = array_values(array_diff($palette, ['white', 'dark']));
 
-        for ($i = count($flash); $i < $count; $i++) {
-            $flash[] = mt_rand(0, 1) ? 'bright' : 'dark';
+        $flash = ['white', 'dark'];
+
+        if ($colours) {
+            $flash[] = $colours[array_rand($colours)];
+        }
+
+        for ($i = count($flash); $i < max(3, $count); $i++) {
+            $flash[] = $palette[array_rand($palette)];
         }
 
         shuffle($flash);
@@ -135,13 +146,12 @@ class LivenessVerifier
      * reasons are deliberately vague on screen — telling an attacker *which*
      * check they tripped tells them what to fix.
      */
-    public function check(Employee $employee, array $frames, array $challenge = []): ?string
+    public function check(Employee $employee, array $frames, array $challenge = [], array $flash = []): ?string
     {
         $config = (array) config('face.liveness');
 
         $neutral = array_values(array_filter($frames, fn ($f) => $f['stage'] === 'neutral'));
         $posed   = array_values(array_filter($frames, fn ($f) => $f['stage'] === 'pose'));
-        $flashed = array_values(array_filter($frames, fn ($f) => $f['stage'] === 'flash'));
 
         if (! $neutral) {
             return 'Face check incomplete. Please try again.';
@@ -163,7 +173,7 @@ class LivenessVerifier
             return $reason;
         }
 
-        return $this->checkFlash($employee, $flashed, $challenge, $config);
+        return $this->checkFlash($employee, $flash, $challenge, $config);
     }
 
     /**
@@ -282,72 +292,173 @@ class LivenessVerifier
     }
 
     /**
-     * The screen-flash sequence, held to the letter of the challenge.
+     * What the screen's own light did to the subject.
      *
-     * Two things a replay device cannot fake at once: the frames tagged with
-     * the challenged segments must be there IN THE ISSUED ORDER (unknown to
-     * the attacker before asking, the same property the pose challenge leans
-     * on), and the captured face luma must rise under 'bright' and fall under
-     * 'dark' by a measurable margin — a live face near the kiosk's own screen
-     * reflects that light, while a phone or monitor already playing a video is
-     * self-lit and does not react to a light it was never recorded reacting
-     * to. That is the gap the pose challenge alone leaves open: a coached
-     * video replay can follow gestures, but it cannot follow the kiosk's
-     * screen.
+     * The kiosk painted a sequence of colours the client could not predict and
+     * measured the face and the surrounding background under each. Three
+     * separate properties are read out of those samples; see the long note in
+     * config/face.php for why each one is here and what beats it alone.
      *
-     * Unlike checkPoses(), sequence membership is NOT deduplicated — the
-     * sequence can (and by default does) repeat a segment, so the comparison
-     * is a straight ordered-list equality rather than "first occurrence of
-     * each".
+     * Ordered-list equality, not deduplicated like checkPoses(): the sequence
+     * may legitimately repeat a colour.
      */
     private function checkFlash(Employee $employee, array $flash, array $challenge, array $config): ?string
     {
         $demanded = array_values((array) ($challenge['flash'] ?? []));
 
-        // A challenge with no flash sequence — the flash_count kill switch, or
-        // a cache entry minted before this shipped — has nothing to verify.
+        // No sequence issued — the flash_count kill switch, or a challenge
+        // minted before this shipped. Nothing to verify.
         if (! $demanded) {
             return null;
         }
 
-        usort($flash, fn ($a, $b) => $a['t'] <=> $b['t']);
+        $samples = array_values((array) ($flash['samples'] ?? []));
 
-        if (array_column($flash, 'seg') !== $demanded) {
+        if (! $samples) {
+            return 'The face security check did not run. Please reload the page and try again.';
+        }
+
+        usort($samples, fn ($a, $b) => $a['t'] <=> $b['t']);
+
+        if (array_column($samples, 'seg') !== $demanded) {
             return 'Face check failed. Please follow the on-screen instructions.';
         }
 
-        $bright = [];
-        $dark   = [];
+        // One embedding taken during the burst, so the face the light was
+        // measured on is provably the same person the poses identified — not
+        // an accomplice stepping in once the gestures were done.
+        $descriptor = $flash['descriptor'] ?? null;
 
-        foreach ($flash as $frame) {
-            // Still this employee under a different screen colour — catches a
-            // swap mid-sequence, however unlikely.
-            if ($this->faces->verify($employee, $frame['descriptor']) === null) {
-                return 'Face not recognised. Please try again.';
-            }
+        if (! is_array($descriptor)
+            || ! $this->faces->isValidVector($descriptor)
+            || $this->faces->verify($employee, $descriptor) === null) {
+            return 'Face not recognised. Please try again.';
+        }
 
-            $luma = (float) ($frame['faceLuma'] ?? 0);
+        if ($reason = $this->checkFlashBrightness($samples, $config)) {
+            return $reason;
+        }
 
-            if ($frame['seg'] === 'bright') {
-                $bright[] = $luma;
-            } else {
-                $dark[] = $luma;
+        return $this->checkFlashColour($samples, $config);
+    }
+
+    /**
+     * Brightness, and — the part that actually stops a screen — how much more
+     * the face moved than the background did.
+     */
+    private function checkFlashBrightness(array $samples, array $config): ?string
+    {
+        $faceWhite = $faceDark = $bgWhite = $bgDark = [];
+
+        foreach ($samples as $sample) {
+            $face = $this->luma($sample['face'] ?? []);
+            $bg   = $this->luma($sample['bg'] ?? []);
+
+            if ($sample['seg'] === 'white') {
+                $faceWhite[] = $face;
+                $bgWhite[]   = $bg;
+            } elseif ($sample['seg'] === 'dark') {
+                $faceDark[] = $face;
+                $bgDark[]   = $bg;
             }
         }
 
-        // issueFlash() guarantees one of each, but a payload that reached here
-        // with only one kind must not divide by zero.
-        if (! $bright || ! $dark) {
+        // issueFlash() always seeds one of each; a payload arriving without
+        // both is malformed rather than merely failing.
+        if (! $faceWhite || ! $faceDark) {
             return 'Face check failed. Please try again.';
         }
 
-        $delta = (array_sum($bright) / count($bright)) - (array_sum($dark) / count($dark));
+        $faceDelta = $this->mean($faceWhite) - $this->mean($faceDark);
 
-        if ($delta < (float) ($config['min_flash_delta'] ?? 12)) {
+        if ($faceDelta < (float) ($config['min_flash_delta'] ?? 8)) {
+            return 'Please use your real face, not a photo or screen.';
+        }
+
+        // The screen is far closer to the face than to whatever is behind it,
+        // so its light has to land unevenly. A phone held up to the lens fills
+        // the frame with its own emission: face and background then carry the
+        // same light and rise together, and this gap disappears.
+        $bgDelta = ($bgWhite && $bgDark) ? $this->mean($bgWhite) - $this->mean($bgDark) : 0.0;
+
+        if (($faceDelta - $bgDelta) < (float) ($config['min_face_bg_delta'] ?? 4)) {
             return 'Please use your real face, not a photo or screen.';
         }
 
         return null;
+    }
+
+    /**
+     * Colour response: under a red screen a real face sends back
+     * proportionally more red than it does on average across the sequence.
+     *
+     * Compared as each channel's SHARE of the face's total RGB rather than its
+     * absolute value, so the test is unmoved by the camera's exposure or white
+     * balance drifting during the burst — both of which scale all three
+     * channels together and cancel out of the ratio.
+     */
+    private function checkFlashColour(array $samples, array $config): ?string
+    {
+        $channels = ['red' => 0, 'green' => 1, 'blue' => 2];
+        $coloured = array_values(array_filter($samples, fn ($s) => isset($channels[$s['seg']])));
+
+        // A sequence with no colour in it (an operator-trimmed palette) simply
+        // does not carry this check.
+        if (! $coloured) {
+            return null;
+        }
+
+        $shares = [];
+
+        foreach ($samples as $sample) {
+            $shares[] = $this->channelShares($sample['face'] ?? []);
+        }
+
+        $baseline = [];
+
+        foreach ([0, 1, 2] as $i) {
+            $baseline[$i] = $this->mean(array_column($shares, $i));
+        }
+
+        foreach ($coloured as $sample) {
+            $i     = $channels[$sample['seg']];
+            $share = $this->channelShares($sample['face'] ?? [])[$i];
+
+            if (($share - $baseline[$i]) < (float) ($config['min_chroma_shift'] ?? 0.03)) {
+                return 'Please use your real face, not a photo or screen.';
+            }
+        }
+
+        return null;
+    }
+
+    /** Rec. 709 luma from an [r, g, b] sample. */
+    private function luma(array $rgb): float
+    {
+        return 0.2126 * (float) ($rgb[0] ?? 0)
+             + 0.7152 * (float) ($rgb[1] ?? 0)
+             + 0.0722 * (float) ($rgb[2] ?? 0);
+    }
+
+    /** Each channel as a fraction of the sample's total energy. */
+    private function channelShares(array $rgb): array
+    {
+        $r = max(0.0, (float) ($rgb[0] ?? 0));
+        $g = max(0.0, (float) ($rgb[1] ?? 0));
+        $b = max(0.0, (float) ($rgb[2] ?? 0));
+
+        $total = $r + $g + $b;
+
+        if ($total <= 0.0) {
+            return [0.0, 0.0, 0.0];
+        }
+
+        return [$r / $total, $g / $total, $b / $total];
+    }
+
+    private function mean(array $values): float
+    {
+        return $values ? array_sum($values) / count($values) : 0.0;
     }
 
     // ---------------------------------------------------------------- helpers

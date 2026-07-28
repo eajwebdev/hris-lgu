@@ -420,6 +420,89 @@
             height: 100%;
             display: block;
         }
+        /* View switch. Two pills; the active one carries the accent. */
+        .mapviews {
+            display: flex;
+            gap: 8px;
+            padding: 0 14px 10px;
+        }
+        .mapview {
+            flex: 1 1 0;
+            appearance: none;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .05);
+            color: var(--muted);
+            font: inherit;
+            font-size: 12.5px;
+            font-weight: 700;
+            padding: 9px 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            transition: background .15s ease, color .15s ease, border-color .15s ease;
+        }
+        .mapview i { font-size: 12px; }
+        .mapview.is-on {
+            background: rgba(56, 224, 255, .14);
+            border-color: rgba(56, 224, 255, .45);
+            color: #DBF4FF;
+        }
+        .mapview:active { transform: scale(.98); }
+
+        /* The station list. Capped and scrollable so a municipality with a
+           dozen sites cannot push the footer off a phone screen. */
+        .stationlist {
+            margin: 10px 14px 0;
+            max-height: 34vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+        .stationrow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            text-align: left;
+            appearance: none;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .04);
+            color: var(--text);
+            font: inherit;
+            padding: 10px 12px;
+            cursor: pointer;
+        }
+        .stationrow.is-focused {
+            border-color: rgba(56, 224, 255, .55);
+            background: rgba(56, 224, 255, .10);
+        }
+        .stationrow__dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            flex: 0 0 auto;
+            background: var(--muted);
+        }
+        .stationrow.is-in  .stationrow__dot { background: var(--ok); box-shadow: 0 0 8px rgba(34,197,94,.8); }
+        .stationrow.is-out .stationrow__dot { background: #FCD34D; }
+        .stationrow__name { font-size: 13px; font-weight: 700; line-height: 1.25; }
+        .stationrow__meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
+        .stationrow__dist {
+            margin-left: auto;
+            font-size: 12px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            flex: 0 0 auto;
+        }
+        .stationrow.is-in  .stationrow__dist { color: #86EFAC; }
+        .stationrow.is-out .stationrow__dist { color: #FCD34D; }
+
         .mapsheet__foot {
             padding: 13px 18px calc(env(safe-area-inset-bottom) + 16px);
         }
@@ -562,13 +645,25 @@
             justify-content: center;
             pointer-events: none;
         }
-        /* Not pure #000: SCRFD still has to find the face on the dark segment,
-           and in an already-dim room a true black screen can take the last of
-           the fill light with it. This tone is a field-tuning knob — if a kiosk
-           starts timing out on dark segments, lift it before touching the
-           liveness thresholds. */
-        .flash--bright { background: #FFFFFF; }
+        /* The illumination palette. Saturated on purpose: the colour channel
+           the server looks for has to actually dominate what the face sends
+           back, and a pastel would not move the ratio enough to measure.
+
+           'dark' is not pure #000 — SCRFD still has to find the face on that
+           segment, and in an already-dim room a true black screen takes the
+           last of the fill light with it. That tone is a field-tuning knob: if
+           a kiosk starts timing out on dark segments, lift it before touching
+           any liveness threshold. */
+        .flash--white  { background: #FFFFFF; }
         .flash--dark   { background: #0A0A0A; }
+        .flash--red    { background: #FF2D2D; }
+        .flash--green  { background: #23FF6A; }
+        .flash--blue   { background: #2D6BFF; }
+
+        /* The hint has to stay readable on all five. */
+        .flash--red .flash__hint,
+        .flash--blue .flash__hint { color: rgba(255, 255, 255, .9); }
+        .flash--green .flash__hint { color: rgba(0, 0, 0, .6); }
         .flash__hint {
             font-size: 13px;
             font-weight: 700;
@@ -684,9 +779,25 @@
                 <i class="fas fa-xmark"></i>
             </button>
         </header>
+        {{-- Nearest is the default view and stays exactly as it was; "All
+             stations" is an additional lens on the same canvas. --}}
+        <div class="mapviews" role="tablist" aria-label="Map view">
+            <button type="button" class="mapview is-on" id="view-near" role="tab" aria-selected="true">
+                <i class="fas fa-location-crosshairs"></i> Nearest
+            </button>
+            <button type="button" class="mapview" id="view-all" role="tab" aria-selected="false">
+                <i class="fas fa-layer-group"></i> All stations
+            </button>
+        </div>
+
         <div class="mapsheet__stage">
             <canvas id="mapcanvas"></canvas>
         </div>
+
+        {{-- Every station, nearest first, with its distance. Only rendered in
+             the "All stations" view; tapping one focuses it on the map. --}}
+        <div class="stationlist d-none" id="stationlist"></div>
+
         <footer class="mapsheet__foot">
             <div class="mapsheet__dist" id="map-dist">Locating…</div>
             <div class="mapsheet__sub"  id="map-sub">Finding the station closest to you.</div>

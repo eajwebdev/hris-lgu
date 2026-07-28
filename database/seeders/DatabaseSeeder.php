@@ -27,17 +27,19 @@ class DatabaseSeeder extends Seeder
             SettingSeeder::class,       // 3. workflow wiring (needs employees)
         ]);
 
+        $default = config('auth.default_password');
+
         $this->command->newLine();
-        $this->command->info('Seeded. Sign-in accounts — change these passwords:');
+        $this->command->info('Seeded. Employee accounts are held on the change-password screen until the default is replaced:');
         $this->command->table(
             ['Sign in at', 'Username / Email', 'Password', 'Role'],
             [
-                ['/hr-admin', 'admin',                    'admin123',    'Administrator'],
-                ['/hr-admin', 'hradmin',                  'admin123',    'HR Administrator'],
-                ['/',         'mayor@mabinay.gov.ph',     'password123', 'Mayor (approves leave)'],
-                ['/',         'vicemayor@mabinay.gov.ph', 'password123', 'Vice Mayor (approves leave)'],
-                ['/',         'hr@mabinay.gov.ph',        'password123', 'HR head'],
-                ['/',         'employee@mabinay.gov.ph',  'password123', 'Employee'],
+                ['/hr-admin', 'admin',                    'admin123', 'Administrator'],
+                ['/hr-admin', 'hradmin',                  'admin123', 'HR Administrator'],
+                ['/',         'mayor@mabinay.gov.ph',     $default,   'Mayor (approves leave)'],
+                ['/',         'vicemayor@mabinay.gov.ph', $default,   'Vice Mayor (approves leave)'],
+                ['/',         'hr@mabinay.gov.ph',        $default,   'HR head'],
+                ['/',         'employee@mabinay.gov.ph',  $default,   'Employee'],
             ]
         );
     }

@@ -124,19 +124,28 @@ class AttendancePortalController extends Controller
             'nonce'                => ['required', 'string', 'max:64'],
             'frames'               => ['required', 'array', 'min:3', 'max:' . $maxFrames],
             // Straight-ahead 'neutral' frames first, then one 'pose' frame per
-            // gesture the challenge demanded (random per attempt), then one
-            // 'flash' frame per screen segment it demanded.
-            'frames.*.stage'       => ['required', Rule::in(['neutral', 'pose', 'flash'])],
+            // gesture the challenge demanded (random per attempt).
+            'frames.*.stage'       => ['required', Rule::in(['neutral', 'pose'])],
             'frames.*.pose'        => ['nullable', Rule::in(['left', 'right', 'up', 'down'])],
-            // Which screen colour was showing, and the face-crop luma read off
-            // that frame. Nullable here like 'pose' above — the meaning of a
-            // missing or mismatched value is settled in LivenessVerifier, not
-            // by a shape rule.
-            'frames.*.seg'         => ['nullable', Rule::in(['bright', 'dark'])],
-            'frames.*.faceLuma'    => ['nullable', 'numeric', 'between:0,255'],
             'frames.*.t'           => ['required', 'numeric'],
             'frames.*.descriptor'  => ['required', 'array', 'size:' . $dimension],
             'frames.*.descriptor.*'=> ['required', 'numeric'],
+            // The active-illumination samples: what the face and the
+            // background reflected under each screen colour, plus one
+            // embedding taken during the burst to bind those readings to the
+            // same person the frames above identified. Carried separately from
+            // 'frames' because these are light measurements, not face captures
+            // — only one of them costs an embedding.
+            'flash'                => ['nullable', 'array'],
+            'flash.samples'        => ['nullable', 'array', 'max:12'],
+            'flash.samples.*.seg'  => ['required', 'string', 'max:16'],
+            'flash.samples.*.t'    => ['required', 'numeric'],
+            'flash.samples.*.face' => ['required', 'array', 'size:3'],
+            'flash.samples.*.face.*'=> ['required', 'numeric', 'between:0,255'],
+            'flash.samples.*.bg'   => ['required', 'array', 'size:3'],
+            'flash.samples.*.bg.*' => ['required', 'numeric', 'between:0,255'],
+            'flash.descriptor'     => ['nullable', 'array', 'size:' . $dimension],
+            'flash.descriptor.*'   => ['required', 'numeric'],
             'qr'                   => ['nullable', 'string', 'max:512', 'required_if:mode,qr'],
             // Live-face probability from the browser's anti-spoof model: the
             // average across frames, and the single worst frame. Nullable at the
@@ -225,7 +234,7 @@ class AttendancePortalController extends Controller
         // answer: does this face drift frame-to-frame the way a living one does,
         // and did it perform the random gestures this challenge demanded, in the
         // order it demanded them?
-        $refusal = $this->liveness->check($employee, $frames, $challenge);
+        $refusal = $this->liveness->check($employee, $frames, $challenge, (array) ($validated['flash'] ?? []));
 
         if ($refusal !== null) {
             Log::warning('Portal liveness check failed.', [

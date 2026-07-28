@@ -119,4 +119,23 @@ return [
 
     'password_timeout' => 10800,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Default issued password
+    |--------------------------------------------------------------------------
+    |
+    | The password every new account is created with — by the seeders and by
+    | HR's "Add Employee" form. It is, by definition, known to everybody in the
+    | municipality, so it is treated as a placeholder rather than a credential:
+    | signing in with it still works, but the account cannot go anywhere until
+    | a new password is set (see EnsurePasswordChanged).
+    |
+    | Changing this does NOT re-issue anybody's password. It changes what new
+    | accounts get, and which existing password is recognised as "still the
+    | default" and therefore has to be replaced.
+    |
+    */
+
+    'default_password' => env('HRIS_DEFAULT_PASSWORD', 'password@123'),
+
 ];

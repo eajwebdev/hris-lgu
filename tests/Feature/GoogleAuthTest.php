@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Mockery;
@@ -102,7 +103,13 @@ class GoogleAuthTest extends TestCase
     public function test_an_employee_is_signed_in_by_their_username(): void
     {
         $employee = Employee::orderBy('id')->firstOrFail();
-        $employee->forceFill(['username' => 'by.username@mabinay.gov.ph', 'stat_1' => 1])->save();
+        $employee->forceFill([
+            'username' => 'by.username@mabinay.gov.ph',
+            'stat_1'   => 1,
+            // Their own password, so the change-password hold (covered in
+            // ForcePasswordChangeTest) does not stand in for the landing page.
+            'password' => Hash::make('TheirOwnPassword1'),
+        ])->save();
 
         $this->googleReturns('by.username@mabinay.gov.ph');
 
@@ -125,6 +132,7 @@ class GoogleAuthTest extends TestCase
             'username'  => '2026-9999',                  // as empCreate() writes it
             'org_email' => 'by.orgemail@mabinay.gov.ph',
             'stat_1'    => 1,
+            'password'  => Hash::make('TheirOwnPassword1'),
         ])->save();
 
         $this->googleReturns('by.orgemail@mabinay.gov.ph');
@@ -134,6 +142,28 @@ class GoogleAuthTest extends TestCase
             ->assertSessionHas('success');
 
         $this->assertTrue(auth()->guard('employee')->check());
+    }
+
+    /**
+     * Google vouches for who they are, not for the password on the record.
+     * "Continue with Google" must not become a way round the change-password
+     * hold that the password form enforces.
+     */
+    public function test_google_is_not_a_way_around_the_password_hold(): void
+    {
+        $employee = Employee::orderBy('id')->firstOrFail();
+        $employee->forceFill([
+            'username' => 'still.default@mabinay.gov.ph',
+            'stat_1'   => 1,
+            'password' => Hash::make(config('auth.default_password')),
+        ])->save();
+
+        $this->googleReturns('still.default@mabinay.gov.ph');
+
+        $this->get('/auth/google/callback')->assertRedirect(route('password.change'));
+
+        $this->assertTrue(auth()->guard('employee')->check());
+        $this->get(route('dashboard'))->assertRedirect(route('password.change'));
     }
 
     // ---------------------------------------------------------------- refusals

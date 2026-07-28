@@ -125,22 +125,47 @@ class AttendanceGeoTest extends TestCase
             $t += 600;
         }
 
-        // A face lit by the kiosk's own screen: luma tracks the segment. The
-        // flash check itself is exercised in AttendancePortalTest; here it only
-        // has to pass so the geo assertions are the ones under test.
-        foreach (($challenge['flash'] ?? []) as $seg) {
-            $frames[] = [
-                'stage'      => 'flash',
-                'pose'       => null,
-                'seg'        => $seg,
-                't'          => $t,
-                'descriptor' => $this->frame($person, null, $person + 700 + $t, 0.02),
-                'faceLuma'   => $seg === 'bright' ? 210.0 : 45.0,
-            ];
-            $t += 500;
+        return $frames;
+    }
+
+    /**
+     * Illumination samples a real face produces. The check itself is exercised
+     * in AttendancePortalTest; here it only has to pass, so the geo assertions
+     * are the ones actually under test.
+     */
+    private function flashPayload(int $person, array $challenge): ?array
+    {
+        $sequence = $challenge['flash'] ?? [];
+
+        if (! $sequence) {
+            return null;
         }
 
-        return $frames;
+        $face = [
+            'white' => [180.0, 180.0, 180.0],
+            'dark'  => [40.0, 40.0, 40.0],
+            'red'   => [190.0, 60.0, 55.0],
+            'green' => [60.0, 190.0, 60.0],
+            'blue'  => [55.0, 60.0, 190.0],
+        ];
+
+        $samples = [];
+        $t       = 6000;
+
+        foreach ($sequence as $seg) {
+            $samples[] = [
+                'seg'  => $seg,
+                't'    => $t,
+                'face' => $face[$seg] ?? [120.0, 120.0, 120.0],
+                // The wall behind barely moves: it is metres further from the
+                // kiosk's panel than the face is.
+                'bg'   => $seg === 'white' ? [52.0, 52.0, 52.0] : [46.0, 46.0, 46.0],
+            ];
+
+            $t += 400;
+        }
+
+        return ['samples' => $samples, 'descriptor' => $this->frame($person, null, $person + 700, 0.02)];
     }
 
     /** A live punch, optionally carrying a GPS fix. */
@@ -153,6 +178,7 @@ class AttendanceGeoTest extends TestCase
             'action'         => 'in',
             'nonce'          => $challenge['nonce'],
             'frames'         => $this->frames($person, $challenge),
+            'flash'          => $this->flashPayload($person, $challenge),
             'geo'            => $geo,
             // A live face passes both anti-spoof floors.
             'liveness_score' => 0.97,
@@ -273,8 +299,11 @@ class AttendanceGeoTest extends TestCase
         $far  = $this->frames(515, $challenge);
         $near = $this->frames(515, $challenge);
 
+        $flash = $this->flashPayload(515, $challenge);
+
         $this->postJson(route('attendancePunch'), [
             'mode' => 'face', 'action' => 'in', 'nonce' => $challenge['nonce'], 'frames' => $far,
+            'flash' => $flash,
             'geo' => ['lat' => self::HALL_LAT + 0.05, 'lng' => self::HALL_LNG],
             'liveness_score' => 0.97, 'liveness_min' => 0.90,
         ])->assertStatus(403);
@@ -282,6 +311,7 @@ class AttendanceGeoTest extends TestCase
         // Same nonce, now standing at the hall: still good.
         $this->postJson(route('attendancePunch'), [
             'mode' => 'face', 'action' => 'in', 'nonce' => $challenge['nonce'], 'frames' => $near,
+            'flash' => $flash,
             'geo' => ['lat' => self::HALL_LAT, 'lng' => self::HALL_LNG],
             'liveness_score' => 0.97, 'liveness_min' => 0.90,
         ])->assertOk()->assertJsonPath('recorded', true);

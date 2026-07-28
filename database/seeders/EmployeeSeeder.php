@@ -11,8 +11,9 @@ use Illuminate\Support\Facades\Hash;
  * Bootstrap personnel. The Mayor, Vice Mayor and HR head are required because
  * the leave workflow routes through them (see SettingSeeder).
  *
- * Every account below uses the password: password123
- * Change these immediately after the first sign-in.
+ * Every account below is issued config('auth.default_password'). That password
+ * is a placeholder, not a credential — signing in with it works, but the
+ * account is held on the change-password screen until a new one is set.
  *
  * NOTE: Employee::boot() hashes the password on `creating`, so a password
  * passed through the model would be hashed twice on insert (and left in plain
@@ -226,7 +227,7 @@ class EmployeeSeeder extends Seeder
             // Written directly, bypassing the model's creating() hook.
             DB::table('employees')
                 ->where('emp_ID', $person['emp_ID'])
-                ->update(['password' => Hash::make('password123')]);
+                ->update(['password' => Hash::make(config('auth.default_password'))]);
 
             foreach ($pdsSections as $section) {
                 $model = "App\\Models\\{$section}";

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\NoCacheMiddleware;
 use App\Http\Controllers\LoginAuthController;
 use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\MasterController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\TirednessController;
@@ -79,7 +80,16 @@ Route::prefix('attendance')->group(function () {
  */
 Route::get('/careers', [JobHiringController::class, 'portal'])->name('careersPortal');
 
-Route::group(['middleware' => ['login_auth', NoCacheMiddleware::class]], function() {
+Route::group(['middleware' => ['login_auth', 'password.changed', NoCacheMiddleware::class]], function() {
+
+    /*
+     * Replacing the issued password. Inside the authenticated group because
+     * only a signed-in account can change its own password, and named in
+     * EnsurePasswordChanged::ALLOWED so an account being held can still reach
+     * it — everything else in this group redirects here until it does.
+     */
+    Route::get('/change-password', [PasswordController::class, 'edit'])->name('password.change');
+    Route::post('/change-password', [PasswordController::class, 'update'])->name('password.change.update');
 
     /*
      * Attendance administration — the punch monitor and the station list.

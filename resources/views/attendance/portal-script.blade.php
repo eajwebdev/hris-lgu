@@ -35,6 +35,9 @@
         mapCanvas: document.getElementById('mapcanvas'),
         mapDist:   document.getElementById('map-dist'),
         mapSub:    document.getElementById('map-sub'),
+        viewNear:  document.getElementById('view-near'),
+        viewAll:   document.getElementById('view-all'),
+        stationList: document.getElementById('stationlist'),
         geohud:    document.getElementById('geohud'),
         geoDist:   document.getElementById('geo-distance'),
         geoNote:   document.getElementById('geo-note'),
@@ -71,6 +74,12 @@
     var luma = document.createElement('canvas');
     luma.width = luma.height = 32;
     var lumaCtx = luma.getContext('2d', { willReadFrequently: true });
+
+    // Colour sampling for the illumination challenge. 16x16 is plenty: the
+    // question is "what colour came back off this region", not what is in it.
+    var rgb = document.createElement('canvas');
+    rgb.width = rgb.height = 16;
+    var rgbCtx = rgb.getContext('2d', { willReadFrequently: true });
 
     var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
 
@@ -486,45 +495,10 @@
             if (typeof posed.real === 'number') reals.push(posed.real);
         }
 
-        // The screen-flash pass, last. It needs the WHOLE screen — which means
-        // it necessarily covers the guide and the pose cues — so it runs after
-        // the guided gestures rather than interrupting them. The server chose
-        // this sequence too: a replay device shows whatever was recorded no
-        // matter what this kiosk's screen does, and light reflected off a real
-        // face nearby is the one thing it cannot follow along with.
-        var flashSeq = challenge.flash || [];
-
-        if (flashSeq.length) {
-            showCue(null, 'Stay still — the screen will flash');
-            await sleep(500); // long enough to read it before the first flash
-
-            for (var f = 0; f < flashSeq.length; f++) {
-                var seg = flashSeq[f];
-
-                showFlash(seg);
-                await sleep(L.flashSettleMs || 220);
-
-                try {
-                    var lit = await captureFlashFrame();
-                } finally {
-                    // Never leave the screen stuck on a flash colour if the
-                    // capture throws — the veil/hint underneath would be
-                    // invisible behind it.
-                    hideFlash();
-                }
-
-                frames.push({
-                    stage: 'flash',
-                    pose: null,
-                    seg: seg,
-                    t: Math.round(performance.now() - t0),
-                    descriptor: Array.from(lit.descriptor),
-                    faceLuma: lit.faceLuma,
-                });
-
-                await sleep(120);
-            }
-        }
+        // The active-illumination pass, last. It needs the WHOLE screen — which
+        // covers the guide and the pose cues — so it runs after the guided
+        // gestures rather than interrupting them.
+        var flash = await runFlash(challenge.flash || [], t0);
 
         hideCue();
 
@@ -542,9 +516,74 @@
         return {
             nonce: challenge.nonce,
             frames: frames,
+            flash: flash,
             liveness: liveness,
             livenessMin: livenessMin,
         };
+    }
+
+    /**
+     * The active-illumination burst: paint a colour, read what comes back off
+     * the face AND off the background beside it, repeat.
+     *
+     * Fast on purpose. The old version ran a detection loop and a full ArcFace
+     * embedding for every segment, which is where most of the punch's waiting
+     * went. The face box barely moves across a burst this short, so it is
+     * located ONCE up front and reused; each segment after that costs two
+     * small canvas reads. A single embedding is taken mid-burst, purely to
+     * bind these light readings to the same person the pose frames identified.
+     *
+     * The background sample is the point of the whole thing. The screen is
+     * inches from the face and metres from the wall, so its light lands
+     * unevenly on a real person. When the "face" is a phone held to the lens,
+     * the entire frame is that phone's own display: both regions carry the
+     * same emitted light and rise together, and the difference collapses.
+     */
+    async function runFlash(sequence, t0) {
+        if (!sequence.length) return null;
+
+        showCue(null, 'Stay still — the screen will change colour');
+        await sleep(600); // time to read the cue before the first colour
+
+        // Locate the face once. Everything after this is arithmetic on pixels.
+        var lock = await captureFlashFrame();
+        var box  = lock.box;
+
+        var samples = [];
+        var settle  = L.flashSettleMs || 320;
+        var descriptor = null;
+
+        try {
+            for (var i = 0; i < sequence.length; i++) {
+                var seg = sequence[i];
+
+                showFlash(seg);
+                await sleep(settle);
+
+                samples.push({
+                    seg:  seg,
+                    t:    Math.round(performance.now() - t0),
+                    face: sampleRegion(box),
+                    bg:   sampleBackground(box),
+                });
+
+                // Mid-burst, while a colour is still up: proves the face the
+                // light was measured on is the enrolled employee.
+                if (descriptor === null && i === Math.floor(sequence.length / 2)) {
+                    var mid = (await detectFull())[0];
+
+                    if (mid) descriptor = Array.from(await FaceEngine.embed(el.video, mid));
+                }
+            }
+        } finally {
+            // Never leave the screen stuck on a colour: the hint underneath
+            // would be invisible behind it.
+            hideFlash();
+        }
+
+        if (!descriptor) descriptor = Array.from(lock.descriptor);
+
+        return { samples: samples, descriptor: descriptor };
     }
 
     async function getChallenge() {
@@ -606,19 +645,17 @@
     }
 
     /**
-     * One frame under the current screen colour, carrying the face-crop luma
-     * the server compares across segments.
+     * Locate the face once, before the colours start, and take the embedding
+     * that anchors the burst.
      *
-     * Deliberately does not run FaceEngine.antispoof() and contributes nothing
-     * to the `reals` average: MiniFASNet was calibrated on normally-lit frames,
-     * and folding a deliberately over- or under-exposed one into that average
-     * would let this check drag down the existing anti-spoof floor for real
-     * employees.
+     * Deliberately does not run FaceEngine.antispoof(): MiniFASNet was
+     * calibrated on normally-lit frames, and folding a deliberately over- or
+     * under-exposed one into the `reals` average would let this check drag
+     * down the existing anti-spoof floor for real employees.
      */
     async function captureFlashFrame() {
         // Shorter than captureAt()'s deadline — there is no gesture to wait on
-        // here, only framing, and a long stall would leave the screen sitting
-        // on a flash colour with nothing happening.
+        // here, only framing.
         var deadline = performance.now() + 6000;
 
         while (performance.now() < deadline) {
@@ -636,7 +673,6 @@
 
             if (full) {
                 full.descriptor = await FaceEngine.embed(el.video, full);
-                full.faceLuma   = brightnessOf(full.box);
 
                 return full;
             }
@@ -645,6 +681,70 @@
         }
 
         throw new Error('Face check timed out. Please try again.');
+    }
+
+    /**
+     * Mean [r, g, b] of a region of the current video frame, read through a
+     * tiny offscreen canvas — the same trick brightnessOf() uses, kept small
+     * because a 16x16 average is all the precision this needs and it costs
+     * almost nothing to take.
+     */
+    function sampleRegion(rect) {
+        var v = el.video;
+        var sx = Math.max(0, Math.round(rect.x));
+        var sy = Math.max(0, Math.round(rect.y));
+        var sw = Math.min(Math.round(rect.width),  v.videoWidth  - sx);
+        var sh = Math.min(Math.round(rect.height), v.videoHeight - sy);
+
+        if (sw <= 1 || sh <= 1) return [0, 0, 0];
+
+        rgbCtx.drawImage(v, sx, sy, sw, sh, 0, 0, 16, 16);
+
+        var d = rgbCtx.getImageData(0, 0, 16, 16).data;
+        var r = 0, g = 0, b = 0, n = d.length / 4;
+
+        for (var i = 0; i < d.length; i += 4) {
+            r += d[i]; g += d[i + 1]; b += d[i + 2];
+        }
+
+        return [r / n, g / n, b / n];
+    }
+
+    /**
+     * The scene beside the head: two vertical strips outside the face box,
+     * averaged.
+     *
+     * Sampled to the sides rather than above or below because that is where
+     * the room actually is — above the head is often ceiling glare and below
+     * is the subject's own chest, which is lit almost as strongly as the face
+     * and would blunt the very difference this is measuring. Falls back to the
+     * frame edges when the face fills the width.
+     */
+    function sampleBackground(box) {
+        var v = el.video;
+        var w = Math.max(8, Math.round(box.width * 0.35));
+        var leftX  = Math.round(box.x) - w;
+        var rightX = Math.round(box.x + box.width);
+
+        var strips = [];
+
+        if (leftX >= 0) {
+            strips.push(sampleRegion({ x: leftX, y: box.y, width: w, height: box.height }));
+        }
+        if (rightX + w <= v.videoWidth) {
+            strips.push(sampleRegion({ x: rightX, y: box.y, width: w, height: box.height }));
+        }
+
+        if (!strips.length) {
+            // Face spans the frame — read the extreme edges instead. A phone
+            // held this close is exactly the case that must not escape the
+            // check by leaving nowhere to sample.
+            strips.push(sampleRegion({ x: 0, y: 0, width: Math.max(8, v.videoWidth * 0.08), height: v.videoHeight }));
+        }
+
+        return [0, 1, 2].map(function (c) {
+            return strips.reduce(function (sum, s) { return sum + s[c]; }, 0) / strips.length;
+        });
     }
 
     // ---------------------------------------------------------------- punch
@@ -691,6 +791,7 @@
                 action: state.action,
                 nonce:  run.nonce,
                 frames: run.frames,
+                flash:  run.flash,
                 liveness_score: run.liveness,
                 liveness_min:   run.livenessMin,
                 geo:    freshGeo(),
@@ -756,9 +857,14 @@
         el.cue.classList.add('d-none');
     }
 
+    var FLASH_SEGMENTS = ['white', 'dark', 'red', 'green', 'blue'];
+
     function showFlash(seg) {
-        el.flash.classList.remove('flash--bright', 'flash--dark', 'd-none');
-        el.flash.classList.add(seg === 'bright' ? 'flash--bright' : 'flash--dark');
+        el.flash.classList.remove('d-none');
+
+        FLASH_SEGMENTS.forEach(function (s) {
+            el.flash.classList.toggle('flash--' + s, s === seg);
+        });
     }
 
     function hideFlash() {
@@ -1230,6 +1336,9 @@
         var view   = null;   // { scale, cx, cy }
         var target = null;
         var origin = null;   // projection origin { lat, lng }
+        var mode      = 'near'; // near | all — 'near' is the default on purpose
+        var focused   = null;   // a station picked from the list, or null
+        var listTimer = null;   // refreshes the rows' distances while open
 
         function ease(a, b, t) { return a + (b - a) * t; }
 
@@ -1273,7 +1382,15 @@
             var W = canvas.clientWidth, H = canvas.clientHeight;
             var pts = [];
 
+            // Focusing one station from the list narrows the frame to it (and
+            // to the employee, so the relationship stays legible). Otherwise
+            // every station has to fit, which is what both views want by
+            // default — "Nearest" only differs in what it emphasises.
+            var only = focused;
+
             stations().forEach(function (s) {
+                if (only && s !== only) return;
+
                 var m = project(s.lat, s.lng);
                 var r = s.radius_m || 50;
                 pts.push({ x: m.x - r, y: m.y - r });
@@ -1433,6 +1550,25 @@
         function updateFoot(best) {
             el.mapSheet.classList.remove('is-ok', 'is-far');
 
+            // A station picked from the list speaks for itself, fix or no fix.
+            if (focused) {
+                var d      = distanceTo(focused);
+                var radius = focused.radius_m || 50;
+
+                el.mapDist.textContent = focused.name;
+
+                if (d === null) {
+                    el.mapSub.textContent = 'Range ' + radius + 'm — waiting for your location.';
+                    return;
+                }
+
+                el.mapSheet.classList.add(d <= radius ? 'is-ok' : 'is-far');
+                el.mapSub.textContent = d <= radius
+                    ? fmtMeters(d) + ' away — you can clock in here.'
+                    : fmtMeters(d) + ' away — you must be within ' + radius + 'm to clock in here.';
+                return;
+            }
+
             if (!state.geo) {
                 el.mapDist.textContent = 'Locating…';
                 el.mapSub.textContent  = 'Waiting for your GPS position. Make sure location is turned on.';
@@ -1463,23 +1599,132 @@
             drawGrid(W, H, t);
 
             var best   = state.geo ? nearestStation(state.geo.lat, state.geo.lng) : null;
-            var nearPx = null;
+            // Whichever station the route and the footer are about: the one
+            // picked from the list, else the nearest.
+            var subject = focused || (best && best.station);
+            var subjPx  = null;
 
             stations().forEach(function (s) {
-                var p      = toPx(project(s.lat, s.lng));
-                var rPx    = (s.radius_m || 50) * view.scale;
-                var isNear = best && best.station === s;
-                drawStation(p, rPx, s, isNear, t);
-                if (isNear) nearPx = p;
+                var p   = toPx(project(s.lat, s.lng));
+                var rPx = (s.radius_m || 50) * view.scale;
+                var lit = s === subject;
+
+                drawStation(p, rPx, s, lit, t);
+
+                if (lit) subjPx = p;
             });
 
             if (state.geo) {
                 var userPx = toPx(project(state.geo.lat, state.geo.lng));
-                if (nearPx && best) drawRoute(userPx, nearPx, best, t);
+
+                if (subjPx && subject) {
+                    drawRoute(userPx, subjPx, { station: subject, distance: distanceTo(subject) }, t);
+                }
+
                 drawUser(userPx, t);
             }
 
             updateFoot(best);
+        }
+
+        /** Metres from the employee to a station, or null without a fix. */
+        function distanceTo(station) {
+            if (!state.geo) return null;
+
+            return Math.round(haversine(state.geo.lat, state.geo.lng, station.lat, station.lng));
+        }
+
+        /**
+         * Every station, nearest first. Built only while the list is on screen
+         * — there is no point re-rendering rows nobody is looking at, and the
+         * map's animation loop runs at 60fps beside it.
+         */
+        function renderList() {
+            if (mode !== 'all') return;
+
+            var rows = stations().map(function (s) {
+                return { station: s, distance: distanceTo(s) };
+            });
+
+            rows.sort(function (a, b) {
+                if (a.distance === null) return 1;
+                if (b.distance === null) return -1;
+                return a.distance - b.distance;
+            });
+
+            el.stationList.innerHTML = '';
+
+            if (!rows.length) {
+                var empty = document.createElement('div');
+                empty.className = 'mapsheet__sub';
+                empty.textContent = 'No attendance stations have been set up yet.';
+                el.stationList.appendChild(empty);
+                return;
+            }
+
+            rows.forEach(function (row) {
+                var radius = row.station.radius_m || 50;
+                var inside = row.distance !== null && row.distance <= radius;
+
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'stationrow'
+                    + (row.distance === null ? '' : (inside ? ' is-in' : ' is-out'))
+                    + (focused === row.station ? ' is-focused' : '');
+
+                var dot = document.createElement('span');
+                dot.className = 'stationrow__dot';
+
+                var text = document.createElement('span');
+
+                var name = document.createElement('span');
+                name.className = 'stationrow__name';
+                name.textContent = row.station.name;
+
+                var meta = document.createElement('span');
+                meta.className = 'stationrow__meta';
+                meta.style.display = 'block';
+                meta.textContent = row.distance === null
+                    ? 'Range ' + radius + 'm · waiting for your location'
+                    : (inside ? 'Within range · you can clock in here' : 'Outside range · ' + radius + 'm needed');
+
+                text.appendChild(name);
+                text.appendChild(meta);
+
+                var dist = document.createElement('span');
+                dist.className = 'stationrow__dist';
+                dist.textContent = row.distance === null ? '—' : fmtMeters(row.distance);
+
+                btn.appendChild(dot);
+                btn.appendChild(text);
+                btn.appendChild(dist);
+
+                btn.addEventListener('click', function () {
+                    // Tapping the focused one again clears it, so the employee
+                    // can get back to the whole picture without the toggle.
+                    focused = (focused === row.station) ? null : row.station;
+                    renderList();
+                });
+
+                el.stationList.appendChild(btn);
+            });
+        }
+
+        // Named for the map, not the camera: there is a separate setMode() in
+        // the outer scope that switches face/QR, and the two must not be
+        // confused for one another.
+        function setMapView(next) {
+            mode    = next;
+            focused = null;
+
+            el.viewNear.classList.toggle('is-on', next === 'near');
+            el.viewAll.classList.toggle('is-on',  next === 'all');
+            el.viewNear.setAttribute('aria-selected', String(next === 'near'));
+            el.viewAll.setAttribute('aria-selected',  String(next === 'all'));
+
+            el.stationList.classList.toggle('d-none', next !== 'all');
+
+            renderList();
         }
 
         function frame(ts) {
@@ -1518,9 +1763,13 @@
             el.mapSheet.setAttribute('aria-hidden', 'false');
             open = true;
             origin = null; view = null; target = null;
+            setMapView('near');   // always opens on the nearest-station view
             resize();
             if (raf) cancelAnimationFrame(raf);
             raf = requestAnimationFrame(frame);
+
+            // The distances on the rows are only as fresh as the last fix.
+            listTimer = setInterval(renderList, 5000);
         }
 
         function closeMap() {
@@ -1528,10 +1777,14 @@
             el.mapSheet.classList.add('d-none');
             el.mapSheet.setAttribute('aria-hidden', 'true');
             if (raf) { cancelAnimationFrame(raf); raf = null; }
+            if (listTimer) { clearInterval(listTimer); listTimer = null; }
         }
 
         window.addEventListener('resize', function () { if (open) resize(); });
         document.addEventListener('keydown', function (e) { if (open && e.key === 'Escape') closeMap(); });
+
+        el.viewNear.addEventListener('click', function () { setMapView('near'); });
+        el.viewAll.addEventListener('click',  function () { setMapView('all'); });
 
         return { open: openMap, close: closeMap };
     })();

@@ -187,7 +187,12 @@ class EmployeeController extends Controller
         }        
 
         $newEmpID = $request->emp_ID;
-        $password = $newEmpID;
+
+        // The issued placeholder, not a credential — the employee is held on
+        // the change-password screen until they replace it. Using the employee
+        // ID here (as this once did) was worse than a shared default: the ID is
+        // printed on their badge, so anyone reading it knew their password.
+        $password = config('auth.default_password');
 
         $employee = new Employee([
             'profile' => $fullFileName,
