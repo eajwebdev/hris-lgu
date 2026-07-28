@@ -24,6 +24,11 @@
                                     <input type="text" name="item_no" class="form-control form-control-sm" id="item_no" placeholder="N/A" autocomplete="off">
                                 </div>
                                 <div class="col-md-2">
+                                    <label class="badge badge-secondary lbel">Employee ID</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span><br>
+                                    <input type="text" name="emp_ID" id="emp_ID" class="form-control form-control-sm" placeholder="e.g. 1234-56" autocomplete="off" required>
+                                    <small id="emp_ID_feedback" class="form-text"></small>
+                                </div>
+                                <div class="col-md-2">
                                     <label class="badge badge-secondary lbel">Last Name</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span><br>
                                     <input type="text" name="lname" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" required>
                                 </div>

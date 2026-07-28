@@ -13,6 +13,17 @@ class GoogleAuthController extends Controller
 {
     public function redirectToGoogle()
     {
+        // Without credentials Socialite still builds a redirect, and the
+        // employee lands on a raw Google "invalid_request" page with no way
+        // back. Catching it here keeps the failure inside the app, where the
+        // sign-in form can say what is actually wrong.
+        if (! $this->configured()) {
+            Log::error('Google OAuth is not configured: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are empty.');
+
+            return redirect()->route('getLogin')
+                ->with('error', 'Google sign-in is not set up yet. Please use your HRIS username and password, or contact HR.');
+        }
+
         return Socialite::driver('google')->redirect();
     }
 
@@ -22,12 +33,29 @@ class GoogleAuthController extends Controller
      */
     public function handleGoogleCallback()
     {
+        if (! $this->configured()) {
+            return redirect()->route('getLogin')
+                ->with('error', 'Google sign-in is not set up yet. Please use your HRIS username and password, or contact HR.');
+        }
+
         try {
             $google_user = Socialite::driver('google')->user();
-            $email = $google_user->getEmail();
+            $email = trim((string) $google_user->getEmail());
+
+            if ($email === '') {
+                return redirect()->route('getLogin')
+                    ->with('error', 'Google did not share an email address with us. Please contact HR for assistance.');
+            }
 
             $user = User::where('username', $email)->first();
-            $employee = Employee::where('username', $email)->first();
+
+            // Matched the same way the password form matches them: an employee
+            // added through the HR form carries their emp_ID as the username
+            // and their address in org_email, so matching on username alone
+            // would lock exactly those people out of Google sign-in.
+            $employee = Employee::where('username', $email)
+                ->orWhere('org_email', $email)
+                ->first();
 
             if (!$user && !$employee) {
                 return redirect()->route('getLogin')
@@ -51,6 +79,17 @@ class GoogleAuthController extends Controller
             return redirect()->route('getLogin')
                 ->with('error', 'There was an issue with Google OAuth. Please try again.');
         }
+    }
+
+    /**
+     * Whether Google sign-in has actually been given credentials. The keys ship
+     * in .env as empty placeholders, so their presence proves nothing.
+     */
+    private function configured(): bool
+    {
+        return filled(config('services.google.client_id'))
+            && filled(config('services.google.client_secret'))
+            && filled(config('services.google.redirect'));
     }
 
     /**

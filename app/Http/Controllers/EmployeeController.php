@@ -138,11 +138,19 @@ class EmployeeController extends Controller
         return view("emp.empadd", compact('guard', 'offices', 'stat', 'quali', 'regions', 'supervisor'));
     }
 
+    public function checkEmpId($empID)
+    {
+        $exists = Employee::where('emp_ID', $empID)->exists();
+
+        return response()->json(['exists' => $exists]);
+    }
+
     public function empCreate(Request $request)
     {
         $validated = $request->validate([
             'lname' => 'required|string',
             'fname' => 'required|string',
+            'emp_ID' => 'required|string|max:255|unique:employees,emp_ID',
         ]);
 
         $existingEmployee = Employee::where('lname', $request->lname)
@@ -178,18 +186,8 @@ class EmployeeController extends Controller
             }
         }        
 
-        $lastEmployee = Employee::orderBy('emp_ID', 'desc')->first();
-
-        if ($lastEmployee) {
-            $lastEmpID = $lastEmployee->emp_ID;
-            $lastNumericPart = (int)substr($lastEmpID, 3);
-            $newNumericPart = $lastNumericPart + 1;
-            $newEmpID = 'EMP' . str_pad($newNumericPart, 4, '0', STR_PAD_LEFT);
-        } else {
-            $newEmpID = 'EMP0001';
-            
-        }
-        $password = substr($newEmpID, 0, 3).substr($newEmpID, 3);
+        $newEmpID = $request->emp_ID;
+        $password = $newEmpID;
 
         $employee = new Employee([
             'profile' => $fullFileName,

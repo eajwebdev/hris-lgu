@@ -33,7 +33,7 @@ class LoginAuthController extends Controller
         return view('login');
     }
     
-    protected function postLogin(Request $request)
+    public function postLogin(Request $request)
     {
         // The field accepts either a username or an email address. Older forms
         // posted it as "username", so both names are honoured.

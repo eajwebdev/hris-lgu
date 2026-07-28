@@ -37,7 +37,9 @@
         mapSub:    document.getElementById('map-sub'),
         geohud:    document.getElementById('geohud'),
         geoDist:   document.getElementById('geo-distance'),
+        geoNote:   document.getElementById('geo-note'),
         geoCoords: document.getElementById('geo-coords'),
+        flash:     document.getElementById('flash'),
         named:     document.getElementById('named'),
         namedName: document.getElementById('named-name'),
         namedPos:  document.getElementById('named-pos'),
@@ -202,6 +204,33 @@
         }
         if (sharpnessOf(box) < T.min_sharpness) {
             return { ok: false, message: 'Hold still — the image is blurry', detection: d };
+        }
+
+        return { ok: true, detection: d, message: 'Ready' };
+    }
+
+    /**
+     * gateOf() minus the brightness and sharpness floors.
+     *
+     * Both of those read how much light is reaching the sensor — brightnessOf()
+     * measures it directly, and sharpnessOf()'s Laplacian variance collapses on
+     * a low-signal frame for the same underlying reason rather than from motion.
+     * Driving that signal up and down is the entire point of a flash segment, so
+     * gateOf()'s floors would refuse to capture the dark segment every single
+     * time. Framing quality — a single face, close enough, confidently detected —
+     * does not depend on scene brightness, so those checks stay.
+     */
+    function flashGateOf(detections) {
+        if (!detections.length)    return { ok: false, message: 'No face detected' };
+        if (detections.length > 1) return { ok: false, message: 'Only one person should be visible' };
+
+        var d = detections[0];
+
+        if (d.box.width / el.video.videoWidth < T.min_face_ratio) {
+            return { ok: false, message: 'Please move closer to the camera', detection: d };
+        }
+        if (d.score < T.min_detection_score) {
+            return { ok: false, message: 'Please position your face properly', detection: d };
         }
 
         return { ok: true, detection: d, message: 'Ready' };
@@ -457,6 +486,46 @@
             if (typeof posed.real === 'number') reals.push(posed.real);
         }
 
+        // The screen-flash pass, last. It needs the WHOLE screen — which means
+        // it necessarily covers the guide and the pose cues — so it runs after
+        // the guided gestures rather than interrupting them. The server chose
+        // this sequence too: a replay device shows whatever was recorded no
+        // matter what this kiosk's screen does, and light reflected off a real
+        // face nearby is the one thing it cannot follow along with.
+        var flashSeq = challenge.flash || [];
+
+        if (flashSeq.length) {
+            showCue(null, 'Stay still — the screen will flash');
+            await sleep(500); // long enough to read it before the first flash
+
+            for (var f = 0; f < flashSeq.length; f++) {
+                var seg = flashSeq[f];
+
+                showFlash(seg);
+                await sleep(L.flashSettleMs || 220);
+
+                try {
+                    var lit = await captureFlashFrame();
+                } finally {
+                    // Never leave the screen stuck on a flash colour if the
+                    // capture throws — the veil/hint underneath would be
+                    // invisible behind it.
+                    hideFlash();
+                }
+
+                frames.push({
+                    stage: 'flash',
+                    pose: null,
+                    seg: seg,
+                    t: Math.round(performance.now() - t0),
+                    descriptor: Array.from(lit.descriptor),
+                    faceLuma: lit.faceLuma,
+                });
+
+                await sleep(120);
+            }
+        }
+
         hideCue();
 
         // Two statistics travel with the punch. The average keeps one unlucky
@@ -531,6 +600,48 @@
             }
 
             await sleep(90);
+        }
+
+        throw new Error('Face check timed out. Please try again.');
+    }
+
+    /**
+     * One frame under the current screen colour, carrying the face-crop luma
+     * the server compares across segments.
+     *
+     * Deliberately does not run FaceEngine.antispoof() and contributes nothing
+     * to the `reals` average: MiniFASNet was calibrated on normally-lit frames,
+     * and folding a deliberately over- or under-exposed one into that average
+     * would let this check drag down the existing anti-spoof floor for real
+     * employees.
+     */
+    async function captureFlashFrame() {
+        // Shorter than captureAt()'s deadline — there is no gesture to wait on
+        // here, only framing, and a long stall would leave the screen sitting
+        // on a flash colour with nothing happening.
+        var deadline = performance.now() + 6000;
+
+        while (performance.now() < deadline) {
+            var gate = flashGateOf(await detectCheap());
+
+            drawBox(gate.detection, gate.ok);
+
+            if (!gate.ok) {
+                setHint(gate.message, 'bad');
+                await sleep(60);
+                continue;
+            }
+
+            var full = (await detectFull())[0];
+
+            if (full) {
+                full.descriptor = await FaceEngine.embed(el.video, full);
+                full.faceLuma   = brightnessOf(full.box);
+
+                return full;
+            }
+
+            await sleep(60);
         }
 
         throw new Error('Face check timed out. Please try again.');
@@ -643,6 +754,15 @@
 
     function hideCue() {
         el.cue.classList.add('d-none');
+    }
+
+    function showFlash(seg) {
+        el.flash.classList.remove('flash--bright', 'flash--dark', 'd-none');
+        el.flash.classList.add(seg === 'bright' ? 'flash--bright' : 'flash--dark');
+    }
+
+    function hideFlash() {
+        el.flash.classList.add('d-none');
     }
 
     function showName(employee) {
@@ -847,6 +967,41 @@
 
     // ---------------------------------------------------------------- boot
 
+    /**
+     * Whether the perimeter is currently a hard gate — enforcement on, and at
+     * least one station to be inside of.
+     */
+    function geofenceEnforced() {
+        return !!(CONFIG.geofence && CONFIG.geofence.enforce)
+            && (CONFIG.stations || []).length > 0;
+    }
+
+    /**
+     * A courtesy refusal, not the gate. Stopping here only saves a wasted
+     * camera pass and a burned challenge when the last fix already makes the
+     * outcome obvious. The server re-derives the same distance from the same
+     * station table and is the one that actually decides — nothing in this file
+     * can be trusted, since anyone holding the phone can edit it.
+     */
+    function geofencePreflight() {
+        if (!geofenceEnforced()) return null;
+
+        var geo = freshGeo();
+
+        if (!geo) {
+            return 'Location is required to clock in here. Enable location access and try again.';
+        }
+
+        var near = nearestStation(geo.lat, geo.lng);
+
+        if (near && near.distance > near.station.radius_m) {
+            return 'You are ' + fmtMeters(near.distance) + ' from ' + near.station.name
+                 + ' — move within ' + near.station.radius_m + 'm to clock in.';
+        }
+
+        return null;
+    }
+
     // Each action button both picks in/out and fires the punch — one tap records
     // the time, no separate confirm.
     el.actions.forEach(function (btn) {
@@ -854,6 +1009,16 @@
             if (state.busy) return; // not mid-sequence
 
             state.action = btn.dataset.action;
+
+            // Refused before the camera work starts, so state.busy is never
+            // taken and the next tap is immediate.
+            var blocked = geofencePreflight();
+
+            if (blocked) {
+                setHint(blocked, 'bad');
+                return;
+            }
+
             punch();
         });
     });
@@ -907,15 +1072,21 @@
 
     /**
      * The live location readout over the camera: nearest station, distance, and
-     * the raw fix. Amber when outside the station radius — with the reassurance
-     * that the punch still counts, just flagged for HR. Courtesy only: the
-     * server re-derives all of this at punch time.
+     * the raw fix. Amber when outside the station radius. The note line says
+     * what being out of range actually costs, which depends on whether the
+     * perimeter is enforced — so it is written here rather than hardcoded in the
+     * markup. Courtesy only: the server re-derives all of this at punch time.
      */
     function updateGeoHud() {
         el.geohud.classList.remove('geohud--ok', 'geohud--far');
 
         if (!state.geo) {
-            el.geoDist.textContent = 'Location off — punch is recorded without location';
+            el.geoDist.textContent = geofenceEnforced()
+                ? 'Location off — required to clock in here'
+                : 'Location off — punch is recorded without location';
+            el.geoNote.textContent = geofenceEnforced()
+                ? 'Enable location access to clock in.'
+                : '';
             el.geoCoords.textContent = 'Lat —, Lng —';
             return;
         }
@@ -928,15 +1099,20 @@
 
         if (!near) {
             el.geoDist.textContent = 'No attendance station configured';
+            el.geoNote.textContent = '';
             return;
         }
 
         if (near.distance <= near.station.radius_m) {
             el.geohud.classList.add('geohud--ok');
             el.geoDist.textContent = near.station.name + ' · ' + fmtMeters(near.distance) + ' away — within range';
+            el.geoNote.textContent = '';
         } else {
             el.geohud.classList.add('geohud--far');
             el.geoDist.textContent = fmtMeters(near.distance) + ' from ' + near.station.name + ' — outside station range';
+            el.geoNote.textContent = geofenceEnforced()
+                ? 'Move within ' + near.station.radius_m + 'm of ' + near.station.name + ' to clock in.'
+                : 'You can still clock in — this punch will be flagged for HR clarification.';
         }
     }
 

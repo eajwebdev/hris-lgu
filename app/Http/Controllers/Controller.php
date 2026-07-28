@@ -194,7 +194,12 @@ class Controller extends BaseController
 
     public function __construct()
     {
-        if (app()->runningInConsole()) {
+        // Artisan commands have no view to share into. Tests are the exception:
+        // they run through the console SAPI but do render views, and skipping
+        // the share left every page built on layouts.master dying on an
+        // undefined $notificationsCount — which hid ten real tests behind a
+        // failure that never happens to an actual visitor.
+        if (app()->runningInConsole() && ! app()->runningUnitTests()) {
             return;
         }
 

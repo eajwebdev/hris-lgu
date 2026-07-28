@@ -124,9 +124,16 @@ class AttendancePortalController extends Controller
             'nonce'                => ['required', 'string', 'max:64'],
             'frames'               => ['required', 'array', 'min:3', 'max:' . $maxFrames],
             // Straight-ahead 'neutral' frames first, then one 'pose' frame per
-            // gesture the challenge demanded (random per attempt).
-            'frames.*.stage'       => ['required', Rule::in(['neutral', 'pose'])],
+            // gesture the challenge demanded (random per attempt), then one
+            // 'flash' frame per screen segment it demanded.
+            'frames.*.stage'       => ['required', Rule::in(['neutral', 'pose', 'flash'])],
             'frames.*.pose'        => ['nullable', Rule::in(['left', 'right', 'up', 'down'])],
+            // Which screen colour was showing, and the face-crop luma read off
+            // that frame. Nullable here like 'pose' above — the meaning of a
+            // missing or mismatched value is settled in LivenessVerifier, not
+            // by a shape rule.
+            'frames.*.seg'         => ['nullable', Rule::in(['bright', 'dark'])],
+            'frames.*.faceLuma'    => ['nullable', 'numeric', 'between:0,255'],
             'frames.*.t'           => ['required', 'numeric'],
             'frames.*.descriptor'  => ['required', 'array', 'size:' . $dimension],
             'frames.*.descriptor.*'=> ['required', 'numeric'],
@@ -137,13 +144,25 @@ class AttendancePortalController extends Controller
             // average is refused below — fail closed, not open.
             'liveness_score'       => ['nullable', 'numeric', 'between:0,1'],
             'liveness_min'         => ['nullable', 'numeric', 'between:0,1'],
-            // Optional on purpose: an employee with location services off can
-            // still punch — the missing fix is itself recorded for HR to see.
+            // Shape-optional; whether a missing fix is *acceptable* is a policy
+            // question answered by geofenceBlock() below, not by this rule.
             'geo'                  => ['nullable', 'array'],
             'geo.lat'              => ['required_with:geo', 'numeric', 'between:-90,90'],
             'geo.lng'              => ['required_with:geo', 'numeric', 'between:-180,180'],
             'geo.accuracy'         => ['nullable', 'numeric', 'between:0,100000'],
         ]);
+
+        // The perimeter is judged first, and deliberately before the challenge
+        // is redeemed: standing in the wrong place says nothing about whether
+        // the face is alive, so it must not burn the employee's single-use
+        // challenge on their way to being told to walk closer.
+        $geoLat = isset($validated['geo']['lat']) ? (float) $validated['geo']['lat'] : null;
+        $geoLng = isset($validated['geo']['lng']) ? (float) $validated['geo']['lng'] : null;
+        $geoTag = $this->geo->resolve($geoLat, $geoLng);
+
+        if ($refusal = $this->geofenceBlock($geoLat, $geoLng, $geoTag)) {
+            return $this->fail($refusal, 403);
+        }
 
         // Burned on the first attempt, pass or fail — see LivenessVerifier::redeem.
         $challenge = $this->liveness->redeem($validated['nonce'], $request->ip());
@@ -283,7 +302,7 @@ class AttendancePortalController extends Controller
             ], 429);
         }
 
-        $location = $this->tagLocation($request, $employee, $validated, $result);
+        $location = $this->tagLocation($request, $employee, $validated, $result, $geoTag);
 
         Log::info('Portal attendance punch.', [
             'emp_ID'   => $employee->emp_ID,
@@ -310,19 +329,67 @@ class AttendancePortalController extends Controller
     }
 
     /**
+     * The perimeter, when the operator has one configured and turned on.
+     *
+     * Returns null when the punch may proceed, or a human-readable reason when
+     * it may not. Unlike every other refusal in this controller the reason here
+     * is specific on purpose: "you are 2.3km from Municipal Hall" is something
+     * the employee can act on by walking, and it leaks nothing an attacker
+     * standing there does not already know.
+     *
+     * No active stations at all never blocks. Nothing is configured to be
+     * inside of yet, and refusing every punch in the municipality because
+     * somebody has not filled in the stations table would be a misconfiguration
+     * taking attendance down, not a security control.
+     */
+    private function geofenceBlock(?float $lat, ?float $lng, array $tag): ?string
+    {
+        if (! config('attendance.geofence.enforce', true)) {
+            return null;
+        }
+
+        if ($lat === null || $lng === null) {
+            if (! AttendanceStation::active()->exists()) {
+                return null;
+            }
+
+            return 'Location is required to clock in here. Please enable location access and try again.';
+        }
+
+        // resolve() already answers "was there anything to compare against":
+        // station_id stays null only when no active station exists, since a
+        // real fix always matches some nearest one once any station does.
+        if ($tag['station_id'] === null) {
+            return null;
+        }
+
+        if ($tag['out_of_range'] === true) {
+            $distance = $tag['distance_m'] >= 1000
+                ? round($tag['distance_m'] / 1000, 1) . 'km'
+                : $tag['distance_m'] . 'm';
+
+            return "You are {$distance} from {$tag['station_name']} — you must be within {$tag['radius_m']}m to clock in.";
+        }
+
+        return null;
+    }
+
+    /**
      * Tag the punch with where it happened and keep the row HR's monitor reads.
      *
-     * The tag never blocks anything — the punch has already been written by the
-     * time this runs. It exists so a punch made far from every station carries
-     * its distance on the record, and nobody has to have the "where were you"
-     * conversation from memory.
+     * The geometry is passed in rather than re-resolved: geofenceBlock() above
+     * already computed it to decide whether this punch was allowed at all, and
+     * a punch should be recorded against the exact tag it was judged by.
+     *
+     * With enforcement on, an out-of-range punch never reaches this method —
+     * it was refused before the employee was even identified. The flag-and-
+     * record path below therefore only runs when an operator has explicitly
+     * turned enforcement off, which is a supported mode, not a leftover.
      */
-    private function tagLocation(Request $request, Employee $employee, array $validated, array $result): array
+    private function tagLocation(Request $request, Employee $employee, array $validated, array $result, array $tag): array
     {
         $lat = isset($validated['geo']['lat']) ? (float) $validated['geo']['lat'] : null;
         $lng = isset($validated['geo']['lng']) ? (float) $validated['geo']['lng'] : null;
-
-        $tag = $this->geo->resolve($lat, $lng);
 
         if ($result['recorded']) {
             $log = AttendancePunchLog::create([

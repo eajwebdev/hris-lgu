@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AttendancePunchLog;
 use App\Models\AttendanceStation;
+use App\Models\Dtr;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\FaceEmbeddingService;
@@ -104,13 +105,13 @@ class AttendanceGeoTest extends TestCase
         $this->faces->storeVector($employee->id, $master);
     }
 
-    /** A live punch, optionally carrying a GPS fix. */
-    private function livePunch(int $person, ?array $geo)
+    /**
+     * A straight-ahead run, then one frame per gesture the challenge chose, in
+     * order, then one per screen-flash segment — the shape the server's
+     * liveness check requires.
+     */
+    private function frames(int $person, array $challenge): array
     {
-        $challenge = $this->postJson(route('attendanceChallenge'))->assertOk()->json('challenge');
-
-        // A straight-ahead run, then one frame per gesture the challenge chose,
-        // in order — the shape the server's liveness check now requires.
         $frames = [];
         $t      = 0;
 
@@ -124,16 +125,47 @@ class AttendanceGeoTest extends TestCase
             $t += 600;
         }
 
+        // A face lit by the kiosk's own screen: luma tracks the segment. The
+        // flash check itself is exercised in AttendancePortalTest; here it only
+        // has to pass so the geo assertions are the ones under test.
+        foreach (($challenge['flash'] ?? []) as $seg) {
+            $frames[] = [
+                'stage'      => 'flash',
+                'pose'       => null,
+                'seg'        => $seg,
+                't'          => $t,
+                'descriptor' => $this->frame($person, null, $person + 700 + $t, 0.02),
+                'faceLuma'   => $seg === 'bright' ? 210.0 : 45.0,
+            ];
+            $t += 500;
+        }
+
+        return $frames;
+    }
+
+    /** A live punch, optionally carrying a GPS fix. */
+    private function livePunch(int $person, ?array $geo)
+    {
+        $challenge = $this->postJson(route('attendanceChallenge'))->assertOk()->json('challenge');
+
         return $this->postJson(route('attendancePunch'), [
             'mode'           => 'face',
             'action'         => 'in',
             'nonce'          => $challenge['nonce'],
-            'frames'         => $frames,
+            'frames'         => $this->frames($person, $challenge),
             'geo'            => $geo,
             // A live face passes both anti-spoof floors.
             'liveness_score' => 0.97,
             'liveness_min'   => 0.90,
         ]);
+    }
+
+    private function todayFor(Employee $employee): ?Dtr
+    {
+        return Dtr::where('emp_ID', $employee->emp_ID)
+            ->where('date', now()->toDateString())
+            ->latest('id')
+            ->first();
     }
 
     private function admin(): User
@@ -185,13 +217,39 @@ class AttendanceGeoTest extends TestCase
         $this->assertSame(12, $log->accuracy_m);
     }
 
-    public function test_a_punch_far_from_every_station_is_flagged_but_still_recorded(): void
+    /** The perimeter, enforced: too far is refused outright, not recorded. */
+    public function test_a_punch_far_from_every_station_is_rejected(): void
     {
         $this->enrol($this->alice, 510);
         $this->station();
 
-        // ~5.5 km north of the hall.
+        // ~5.5 km north of the hall. The message names the station and the
+        // radius, so the employee knows where to walk and how close is close
+        // enough; the distance itself is asserted loosely, since it is the
+        // haversine's business and not this test's.
         $response = $this->livePunch(510, ['lat' => self::HALL_LAT + 0.05, 'lng' => self::HALL_LNG, 'accuracy' => 8])
+            ->assertStatus(403);
+
+        $this->assertStringContainsString('from Municipal Hall', $response->json('message'));
+        $this->assertStringContainsString('within 200m', $response->json('message'));
+
+        $this->assertNull($this->todayFor($this->alice));
+        $this->assertFalse(AttendancePunchLog::where('emp_ID', $this->alice->emp_ID)->exists());
+    }
+
+    /**
+     * The legacy mode, still supported: with enforcement off the punch goes
+     * through and carries its distance for HR to read.
+     */
+    public function test_a_punch_far_from_every_station_is_flagged_but_still_recorded_when_enforcement_is_off(): void
+    {
+        config(['attendance.geofence.enforce' => false]);
+
+        $this->enrol($this->alice, 511);
+        $this->station();
+
+        // ~5.5 km north of the hall.
+        $response = $this->livePunch(511, ['lat' => self::HALL_LAT + 0.05, 'lng' => self::HALL_LNG, 'accuracy' => 8])
             ->assertOk()
             ->assertJsonPath('recorded', true)
             ->assertJsonPath('location.out_of_range', true);
@@ -202,6 +260,31 @@ class AttendanceGeoTest extends TestCase
 
         $this->assertTrue($log->out_of_range);
         $this->assertGreaterThan(5000, $log->distance_m);
+    }
+
+    /** A geofence refusal is not a liveness failure, so it must not spend one. */
+    public function test_a_geofence_refusal_does_not_burn_the_challenge(): void
+    {
+        $this->enrol($this->alice, 515);
+        $this->station();
+
+        $challenge = $this->postJson(route('attendanceChallenge'))->assertOk()->json('challenge');
+
+        $far  = $this->frames(515, $challenge);
+        $near = $this->frames(515, $challenge);
+
+        $this->postJson(route('attendancePunch'), [
+            'mode' => 'face', 'action' => 'in', 'nonce' => $challenge['nonce'], 'frames' => $far,
+            'geo' => ['lat' => self::HALL_LAT + 0.05, 'lng' => self::HALL_LNG],
+            'liveness_score' => 0.97, 'liveness_min' => 0.90,
+        ])->assertStatus(403);
+
+        // Same nonce, now standing at the hall: still good.
+        $this->postJson(route('attendancePunch'), [
+            'mode' => 'face', 'action' => 'in', 'nonce' => $challenge['nonce'], 'frames' => $near,
+            'geo' => ['lat' => self::HALL_LAT, 'lng' => self::HALL_LNG],
+            'liveness_score' => 0.97, 'liveness_min' => 0.90,
+        ])->assertOk()->assertJsonPath('recorded', true);
     }
 
     public function test_the_nearest_station_wins_when_several_exist(): void
@@ -229,12 +312,30 @@ class AttendanceGeoTest extends TestCase
             ->assertJsonPath('location.out_of_range', null);
     }
 
-    public function test_a_punch_without_location_is_recorded_and_marked_unlocated(): void
+    /**
+     * With a perimeter configured and enforced, "location off" is no longer a
+     * way to punch from anywhere unflagged — it is refused.
+     */
+    public function test_a_punch_without_location_is_rejected_when_a_station_exists(): void
     {
         $this->enrol($this->alice, 540);
         $this->station();
 
         $this->livePunch(540, null)
+            ->assertStatus(403)
+            ->assertJsonFragment(['message' => 'Location is required to clock in here. Please enable location access and try again.']);
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    public function test_a_punch_without_location_is_recorded_and_marked_unlocated_when_enforcement_is_off(): void
+    {
+        config(['attendance.geofence.enforce' => false]);
+
+        $this->enrol($this->alice, 541);
+        $this->station();
+
+        $this->livePunch(541, null)
             ->assertOk()
             ->assertJsonPath('recorded', true)
             ->assertJsonPath('location.has_location', false)
@@ -314,6 +415,11 @@ class AttendanceGeoTest extends TestCase
 
     public function test_the_monitor_lists_todays_punches_with_their_flags(): void
     {
+        // The monitor's job is rendering a flagged row; whether the perimeter
+        // is currently being enforced is a separate question. Use the legacy
+        // path to produce one, since an enforced punch can never be flagged.
+        config(['attendance.geofence.enforce' => false]);
+
         $this->enrol($this->alice, 570);
         $this->station();
 

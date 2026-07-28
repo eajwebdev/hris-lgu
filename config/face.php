@@ -119,8 +119,15 @@ return [
     | Honest limit: a coached live video replay of the employee performing many
     | gestures could in principle follow along; the random order, the timing
     | window, and the anti-spoof pixel model below are what make that
-    | impractical. Where identity truly matters, the QR path (encrypted token +
-    | 1:1 face verify) remains the stronger option.
+    | impractical. The 'flash_count'/'min_flash_delta' screen-flash sequence
+    | further down this array closes exactly that gap for an *unmodified*
+    | replay device — a phone or video-call app has no reason to react to a
+    | light it was never recorded reacting to — but neither check is a
+    | guarantee, and an attacker who has additionally patched the client JS to
+    | fabricate liveness/luma values is not caught by either alone (the same
+    | class of risk the anti-spoof score already carries). Where identity truly
+    | matters, the QR path (encrypted token + 1:1 face verify) remains the
+    | stronger option.
     |
     */
 
@@ -143,8 +150,13 @@ return [
         'min_pose_shift' => 0.05,
 
         // Upper bound on the whole payload, so the endpoint cannot be used to
-        // ship megabytes of vectors.
-        'max_frames' => 12,
+        // ship megabytes of vectors. Must stay at least min_neutral_frames +
+        // count(pose_pool) + flash_count, or a worst-case attempt (every pose,
+        // full flash sequence) is rejected by this cap before liveness ever
+        // gets to judge it — 5 + 4 + 3 = 12 at the pool's full extent, so 16
+        // leaves headroom without another config touch if pose_count or
+        // flash_count is raised later.
+        'max_frames' => 16,
 
         // The frames must span at least this long — a human takes time to
         // perform two gestures; a payload assembled in one instant does not.
@@ -159,6 +171,47 @@ return [
         // rigidly-held still image; the real work is done by the pose challenge
         // and the anti-spoof model. Kept low so it never rejects a live employee.
         'min_variation' => 0.02,
+
+        // Server-randomised bright/dark full-screen sequence, verified against
+        // the captured frames' face-crop luma (brightnessOf(), the same helper
+        // the framing gate above already uses). A live, nearby face measurably
+        // brightens under the kiosk's own bright flash and dims under the dark
+        // segment — physical reflectance. A phone or monitor replaying a
+        // pre-recorded clip or a live video call is self-luminous: its
+        // displayed brightness is whatever was recorded, and does not react to
+        // the KIOSK's screen at all, so the captured luma stays flat regardless
+        // of the sequence. Same "random server-issued sequence + verify the
+        // frames obey it" architecture as the pose challenge above, on an
+        // orthogonal signal (reflectance, not shape).
+        //
+        // 'flash_count' is how many segments the sequence has. 0 is the kill
+        // switch — checkFlash() treats an empty sequence as nothing to verify,
+        // exactly like checkPoses() already no-ops on an empty pose list. Any
+        // nonzero value is raised to at least 2 internally: with only one
+        // segment there is no dark reading to compare a bright one against.
+        'flash_count' => 3,
+
+        // Minimum by which the mean face-crop luma (0-255, brightnessOf()
+        // scale — see 'min_brightness' below, 55 on the same scale) during
+        // 'bright' segments must exceed the mean during 'dark' segments.
+        // Deliberately a heuristic threshold, not a guarantee — like
+        // min_pose_shift and min_variation above, it needs field tuning.
+        // Started conservative: low enough that a kiosk in an already-bright
+        // hallway (where the screen's own contribution to the subject's face
+        // is small next to ambient light) still passes a real employee, high
+        // enough to require an actual rising/falling trend rather than
+        // ordinary frame-to-frame sensor noise. Watch rejected attempts in the
+        // field and raise or lower it.
+        'min_flash_delta' => 12,
+
+        // Milliseconds the client waits after switching the screen to a
+        // segment's colour before it trusts a captured frame — lets the
+        // display actually repaint and lets any camera auto-exposure begin
+        // reacting, so the frame reflects that segment and not a
+        // mid-transition blend of both. Client-side pacing only; unlike
+        // min_flash_delta this is not itself a verifying threshold, so it is
+        // safe to hand to the browser via portalConfig.
+        'flash_settle_ms' => 220,
     ],
 
     /*

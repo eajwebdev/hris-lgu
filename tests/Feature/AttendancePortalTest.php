@@ -193,6 +193,8 @@ class AttendancePortalTest extends TestCase
      * in the order it demanded them — the shape a real capture now produces.
      * Each pose frame is pushed in that gesture's direction so it sits clear of
      * the straight-ahead master (the min_pose_shift the server enforces).
+     * Finally one frame per screen-flash segment, carrying the face luma the
+     * server diffs across segments.
      */
     private function challengedFrames(int $person, array $challenge, int $spacing = 400): array
     {
@@ -210,7 +212,30 @@ class AttendancePortalTest extends TestCase
             $t += 600;
         }
 
+        foreach (($challenge['flash'] ?? []) as $seg) {
+            $frames[] = $this->flashFrame($person, $seg, $t);
+
+            $t += 500;
+        }
+
         return $frames;
+    }
+
+    /**
+     * One flash frame: a face lit by the kiosk's own screen. The luma pair is
+     * fixed rather than derived from the threshold so the fixture keeps working
+     * if min_flash_delta is retuned — 210 vs 45 clears any plausible value.
+     */
+    private function flashFrame(int $person, string $seg, int $t, ?float $luma = null): array
+    {
+        return [
+            'stage'      => 'flash',
+            'pose'       => null,
+            'seg'        => $seg,
+            't'          => $t,
+            'descriptor' => $this->frame($person, null, $person + 700 + $t, 0.02),
+            'faceLuma'   => $luma ?? ($seg === 'bright' ? 210.0 : 45.0),
+        ];
     }
 
     /** A full, valid live payload for a given challenge (frames + spoof scores). */
@@ -269,6 +294,75 @@ class AttendancePortalTest extends TestCase
         ])->assertStatus(403);
 
         $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /**
+     * The flash sequence is the server's to choose, like the poses. Answering a
+     * different one — even a well-formed one — is not a capture, it is a guess.
+     */
+    public function test_a_flash_sequence_in_the_wrong_order_is_rejected(): void
+    {
+        $this->enrol($this->alice, 110);
+
+        $challenge = $this->challenge();
+        $payload   = $this->livePayload(110, $challenge, 'in');
+
+        // Invert each segment rather than reversing the list: a reversal of a
+        // palindromic sequence would still match.
+        $payload['frames'] = array_map(function (array $frame) {
+            if ($frame['stage'] === 'flash') {
+                $frame['seg']      = $frame['seg'] === 'bright' ? 'dark' : 'bright';
+                $frame['faceLuma'] = $frame['seg'] === 'bright' ? 210.0 : 45.0;
+            }
+
+            return $frame;
+        }, $payload['frames']);
+
+        $this->punch($payload)->assertStatus(403);
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /**
+     * The headline new requirement: a screen replaying a recording — a video
+     * call, a saved clip — is self-luminous. It does not brighten when the
+     * kiosk's own screen flashes white, so its luma stays flat across segments
+     * no matter how convincing the face on it looks.
+     */
+    public function test_a_face_that_does_not_react_to_the_flash_is_rejected(): void
+    {
+        $this->enrol($this->alice, 120);
+
+        $challenge = $this->challenge();
+        $payload   = $this->livePayload(120, $challenge, 'in');
+
+        $payload['frames'] = array_map(function (array $frame) {
+            if ($frame['stage'] === 'flash') {
+                $frame['faceLuma'] = 128.0;   // identical under bright and dark
+            }
+
+            return $frame;
+        }, $payload['frames']);
+
+        $this->punch($payload)->assertStatus(403);
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /** flash_count = 0 turns the whole check off, poses and all else unchanged. */
+    public function test_the_flash_check_can_be_disabled(): void
+    {
+        config(['face.liveness.flash_count' => 0]);
+
+        $this->enrol($this->alice, 125);
+
+        $challenge = $this->challenge();
+
+        $this->assertSame([], $challenge['flash']);
+
+        $this->punch($this->livePayload(125, $challenge, 'in'))
+            ->assertOk()
+            ->assertJsonPath('recorded', true);
     }
 
     /** A captured payload cannot be sent twice: the challenge is burned on use. */
@@ -370,7 +464,7 @@ class AttendancePortalTest extends TestCase
             ->assertOk()
             ->assertJsonPath('action', 'CLOCK IN')
             ->assertJsonPath('recorded', true)
-            ->assertJsonPath('employee.name', $this->name($this->alice));
+            ->assertJsonPath('employee.name', $this->employeeName($this->alice));
 
         $row = $this->todayFor($this->alice);
 
@@ -422,7 +516,7 @@ class AttendancePortalTest extends TestCase
 
         $this->livePunch(241)
             ->assertOk()
-            ->assertJsonPath('employee.name', $this->name($this->bob));
+            ->assertJsonPath('employee.name', $this->employeeName($this->bob));
 
         $this->assertNull($this->todayFor($this->alice));
         $this->assertNotNull($this->todayFor($this->bob));
@@ -457,7 +551,7 @@ class AttendancePortalTest extends TestCase
 
         $this->postJson(route('attendanceQrCheck'), ['qr' => shortEncrypt($this->alice->emp_ID)])
             ->assertOk()
-            ->assertJsonPath('employee.name', $this->name($this->alice));
+            ->assertJsonPath('employee.name', $this->employeeName($this->alice));
     }
 
     public function test_a_garbage_qr_is_refused(): void
@@ -472,7 +566,7 @@ class AttendancePortalTest extends TestCase
         $this->livePunch(310, 'in', [
             'mode' => 'qr',
             'qr'   => shortEncrypt($this->alice->emp_ID),
-        ])->assertOk()->assertJsonPath('employee.name', $this->name($this->alice));
+        ])->assertOk()->assertJsonPath('employee.name', $this->employeeName($this->alice));
 
         $this->assertNotNull($this->todayFor($this->alice));
     }
@@ -523,7 +617,7 @@ class AttendancePortalTest extends TestCase
             'employee_id' => $this->bob->id,
         ])
             ->assertOk()
-            ->assertJsonPath('employee.name', $this->name($this->alice));
+            ->assertJsonPath('employee.name', $this->employeeName($this->alice));
 
         $this->assertNull($this->todayFor($this->bob));
         $this->assertNotNull($this->todayFor($this->alice));

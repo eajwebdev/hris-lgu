@@ -160,7 +160,10 @@ class MasterController extends Controller
         $actual = Carbon::createFromFormat('H:i', substr($time, 0, 5));
         $expected = Carbon::createFromFormat('H:i', $limit);
 
-        return $actual->greaterThan($expected) ? $actual->diffInMinutes($expected) : 0;
+        // Diffed from the earlier instant to the later one: Carbon 3 returns a
+        // SIGNED difference, so $actual->diffInMinutes($expected) on a late
+        // arrival counts backwards and reports the tardiness as negative.
+        return $actual->greaterThan($expected) ? $expected->diffInMinutes($actual) : 0;
     }
 
     private function minutesBefore($time, $limit)

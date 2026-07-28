@@ -214,7 +214,11 @@ class EventController extends Controller
         // cooldown so a fresh clock-in is not instantly flipped to a clock-out.
         $last = Carbon::parse($log->out ?? $log->in);
 
-        if ($now->diffInSeconds($last) < $cooldown) {
+        // Diffed from the earlier instant to the later one: Carbon 3 returns a
+        // SIGNED difference, so $now->diffInSeconds($last) went negative on
+        // every past scan, the cooldown always matched, and nobody could ever
+        // be clocked out.
+        if ($last->diffInSeconds($now) < $cooldown) {
             return $this->scanResult(
                 $log->out ? 'CLOCK OUT' : 'CLOCK IN',
                 false, $employee, $last, 'Already scanned a moment ago'

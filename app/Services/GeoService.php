@@ -7,12 +7,14 @@ use App\Models\AttendanceStation;
 /**
  * Where a punch happened, relative to the configured stations.
  *
- * Policy note that shapes the whole class: distance never blocks a punch. An
- * employee on field work is legitimately far from every station, so the output
- * here is a *tag* for HR to read, not a gate. That is also why "no location" and
- * "no stations configured" resolve to out_of_range = null rather than true —
- * flagging someone red because GPS was off would start exactly the arguments
- * this feature exists to end.
+ * This class only computes the geometry; it does not itself decide whether
+ * that geometry blocks a punch. AttendancePortalController makes that call,
+ * against config('attendance.geofence.enforce'), before this class's result
+ * is ever used to write anything — which is also why "no location" and "no
+ * stations configured" resolve to out_of_range = null here rather than true:
+ * this class has no opinion on policy, only on distance. Keeping enforcement
+ * out of this class is what lets it stay reusable for the courtesy HUD, which
+ * must never itself refuse anything.
  */
 class GeoService
 {
@@ -47,6 +49,7 @@ class GeoService
             'station_id'   => null,
             'station_name' => null,
             'distance_m'   => null,
+            'radius_m'     => null,
             'out_of_range' => null,
         ];
 
@@ -76,6 +79,7 @@ class GeoService
             'station_id'   => $nearest->id,
             'station_name' => $nearest->name,
             'distance_m'   => (int) round($shortest),
+            'radius_m'     => (int) $nearest->radius_m,
             'out_of_range' => $shortest > $nearest->radius_m,
         ];
     }

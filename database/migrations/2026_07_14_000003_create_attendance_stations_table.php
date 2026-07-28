@@ -7,9 +7,10 @@ use Illuminate\Support\Facades\Schema;
 /**
  * The places employees are expected to clock in from.
  *
- * A station is a point plus a radius. Punches are never blocked by distance —
- * the policy is "clock in from anywhere, but HR sees who was far from every
- * station", so the geometry only ever feeds an indicator, not a refusal.
+ * A station is a point plus a radius. Whether distance actually blocks a
+ * punch is a runtime policy, not fixed by this schema — see
+ * config('attendance.geofence.enforce') and
+ * AttendancePortalController::geofenceBlock().
  */
 return new class extends Migration
 {

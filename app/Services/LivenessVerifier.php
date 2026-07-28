@@ -47,11 +47,13 @@ class LivenessVerifier
         shuffle($pool);
 
         $poses = array_slice($pool, 0, max(1, $count));
+        $flash = $this->issueFlash();
 
         $ttl = (int) config('face.liveness.challenge_ttl', 90);
 
         Cache::put(self::CACHE_PREFIX . $nonce, [
             'poses'      => $poses,
+            'flash'      => $flash,
             'ip'         => $ip,
             'issued_at'  => now()->timestamp,
         ], $ttl);
@@ -59,8 +61,37 @@ class LivenessVerifier
         return [
             'nonce'      => $nonce,
             'poses'      => $poses,
+            'flash'      => $flash,
             'expires_in' => $ttl,
         ];
+    }
+
+    /**
+     * Random bright/dark screen-flash sequence, drawn WITH replacement —
+     * unlike issue()'s pose draw, there are only two possible segments, so a
+     * distinct draw caps at two no matter what the config asks for. 0 is the
+     * kill switch; any nonzero count is raised to at least 2 so the sequence
+     * always contains one of each — with only one segment there is nothing to
+     * compare a delta against.
+     */
+    private function issueFlash(): array
+    {
+        $count = (int) config('face.liveness.flash_count', 3);
+
+        if ($count <= 0) {
+            return [];
+        }
+
+        $count = max(2, $count);
+        $flash = ['bright', 'dark'];
+
+        for ($i = count($flash); $i < $count; $i++) {
+            $flash[] = mt_rand(0, 1) ? 'bright' : 'dark';
+        }
+
+        shuffle($flash);
+
+        return $flash;
     }
 
     /**
@@ -110,6 +141,7 @@ class LivenessVerifier
 
         $neutral = array_values(array_filter($frames, fn ($f) => $f['stage'] === 'neutral'));
         $posed   = array_values(array_filter($frames, fn ($f) => $f['stage'] === 'pose'));
+        $flashed = array_values(array_filter($frames, fn ($f) => $f['stage'] === 'flash'));
 
         if (! $neutral) {
             return 'Face check incomplete. Please try again.';
@@ -127,7 +159,11 @@ class LivenessVerifier
             return $reason;
         }
 
-        return $this->checkPoses($employee, $neutral, $posed, $challenge, $config);
+        if ($reason = $this->checkPoses($employee, $neutral, $posed, $challenge, $config)) {
+            return $reason;
+        }
+
+        return $this->checkFlash($employee, $flashed, $challenge, $config);
     }
 
     /**
@@ -240,6 +276,75 @@ class LivenessVerifier
             if ($this->distance($frame['descriptor'], $master) < $minShift) {
                 return 'Face check failed. Please follow the on-screen instructions.';
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * The screen-flash sequence, held to the letter of the challenge.
+     *
+     * Two things a replay device cannot fake at once: the frames tagged with
+     * the challenged segments must be there IN THE ISSUED ORDER (unknown to
+     * the attacker before asking, the same property the pose challenge leans
+     * on), and the captured face luma must rise under 'bright' and fall under
+     * 'dark' by a measurable margin — a live face near the kiosk's own screen
+     * reflects that light, while a phone or monitor already playing a video is
+     * self-lit and does not react to a light it was never recorded reacting
+     * to. That is the gap the pose challenge alone leaves open: a coached
+     * video replay can follow gestures, but it cannot follow the kiosk's
+     * screen.
+     *
+     * Unlike checkPoses(), sequence membership is NOT deduplicated — the
+     * sequence can (and by default does) repeat a segment, so the comparison
+     * is a straight ordered-list equality rather than "first occurrence of
+     * each".
+     */
+    private function checkFlash(Employee $employee, array $flash, array $challenge, array $config): ?string
+    {
+        $demanded = array_values((array) ($challenge['flash'] ?? []));
+
+        // A challenge with no flash sequence — the flash_count kill switch, or
+        // a cache entry minted before this shipped — has nothing to verify.
+        if (! $demanded) {
+            return null;
+        }
+
+        usort($flash, fn ($a, $b) => $a['t'] <=> $b['t']);
+
+        if (array_column($flash, 'seg') !== $demanded) {
+            return 'Face check failed. Please follow the on-screen instructions.';
+        }
+
+        $bright = [];
+        $dark   = [];
+
+        foreach ($flash as $frame) {
+            // Still this employee under a different screen colour — catches a
+            // swap mid-sequence, however unlikely.
+            if ($this->faces->verify($employee, $frame['descriptor']) === null) {
+                return 'Face not recognised. Please try again.';
+            }
+
+            $luma = (float) ($frame['faceLuma'] ?? 0);
+
+            if ($frame['seg'] === 'bright') {
+                $bright[] = $luma;
+            } else {
+                $dark[] = $luma;
+            }
+        }
+
+        // issueFlash() guarantees one of each, but a payload that reached here
+        // with only one kind must not divide by zero.
+        if (! $bright || ! $dark) {
+            return 'Face check failed. Please try again.';
+        }
+
+        $delta = (array_sum($bright) / count($bright)) - (array_sum($dark) / count($dark));
+
+        if ($delta < (float) ($config['min_flash_delta'] ?? 12)) {
+            return 'Please use your real face, not a photo or screen.';
         }
 
         return null;

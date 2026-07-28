@@ -48,6 +48,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Geofencing
+    |--------------------------------------------------------------------------
+    |
+    | Historically a punch outside every station's radius was tagged for HR,
+    | never refused. This flips that to a hard gate: when true and at least
+    | one active station exists, a punch with no location, or a location
+    | outside every active station's radius, is rejected before it is ever
+    | recorded.
+    |
+    | No active stations configured at all still never blocks — nothing is
+    | configured to be "inside of" yet, and blocking every punch because ops
+    | forgot to add a station would be a misconfiguration bricking attendance,
+    | not a security control.
+    |
+    | Env-backed and default true so this can be flipped back to the legacy
+    | flag-only behaviour in the field without a deploy.
+    |
+    */
+
+    'geofence' => [
+        'enforce' => env('ATTENDANCE_GEOFENCE_ENFORCE', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Portal
     |--------------------------------------------------------------------------
     */

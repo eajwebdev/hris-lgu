@@ -544,6 +544,40 @@
         .result__date   { font-size: 12px; color: var(--muted); margin-top: -10px; }
         .result__note   { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
+        /* ---------------------------------------------------------------- flash */
+
+        /* The liveness flash. z-index 40 puts it above everything else on the
+           page (.mapsheet, the previous ceiling, is 30) because this is a light
+           source rather than a UI layer — it has to cover the header and the
+           action bar too, or the screen is not evenly lighting the face.
+           pointer-events: none: it is timed, not dismissible. It does not
+           interrupt capture — the video element's pixel buffer keeps updating
+           underneath whatever is painted over it. */
+        .flash {
+            position: absolute;
+            inset: 0;
+            z-index: 40;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+        /* Not pure #000: SCRFD still has to find the face on the dark segment,
+           and in an already-dim room a true black screen can take the last of
+           the fill light with it. This tone is a field-tuning knob — if a kiosk
+           starts timing out on dark segments, lift it before touching the
+           liveness thresholds. */
+        .flash--bright { background: #FFFFFF; }
+        .flash--dark   { background: #0A0A0A; }
+        .flash__hint {
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            padding: 0 24px;
+            color: rgba(0, 0, 0, .55);
+        }
+        .flash--dark .flash__hint { color: rgba(255, 255, 255, .65); }
+
         .d-none { display: none !important; }
 
         @media (prefers-reduced-motion: reduce) {
@@ -618,17 +652,15 @@
             <i class="fas fa-map-location-dot"></i>
         </button>
 
-        {{-- Live location: distance to the nearest station + the raw fix. When
-             out of range it says so — and says the punch still goes through,
-             flagged for HR clarification. --}}
+        {{-- Live location: distance to the nearest station + the raw fix. The
+             note line is written by updateGeoHud(), which knows whether the
+             perimeter is being enforced — do not hardcode a policy here. --}}
         <div class="geohud" id="geohud">
             <div class="geohud__row">
                 <i class="fas fa-location-dot"></i>
                 <span id="geo-distance">Waiting for location…</span>
             </div>
-            <div class="geohud__note" id="geo-note">
-                You can still clock in — this punch will be flagged for HR clarification.
-            </div>
+            <div class="geohud__note" id="geo-note"></div>
             <div class="geohud__coords" id="geo-coords">Lat —, Lng —</div>
         </div>
 
@@ -681,6 +713,14 @@
         </div>
     </div>
 
+    {{-- The liveness flash. Covers the whole app column so the screen itself
+         becomes the light source: a real face reflects it and its brightness
+         tracks the sequence, while a phone or monitor replaying a recording is
+         self-lit and stays flat no matter what this does. --}}
+    <div class="flash d-none" id="flash" aria-hidden="true">
+        <div class="flash__hint">Hold still</div>
+    </div>
+
     {{-- Result takes over the whole screen, then hands it back. --}}
     <div class="result d-none" id="result">
         <div class="result__mark" id="result-mark"><i class="fas fa-check"></i></div>
@@ -708,10 +748,19 @@
         // For the live distance HUD only — the authoritative distance/range
         // judgement is re-derived server-side at punch time.
         'stations'   => $stations,
-        // Only how many frontal frames to gather. Every threshold that decides
-        // whether the face is alive stays on the server, where it cannot be edited.
+        // Whether the perimeter is a hard gate. Drives the pre-flight check
+        // that saves a wasted camera pass; the server re-derives the same
+        // judgement from the same config and station table at punch time.
+        'geofence'   => [
+            'enforce' => (bool) config('attendance.geofence.enforce', true),
+        ],
+        // How many frontal frames to gather, and how long to let the screen
+        // settle on a flash colour before trusting the frame. Every threshold
+        // that decides whether the face is alive — including min_flash_delta —
+        // stays on the server, where it cannot be edited.
         'liveness'   => [
-            'frames' => (int) config('face.liveness.min_neutral_frames', 5),
+            'frames'        => (int) config('face.liveness.min_neutral_frames', 5),
+            'flashSettleMs' => (int) config('face.liveness.flash_settle_ms', 220),
         ],
         // The browser gates locally on this; the server enforces it again.
         'antispoof'  => [
