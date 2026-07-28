@@ -24,24 +24,26 @@
                                     <input type="text" name="item_no" class="form-control form-control-sm" id="item_no" placeholder="N/A" autocomplete="off">
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Employee ID</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span><br>
+                                    <label class="badge badge-secondary lbel">Employee ID</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
                                     <input type="text" name="emp_ID" id="emp_ID" class="form-control form-control-sm" placeholder="e.g. 1234-56" autocomplete="off" required>
-                                    <small id="emp_ID_feedback" class="form-text"></small>
+                                    {{-- Height is reserved so the availability message appearing
+                                         does not grow this column and shunt the next row down. --}}
+                                    <small id="emp_ID_feedback" class="form-text" style="min-height:1rem;line-height:1rem;margin-top:.15rem;"></small>
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Last Name</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span><br>
+                                    <label class="badge badge-secondary lbel">Last Name</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
                                     <input type="text" name="lname" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" required>
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">First Name</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span><br>
+                                    <label class="badge badge-secondary lbel">First Name</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
                                     <input type="text" name="fname" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" required>
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Middle Name</label><br>
+                                    <label class="badge badge-secondary lbel">Middle Name</label>
                                     <input type="text" name="mname" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" oninput="this.value = this.value.replace(/\./g, '')">
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Suffix</label><br>
+                                    <label class="badge badge-secondary lbel">Suffix</label>
                                     <select class="form-control form-control-sm" name="suffix">
                                         <option disabled selected> Select </option>
                                         <option value="Jr.">Jr.</option>
@@ -54,7 +56,7 @@
                                     </select>
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Prefix</label><br>
+                                    <label class="badge badge-secondary lbel">Prefix</label>
                                     <select class="form-control form-control-sm" name="prefix">
                                         <option disabled selected> Select </option>
                                         <option>Atty.</option>
@@ -67,7 +69,7 @@
                                     </select>
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Title Prefix</label><br>
+                                    <label class="badge badge-secondary lbel">Title Prefix</label>
                                     <input type="text" name="title_prefix" class="form-control form-control-sm" placeholder="e.g MBA/ DPA / MD etc.">
                                 </div>
                                 <div class="col-md-2">
@@ -81,12 +83,12 @@
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Birth Place</label><br>
+                                    <label class="badge badge-secondary lbel">Birth Place</label>
                                     <input type="text" name="b_place" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Sex</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span><br>
+                                    <label class="badge badge-secondary lbel">Sex</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
                                     <select class="form-control form-control-sm" name="sex" autocomplete="off" required>
                                         <option disabled selected> Select </option>
                                         <option value="Male">Male</option>
@@ -95,7 +97,7 @@
                                 </div>
                                 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Civil Status</label><br>
+                                    <label class="badge badge-secondary lbel">Civil Status</label>
                                     <select class="form-control form-control-sm" name="civil_status">
                                         <option disabled selected> Select </option>
                                         <option>Single</option>
@@ -107,7 +109,7 @@
                                 </div>
 
                                 <div class="col-md-4">
-                                    <label class="badge badge-secondary lbel">Citizenship</label><br>
+                                    <label class="badge badge-secondary lbel">Citizenship</label>
                                     <div class="row">
                                         <div class="col-4">
                                             <select class="form-control form-control-sm" name="citizenship">
@@ -130,7 +132,7 @@
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Country</label><br>
+                                    <label class="badge badge-secondary lbel">Country</label>
                                     <select class="form-control form-control-sm select2" name="country">
                                         <option value="" disabled selected>Select</option>
                                         <option value="Afghanistan">Afghanistan</option>
@@ -332,7 +334,7 @@
                                 </div>                                
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Employe Status</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span><br>
+                                    <label class="badge badge-secondary lbel">Employe Status</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
                                     <select class="form-control form-control-sm select2" style="width: 100%;" name="emp_status" autocomplete="off" required>
                                         <option value=""> select </option>
                                         @foreach ($stat as $st)
@@ -342,12 +344,12 @@
                                 </div> 
                                 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Position</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span><br>
+                                    <label class="badge badge-secondary lbel">Position</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
                                     <input type="text" name="position" id="position" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" required>
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Department/Office</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span><br>
+                                    <label class="badge badge-secondary lbel">Department/Office</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
                                     <select class="form-control form-control-sm select2" style="width: 100%;" name="emp_dept" autocomplete="off" required>
                                         <option value=""> select </option>
                                         @foreach ($offices as $q)
@@ -357,7 +359,7 @@
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Immediate Supervisor</label><br>
+                                    <label class="badge badge-secondary lbel">Immediate Supervisor</label>
                                     <select class="form-control form-control-sm select2" style="width: 100%;" name="supervisor">
                                         <option value="0"> select </option>
                                         @foreach ($supervisor as $sup)
@@ -367,27 +369,27 @@
                                 </div>
                                 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Height (cm)</label><br>
+                                    <label class="badge badge-secondary lbel">Height (cm)</label>
                                     <input type="text" name="height_cm" id="height_cm" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Height (ft)</label><br>
+                                    <label class="badge badge-secondary lbel">Height (ft)</label>
                                     <input type="text" name="height_ft" id="height_ft" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Weight (kg)</label><br>
+                                    <label class="badge badge-secondary lbel">Weight (kg)</label>
                                     <input type="text" name="weight_kg" id="weight_kg" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Weight (lb)</label><br>
+                                    <label class="badge badge-secondary lbel">Weight (lb)</label>
                                     <input type="text" name="weight_lb" id="weight_lb" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
                                 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Blood Type</label><br>
+                                    <label class="badge badge-secondary lbel">Blood Type</label>
                                     <select class="form-control form-control-sm" name="b_type">
                                         <option disabled selected> Select </option>
                                         <option>A+</option>
@@ -401,42 +403,42 @@
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">GSIS</label><br>
+                                    <label class="badge badge-secondary lbel">GSIS</label>
                                     <input type="text" name="gsis" class="form-control form-control-sm"  placeholder="N/A" autocomplete="off">
                                 </div>
                                 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">PAGIBIG</label><br>
+                                    <label class="badge badge-secondary lbel">PAGIBIG</label>
                                     <input type="text" name="pagibig" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">PHILHEALTH</label><br>
+                                    <label class="badge badge-secondary lbel">PHILHEALTH</label>
                                     <input type="text" name="philhealth" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">SSS</label><br>
+                                    <label class="badge badge-secondary lbel">SSS</label>
                                     <input type="text" name="sss" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">TIN</label><br>
+                                    <label class="badge badge-secondary lbel">TIN</label>
                                     <input type="text" name="tin" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Telephone Number</label><br>
+                                    <label class="badge badge-secondary lbel">Telephone Number</label>
                                     <input type="text" name="telephone" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Email Address</label><br>
+                                    <label class="badge badge-secondary lbel">Email Address</label>
                                     <input type="text" name="org_email" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Mobile Number</label><br>
+                                    <label class="badge badge-secondary lbel">Mobile Number</label>
                                     <input type="text" name="mobile" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
 
@@ -485,19 +487,19 @@
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">House/Block/Lot No.</label><br>
+                                    <label class="badge badge-secondary lbel">House/Block/Lot No.</label>
                                     <input type="text" name="add_block" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Street</label><br>
+                                    <label class="badge badge-secondary lbel">Street</label>
                                     <input type="text" name="add_street" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Subdivision/Village</label><br>
+                                    <label class="badge badge-secondary lbel">Subdivision/Village</label>
                                     <input type="text" name="add_village" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">ZIP Code</label><br>
+                                    <label class="badge badge-secondary lbel">ZIP Code</label>
                                     <input type="number" name="add_zcode" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
                             </div>
@@ -545,19 +547,19 @@
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">House/Block/Lot No.</label><br>
+                                    <label class="badge badge-secondary lbel">House/Block/Lot No.</label>
                                     <input type="text" name="padd_block" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Street</label><br>
+                                    <label class="badge badge-secondary lbel">Street</label>
                                     <input type="text" name="padd_street" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Subdivision/Village</label><br>
+                                    <label class="badge badge-secondary lbel">Subdivision/Village</label>
                                     <input type="text" name="padd_village" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">ZIP Code</label><br>
+                                    <label class="badge badge-secondary lbel">ZIP Code</label>
                                     <input type="number" name="padd_zcode" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
                                 </div>
                             </div>
