@@ -300,6 +300,14 @@
      * closer is more use than being told the confidence is low.
      */
     function evaluate(detections, step) {
+        // Belt and braces for a step that is not one of the configured four.
+        // The caller already avoids this, but the fall-through used to reach
+        // CONFIG.steps[step].label and throw a TypeError that the loop's catch
+        // swallowed, freezing the guidance with no clue why.
+        if (!step || !CONFIG.steps[step]) {
+            return { ok: false, message: 'All captures complete', detection: detections[0] || null };
+        }
+
         if (!detections.length) {
             return { ok: false, message: 'No face detected' };
         }
@@ -410,15 +418,29 @@
                                           // rejected-but-seen face lets us say why
                 });
 
-                var step   = ORDER[state.stepIndex];
-                var result = evaluate(detections, step);
+                var step = ORDER[state.stepIndex];
 
-                state.lastCheck = result;
+                if (!step) {
+                    // Every step is captured. Keep the preview alive, but stop
+                    // judging it: the gate below is written for a SPECIFIC
+                    // step, and with none left it fell through to the movement
+                    // branch and repainted the "4/4 captured" confirmation as
+                    // "Slightly move your head" eight times a second — the
+                    // finished-but-still-complaining bug. Leaving the button
+                    // disabled also stops a fifth capture being filed under an
+                    // undefined step, which silently broke Finish.
+                    draw(detections.length ? detections[0] : null, true);
+                    el.captureBtn.disabled = true;
+                } else {
+                    var result = evaluate(detections, step);
 
-                draw(result.detection, result.ok);
-                setFeedback(result.message, result.ok);
+                    state.lastCheck = result;
 
-                el.captureBtn.disabled = !result.ok;
+                    draw(result.detection, result.ok);
+                    setFeedback(result.message, result.ok);
+
+                    el.captureBtn.disabled = !result.ok;
+                }
             }
         } catch (e) {
             // A transient decode error should not kill the loop.
@@ -442,6 +464,12 @@
 
     async function capture() {
         var step = ORDER[state.stepIndex];
+
+        // Nothing left to capture. Without this a late click — the button
+        // re-enabled for a frame, a double tap, a stuck key — would file an
+        // embedding under an undefined step, leaving five keys where Finish
+        // expects four and refusing to submit with no explanation.
+        if (!step) return;
 
         if (!state.lastCheck || !state.lastCheck.ok) return;
 
@@ -664,7 +692,19 @@
     // ---------------------------------------------------------------- submit
 
     async function submit() {
-        if (Object.keys(state.captures).length !== ORDER.length) return;
+        // Was a silent return. A Finish button that does nothing at all, with
+        // no message, is the least debuggable failure in the flow — say which
+        // steps are outstanding instead.
+        var missing = ORDER.filter(function (type) { return !state.captures[type]; });
+
+        if (missing.length) {
+            var labels = missing.map(function (type) {
+                return (CONFIG.steps[type] && CONFIG.steps[type].label) || type;
+            });
+
+            setFeedback('Still needed: ' + labels.join(', '), false);
+            return;
+        }
 
         el.finishBtn.disabled = true;
         el.finishBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
