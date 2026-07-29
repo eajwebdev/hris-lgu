@@ -120,7 +120,7 @@
     </style>
 </head>
 <body>
-    <div class="title">NON-TEACHING APPLICANTS</div>
+    <div class="title">LIST OF APPLICANTS</div>
     <div class="filters">
         <strong>Position:</strong> {{ $selectedPosition ? $selectedPosition->title : 'All Positions' }}
         &nbsp;&nbsp;

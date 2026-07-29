@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
 
             SettingSeeder::class,       // 3. workflow wiring (needs employees)
+            PsbMemberSeeder::class,     //    selection board (matches employees by surname)
         ]);
 
         $default = config('auth.default_password');

@@ -105,18 +105,18 @@
             }
 
             $campuses = [
-                '1' => 'CPSU Main',
-                '2' => 'CPSU Candoni',
-                '3' => 'CPSU Cauayan',
-                '4' => 'CPSU Hinigaran',
-                '5' => 'CPSU Hinoba-an',
-                '6' => 'CPSU Ilog',
-                '7' => 'CPSU San Carlos',
-                '8' => 'CPSU Sipalay',
-                '9' => 'CPSU Victorias',
-                '10' => 'CPSU Murcia',
-                '11' => 'CPSU Valladolid',
-                '12' => 'CPSU Moises Padilla',
+                '1' => 'LGU Mabinay Main',
+                '2' => 'LGU Mabinay Candoni',
+                '3' => 'LGU Mabinay Cauayan',
+                '4' => 'LGU Mabinay Hinigaran',
+                '5' => 'LGU Mabinay Hinoba-an',
+                '6' => 'LGU Mabinay Ilog',
+                '7' => 'LGU Mabinay San Carlos',
+                '8' => 'LGU Mabinay Sipalay',
+                '9' => 'LGU Mabinay Victorias',
+                '10' => 'LGU Mabinay Murcia',
+                '11' => 'LGU Mabinay Valladolid',
+                '12' => 'LGU Mabinay Moises Padilla',
             ];
 
             $logsGroupedByDate = [];

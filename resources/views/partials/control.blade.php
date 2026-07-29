@@ -142,6 +142,12 @@
                 </a>
                 <ul class="nav nav-treeview">
                     <li class="nav-item">
+                        <a href="{{ route('positionDescriptionList') }}" class="nav-link {{ request()->is('position-descriptions*') ? 'active' : '' }}">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Position Descriptions</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a href="{{ route('jlist') }}" class="nav-link {{ request()->is('career') ? 'active' : '' }}">
                             <i class="far fa-circle nav-icon"></i>
                             <p>Job Openings</p>
@@ -163,6 +169,12 @@
                         <a href="{{ route('interviewEvaluationList') }}" class="nav-link {{ request()->is('interview*') ? 'active' : '' }}">
                             <i class="far fa-circle nav-icon"></i>
                             <p>Interview Assessment</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('psbMembers') }}" class="nav-link {{ request()->is('psb*') ? 'active' : '' }}">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Selection Board</p>
                         </a>
                     </li>
                 </ul>

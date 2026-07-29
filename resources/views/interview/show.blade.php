@@ -44,6 +44,15 @@
                     <a href="{{ route('interviewSummaryRatingPdf', $interview->id) }}" target="_blank" class="btn btn-danger">
                         <i class="fas fa-file-pdf"></i> Summary Rating
                     </a>
+                    <a href="{{ route('psbInterviewForm', $interview->id) }}" target="_blank" class="btn btn-success"
+                       title="Personnel Selection Board interview form, ready to sign">
+                        <i class="fas fa-print"></i> PSB Interview Form
+                    </a>
+                    @if($interview->jid)
+                        <a href="{{ route('psbAssessment', $interview->jid) }}" class="btn btn-outline-success">
+                            <i class="fas fa-scale-balanced"></i> Comparative Assessment
+                        </a>
+                    @endif
                     <button type="button" class="btn btn-info" data-toggle="modal" data-target="#panelMembersModal">
                         <i class="fas fa-users"></i> Panel
                     </button>

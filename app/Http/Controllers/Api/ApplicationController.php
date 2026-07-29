@@ -100,7 +100,7 @@ class ApplicationController extends Controller
 
     //     // 📧 Send email directly here
     //     try {
-    //         $toEmail = 'cpsu_career@cpsu.edu.ph'; // ✅ fixed
+    //         $toEmail = 'careers@mabinay.gov.ph'; // ✅ fixed
 
     //         $subject = "New Job Application: {$request->first_name} {$request->last_name}";
             
@@ -112,7 +112,7 @@ class ApplicationController extends Controller
     //                     </div>
     //                     <div style="padding: 24px; color: #333;">
     //                         <p style="font-size: 16px; margin-bottom: 10px;">Dear HR Team,</p>
-    //                         <p style="margin-bottom: 20px;">A new job application has been submitted via the CPSU Career Portal. Here are the details:</p>
+    //                         <p style="margin-bottom: 20px;">A new job application has been submitted via the LGU Mabinay Career Portal. Here are the details:</p>
 
     //                         <table style="width: 100%; border-collapse: collapse;">
     //                             <tr><td style="padding: 6px 0; font-weight: bold;">Application No:</td><td>' . $applicationNumber . '</td></tr>
@@ -130,10 +130,10 @@ class ApplicationController extends Controller
     //                             <p style="margin: 0;">📎 The applicant’s <strong>Intent Letter (PDF)</strong> is attached to this email.</p>
     //                         </div>
 
-    //                         <p style="margin-top: 24px;">Best regards,<br><strong>CPSU Online Career Portal</strong></p>
+    //                         <p style="margin-top: 24px;">Best regards,<br><strong>LGU Mabinay Online Career Portal</strong></p>
     //                     </div>
     //                     <div style="background: #f1f1f1; text-align: center; padding: 10px; font-size: 12px; color: #555;">
-    //                         © ' . date('Y') . ' Central Philippines State University | HRIS
+    //                         © ' . date('Y') . ' LGU Mabinay | HRIS
     //                     </div>
     //                 </div>
     //             </div>
@@ -258,7 +258,7 @@ class ApplicationController extends Controller
                         </div>
                         <div style="padding: 24px; color: #333;">
                             <p style="font-size: 16px; margin-bottom: 10px;">Dear Records Office Team,</p>
-                            <p style="margin-bottom: 20px;">A new job application has been submitted via the CPSU Career Portal. Here are the details:</p>
+                            <p style="margin-bottom: 20px;">A new job application has been submitted via the LGU Mabinay Career Portal. Here are the details:</p>
 
                             <table style="width: 100%; border-collapse: collapse;">
                                 <tr><td style="padding: 6px 0; font-weight: bold;">Application No:</td><td>' . $applicationNumber . '</td></tr>
@@ -276,10 +276,10 @@ class ApplicationController extends Controller
                                 <p style="margin: 0;">📎 The applicant’s <strong>Intent Letter (PDF)</strong> is attached to this email.</p>
                             </div>
 
-                            <p style="margin-top: 24px;">Best regards,<br><strong>CPSU Online Career Portal</strong></p>
+                            <p style="margin-top: 24px;">Best regards,<br><strong>LGU Mabinay Online Career Portal</strong></p>
                         </div>
                         <div style="background: #f1f1f1; text-align: center; padding: 10px; font-size: 12px; color: #555;">
-                            © ' . date('Y') . ' Central Philippines State University | HRIS
+                            © ' . date('Y') . ' LGU Mabinay | HRIS
                         </div>
                     </div>
                 </div>
@@ -297,7 +297,7 @@ class ApplicationController extends Controller
             });
 
             // ===== 📩 Email to Applicant =====
-            $subjectApplicant = "CPSU Career Portal - Application Confirmation (#{$applicationNumber})";
+            $subjectApplicant = "LGU Mabinay Career Portal - Application Confirmation (#{$applicationNumber})";
             $bodyApplicant = '
                 <div style="font-family: Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
                     <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 0 10px rgba(0,0,0,0.05);">
@@ -306,7 +306,7 @@ class ApplicationController extends Controller
                         </div>
                         <div style="padding: 24px; color: #333;">
                             <p>Dear <strong>' . $request->first_name . ' ' . $request->last_name . '</strong>,</p>
-                            <p>Thank you for submitting your application to <strong>Central Philippines State University (CPSU)</strong>.</p>
+                            <p>Thank you for submitting your application to <strong>LGU Mabinay</strong>.</p>
                             <p>Your Application Number is:</p>
                             <div style="background: #f0fdf4; border-left: 4px solid '.$green.'; padding: 10px 16px; margin: 16px 0; font-size: 18px; font-weight: bold; color: '.$green.';">
                                 ' . $applicationNumber . '
@@ -314,10 +314,10 @@ class ApplicationController extends Controller
                             <p>You can track your application status anytime using the link below:</p>
                             <p><a href="' . $trackingUrl . '" style="display: inline-block; background-color: '.$green.'; color: white; text-decoration: none; padding: 10px 18px; border-radius: 6px;">Track My Application</a></p>
 
-                            <p style="margin-top: 24px;">Best regards,<br><strong>CPSU Career Portal</strong></p>
+                            <p style="margin-top: 24px;">Best regards,<br><strong>LGU Mabinay Career Portal</strong></p>
                         </div>
                         <div style="background: #f1f1f1; text-align: center; padding: 10px; font-size: 12px; color: #555;">
-                            © ' . date('Y') . ' Central Philippines State University | HRIS
+                            © ' . date('Y') . ' LGU Mabinay | HRIS
                         </div>
                     </div>
                 </div>

@@ -542,15 +542,73 @@ class MasterController extends Controller
 
     public function systemSetting(){
         $guard = $this->getGuard();
-        $employees = Employee::select('id', 'emp_ID', 'fname', 'lname')->get();
-        $settings = Setting::first();
+        $employees = Employee::select('id', 'emp_ID', 'fname', 'lname')
+            ->orderBy('lname')->orderBy('fname')->get();
 
-        $kioskAccess = explode(',', $settings->hr_kiosk);
-        $dtrFullAccess = explode(',', $settings->dtr_acct);
+        // firstOrNew so the page still renders on a database that has never
+        // been seeded; saving creates the row.
+        $settings = Setting::firstOrNew(['id' => 1]);
+
+        // Both columns hold a comma-joined list. Casting first keeps
+        // explode() off a null (deprecated on PHP 8.1) and array_filter drops
+        // the empty string an empty column would otherwise produce.
+        $kioskAccess   = array_values(array_filter(explode(',', (string) $settings->hr_kiosk)));
+        $dtrFullAccess = array_values(array_filter(explode(',', (string) $settings->dtr_acct)));
 
         $stations = \App\Models\AttendanceStation::orderBy('name')->get();
 
         return view('settings.index', compact('guard', 'employees', 'settings', 'kioskAccess', 'dtrFullAccess', 'stations'));
+    }
+
+    /**
+     * Save the system settings page.
+     *
+     * There is one settings row and every field on the page lives on it, so the
+     * whole form is written in one go. The two access lists are stored the way
+     * the readers expect them: a comma-joined list of ids that DtrController
+     * and the kiosk explode back out.
+     */
+    public function systemSettingUpdate(Request $request)
+    {
+        $data = $request->validate([
+            'mayor'                => 'nullable|integer|exists:employees,id',
+            'vice_mayor'           => 'nullable|integer|exists:employees,id',
+            'hr'                   => 'nullable|integer|exists:employees,id',
+            'te_rstrct_lvl'        => 'required|in:0,1,2',
+            'hr_kiosk'             => 'nullable|array',
+            'hr_kiosk.*'           => 'exists:employees,emp_ID',
+            'dtr_acct'             => 'nullable|array',
+            'dtr_acct.*'           => 'integer|exists:employees,id',
+            'records_office_email' => 'nullable|email',
+            'job_portal_email'     => 'nullable|email',
+        ]);
+
+        $setting = Setting::firstOrNew(['id' => 1]);
+        $setting->id = 1;
+
+        // The "— Not assigned —" option posts an empty string, and the officials
+        // are integer columns: "" has to become NULL or the write fails. Not
+        // left to ConvertEmptyStringsToNull, so this holds however it is called.
+        $blankToNull = fn ($value) => ($value === '' || $value === null) ? null : $value;
+
+        $setting->fill([
+            'mayor'                => $blankToNull($data['mayor'] ?? null),
+            'vice_mayor'           => $blankToNull($data['vice_mayor'] ?? null),
+            'hr'                   => $blankToNull($data['hr'] ?? null),
+            'te_rstrct_lvl'        => $data['te_rstrct_lvl'],
+            'hr_kiosk'             => implode(',', $data['hr_kiosk'] ?? []),
+            'dtr_acct'             => implode(',', $data['dtr_acct'] ?? []),
+            'records_office_email' => $blankToNull($data['records_office_email'] ?? null),
+            'job_portal_email'     => $blankToNull($data['job_portal_email'] ?? null),
+            // Unchecked switches post nothing at all, so read them as booleans
+            // rather than looking for a key that will not be there.
+            'maintenance'          => $request->boolean('maintenance'),
+            'sync_backups'         => $request->boolean('sync_backups'),
+        ]);
+
+        $setting->save();
+
+        return redirect()->route('settings')->with('success', 'System settings saved.');
     }
 
     public function dataPrivacyNotice(Request $request)

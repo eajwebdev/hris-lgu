@@ -6,6 +6,8 @@ use App\Http\Controllers\LoginAuthController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\MasterController;
+use App\Http\Controllers\PositionDescriptionController;
+use App\Http\Controllers\ComparativeAssessmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\TirednessController;
 use App\Http\Controllers\OfficeController;
@@ -172,6 +174,35 @@ Route::group(['middleware' => ['login_auth', 'password.changed', NoCacheMiddlewa
         
     });
 
+    /*
+     * Position Description Form (DBM-CSC Form No. 1, Revised 2017).
+     * A standing document per plantilla item, reused by every posting of it.
+     */
+    Route::prefix('position-descriptions')->middleware('face.registrar')->group(function () {
+        Route::get('/', [PositionDescriptionController::class, 'index'])->name('positionDescriptionList');
+        Route::get('/create', [PositionDescriptionController::class, 'create'])->name('positionDescriptionCreate');
+        Route::post('/', [PositionDescriptionController::class, 'store'])->name('positionDescriptionStore');
+        Route::get('/{id}/edit', [PositionDescriptionController::class, 'edit'])->name('positionDescriptionEdit');
+        Route::post('/{id}', [PositionDescriptionController::class, 'update'])->name('positionDescriptionUpdate');
+        Route::post('/{id}/delete', [PositionDescriptionController::class, 'destroy'])->name('positionDescriptionDelete');
+        Route::get('/{id}/print', [PositionDescriptionController::class, 'print'])->name('positionDescriptionPrint');
+    });
+
+    /*
+     * Personnel Selection Board — the Comparative Assessment Form, and the
+     * board membership that signs it.
+     */
+    Route::prefix('psb')->middleware('face.registrar')->group(function () {
+        Route::get('/assessment/{jid}', [ComparativeAssessmentController::class, 'show'])->name('psbAssessment');
+        Route::post('/assessment/{jid}/build', [ComparativeAssessmentController::class, 'build'])->name('psbAssessmentBuild');
+        Route::post('/assessment/{id}/save', [ComparativeAssessmentController::class, 'save'])->name('psbAssessmentSave');
+        Route::post('/assessment/{id}/finalise', [ComparativeAssessmentController::class, 'finalise'])->name('psbAssessmentFinalise');
+        Route::get('/assessment/{id}/print', [ComparativeAssessmentController::class, 'print'])->name('psbAssessmentPrint');
+
+        Route::get('/members', [ComparativeAssessmentController::class, 'members'])->name('psbMembers');
+        Route::post('/members', [ComparativeAssessmentController::class, 'membersSave'])->name('psbMembersSave');
+    });
+
     Route::prefix('ete')->group(function () {
         Route::get('/ete-evaluations',[EteEvaluationController::class, 'eteEvaluationList'])->name('eteEvaluationList');
         Route::post('/ete-evaluations/store',[EteEvaluationController::class, 'eteEvaluationStore'])->name('eteEvaluationStore');
@@ -195,6 +226,7 @@ Route::group(['middleware' => ['login_auth', 'password.changed', NoCacheMiddlewa
         Route::get('/evaluations/{id}/consolidated', [InterviewEvaluationController::class, 'consolidatedScreen'])->name('interviewConsolidatedScreen');
         Route::get('/evaluations/{id}/consolidated-data', [InterviewEvaluationController::class, 'consolidatedData'])->name('interviewConsolidatedData');
         Route::get('/evaluations/{id}/summary-rating', [InterviewEvaluationController::class, 'summaryRatingPdf'])->name('interviewSummaryRatingPdf');
+        Route::get('/evaluations/{id}/psb-interview-form', [InterviewEvaluationController::class, 'psbInterviewForm'])->name('psbInterviewForm');
         Route::get('/evaluations/{id}/panel-progress', [InterviewEvaluationController::class, 'panelProgress'])->name('interviewPanelProgress');
         Route::get('/evaluations/{id}', [InterviewEvaluationController::class, 'show'])->name('interviewEvaluationShow');
         Route::post('/evaluations/{id}/candidate/{applicationId}/cast', [InterviewEvaluationController::class, 'cast'])->name('interviewCandidateCast');
@@ -429,7 +461,17 @@ Route::group(['middleware' => ['login_auth', 'password.changed', NoCacheMiddlewa
         Route::post('/scan-punch', [EventController::class, 'scanPunch'])->name('eventScanPunch');
     });
 
-    Route::get('/settings', [MasterController::class, 'systemSetting'])->name('settings');
+    /*
+     * System settings. The sidebar only draws the link for an admin, but that
+     * is presentation — face.registrar (Administrator / HR Administrator) is
+     * what actually refuses everyone else, on the read as well as the write.
+     * Without it any signed-in employee could POST themselves into DTR Full
+     * Access or make themselves the approving Mayor.
+     */
+    Route::middleware('face.registrar')->group(function () {
+        Route::get('/settings', [MasterController::class, 'systemSetting'])->name('settings');
+        Route::post('/settings', [MasterController::class, 'systemSettingUpdate'])->name('settingsUpdate');
+    });
     Route::get('/leave/disapprove', [LeaveApplicationController::class, 'leaveDisapprove']);
     Route::post('/logout', [MasterController::class, 'logout'])->name('logout');
 

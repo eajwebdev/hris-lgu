@@ -18,7 +18,7 @@ class Employee extends Authenticatable
         'fname', 'mname', 'lname', 'position', 'profile', 'area_id', 'emp_ID', 'android_id', 'emp_status', 'emp_salary', 'emp_dept', 'item_no',
         'username', 'verification_code', 'password', 'role', 'date_hired', 'prefix', 'title_prefix', 'suffix', 'bdate', 'age',
         'b_place', 'sex', 'civil_status', 'height_cm', 'height_m', 'weight_kg', 'weight_lb', 'b_type',
-        'gsis', 'pagibig', 'philhealth', 'sss', 'tin', 'citizenship', 'c_category', 'country', 'telephone', 'mobile',
+        'gsis', 'pagibig', 'philhealth', 'sss', 'umid', 'philsys', 'tin', 'citizenship', 'c_category', 'country', 'telephone', 'mobile',
         'org_email', 'add_block', 'add_street', 'add_village', 'add_brgy', 'add_city', 'supervisor',
         'add_region', 'add_prov', 'add_zcode', 'padd_block', 'padd_street', 'padd_village', 'padd_brgy',
         'padd_city', 'padd_region', 'padd_prov', 'padd_zcode', 'sl', 'vl', 'mat_leave', 'special_pl', 'solo_pl', 

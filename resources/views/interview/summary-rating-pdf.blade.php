@@ -226,7 +226,7 @@
 </head>
 <body>
 @php
-    $sealData = 'data:image/jpeg;base64,'.base64_encode(file_get_contents(public_path('template/img/ete-cpsu-seal.jpeg')));
+    $sealData = 'data:image/jpeg;base64,'.base64_encode(file_get_contents(public_path('template/img/mabinay-seal.jpeg')));
     $bagongData = 'data:image/png;base64,'.base64_encode(file_get_contents(public_path('template/img/bagong-pilipinas.png')));
     $footerData = 'data:image/png;base64,'.base64_encode(file_get_contents(public_path('template/img/report-footer.png')));
 @endphp
@@ -241,8 +241,8 @@
                     </span>
                     <span class="agency-text">
                         Republic of the Philippines<br>
-                        <strong>CENTRAL PHILIPPINES STATE UNIVERSITY</strong><br>
-                        Kabankalan City, Negros Occidental 6111
+                        <strong>MUNICIPALITY OF MABINAY</strong><br>
+                        Negros Oriental
                     </span>
                 </div>
             </td>

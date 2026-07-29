@@ -16,7 +16,7 @@ class ImportSql extends Command
      *   php artisan db:import-sql --connection=payroll
      */
     protected $signature = 'db:import-sql
-                            {file? : Path to the .sql file (defaults to storage/app/dbcpsuhris.sql)}
+                            {file? : Path to the .sql file (defaults to storage/app/hris-mabinay.sql)}
                             {--connection= : DB connection to import into (defaults to the default connection)}
                             {--fresh : Drop all existing tables in the target database before importing}';
 
@@ -30,7 +30,7 @@ class ImportSql extends Command
      */
     public function handle(): int
     {
-        $file = $this->argument('file') ?: storage_path('app/dbcpsuhris.sql');
+        $file = $this->argument('file') ?: storage_path('app/hris-mabinay.sql');
 
         // Allow relative paths from the project root too.
         if (!file_exists($file) && file_exists(base_path($file))) {

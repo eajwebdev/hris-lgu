@@ -15,7 +15,7 @@
         <!-- Theme style -->
         <link rel="stylesheet" href="{{ asset('template/dist/css/adminlte.css') }}">
         <!-- Logo  -->
-        <link rel="shortcut icon" type="" href="{{ asset('template/img/CPSU_L.png') }}">
+        <link rel="shortcut icon" type="" href="{{ asset('Uploads/logo.png') }}">
         
         <style>
             body {
@@ -102,12 +102,12 @@
                     <div class="login-page">
                         <div class="login-logo">
                             <a href="./">
-                                <img src="{{ asset('template/img/CPSU_L.png') }}" class="img-responsive" width="50%">
+                                <img src="{{ asset('Uploads/logo.png') }}" class="img-responsive" width="50%">
                             </a>
                         </div>
                         <div class="">
                             <div class="">
-                                <p class="login-box-msg" style="color: #358359;">Welcome to <b style="color: #FFCB2C;">CPSU HRIS</b></p>
+                                <p class="login-box-msg" style="color: #358359;">Welcome to <b style="color: #FFCB2C;">LGU Mabinay HRIS</b></p>
                                 <h4 style="color: #358359;" class="mb-3"><b>Login</h4>
                                 <form action="{{ route('postLogin') }}" method="post" id="signInAuth">
                                     @csrf

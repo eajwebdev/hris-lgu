@@ -83,7 +83,7 @@
         ['c.', 'For every 50 hours consisting of 1 or more relevant in-service training', 1, 67],
     ];
     $applicantName = trim($application->first_name.' '.$application->middle_name.' '.$application->last_name);
-    $sealData = 'data:image/jpeg;base64,'.base64_encode(file_get_contents(public_path('template/img/ete-cpsu-seal.jpeg')));
+    $sealData = 'data:image/jpeg;base64,'.base64_encode(file_get_contents(public_path('template/img/mabinay-seal.jpeg')));
     $bagongData = 'data:image/png;base64,'.base64_encode(file_get_contents(public_path('template/img/bagong-pilipinas.png')));
     $pdfCheckbox = function ($checked) {
         return '<span style="display:inline-block;white-space:nowrap;margin-left:5px;">'
@@ -111,7 +111,7 @@
                 <td class="agency">
                     <div class="agency-inner">
                         <span class="agency-logos"><img class="seal" src="{{ $sealData }}"><img class="bagong" src="{{ $bagongData }}" width="70" height="70" style="width:60px !important;height:60px !important;"></span>
-                        <span class="agency-text">Republic of the Philippines<br><strong>CENTRAL PHILIPPINES STATE UNIVERSITY</strong><br>Kabankalan City, Negros Occidental 6111</span>
+                        <span class="agency-text">Republic of the Philippines<br><strong>MUNICIPALITY OF MABINAY</strong><br>Negros Oriental</span>
                     </div>
                 </td>
             </tr>
@@ -238,7 +238,7 @@
         </div>
 
         <div class="footer">
-            <span>Doc Control Code: CPSU-F-HRMO-06-REV01</span>
+            <span>Doc Control Code: LGU-MABINAY-F-HRMO-06-REV01</span>
             <span>Effective Date: 09/12/2018</span>
             <span>Page No: 1/1</span>
         </div>

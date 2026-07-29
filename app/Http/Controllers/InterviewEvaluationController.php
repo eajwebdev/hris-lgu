@@ -16,9 +16,17 @@ use Illuminate\Support\Facades\DB;
 
 class InterviewEvaluationController extends Controller
 {
+    /**
+     * The seven traits on the PSB Interview Form.
+     *
+     * Each is rated 1-10 by each panel member, then weighted by the percentage
+     * printed on the form. The weights live in App\Services\PsbScoring so the
+     * rating screen, the ranking and the printed form cannot drift apart; they
+     * are mirrored into 'weight' below only for display.
+     */
     private array $interviewCriteria = [
-        'voice_speech' => [
-            'label' => 'Voice and speech',
+        'communication_skill' => [
+            'label' => 'Communication skill',
             'prompt' => 'Is his/her voice inviting or pleasant? Can you easily hear what he/she says? Is his/her speech clear and distinct? Is his/her voice resonant and well-modulated?',
             'levels' => [
                 '1 - 2' => 'Irritating or indistinct',
@@ -478,9 +486,20 @@ class InterviewEvaluationController extends Controller
         });
     }
 
+    /**
+     * The Interview Form totals 100 by weight, not by raw points: the seven
+     * traits are worth 10/10/20/20/10/15/15, so a raw sum out of 70 is not the
+     * score. interview_total therefore holds the weighted figure.
+     */
     private function maxInterviewScore(): int
     {
-        return count($this->interviewCriteria) * 10;
+        return 100;
+    }
+
+    /** The weight printed beside each trait on the form. */
+    private function interviewWeight(string $key): int
+    {
+        return \App\Services\PsbScoring::INTERVIEW_WEIGHTS[$key] ?? 0;
     }
 
     private function maxPotentialScore(): int
@@ -1074,9 +1093,10 @@ class InterviewEvaluationController extends Controller
             );
             $isComplete = collect($interviewKeys)->every(fn ($key) => isset($interviewScores[$key]) && $interviewScores[$key] !== '')
                 && collect($potentialKeys)->every(fn ($key) => isset($potentialScores[$key]) && $potentialScores[$key] !== '');
-            $interviewTotal = $isComplete
-                ? $this->sumScores($interviewScores, $interviewKeys, 1, 10)
-                : $this->sumProvidedScores($interviewScores, $interviewKeys, 1, 10);
+            // Weighted to 100 by the percentages on the PSB Interview Form. A
+            // part-finished sheet scores what has been rated so far; the
+            // unrated traits simply contribute nothing.
+            $interviewTotal = (new \App\Services\PsbScoring())->interviewTotal($interviewScores);
             $potentialTotal = $isComplete
                 ? $this->sumScores($potentialScores, $potentialKeys, 1, 5)
                 : $this->sumProvidedScores($potentialScores, $potentialKeys, 1, 5);
@@ -1218,6 +1238,57 @@ class InterviewEvaluationController extends Controller
 
         return response()->json(['success' => true, 'data' => $data])
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    /**
+     * The PSB INTERVIEW FORM, ready to print.
+     *
+     * One row per candidate. Each trait shows the panel's mean rating and the
+     * TOTAL column the panel's mean weighted score, because the board records a
+     * single figure per candidate, not one sheet per panellist.
+     */
+    public function psbInterviewForm($id)
+    {
+        $this->authorizeRankingAdmin();
+
+        $interview = InterviewEvaluation::with(['job', 'applicants.application', 'ratings'])->findOrFail($id);
+        $this->syncApplicantRows($interview);
+        $interview->load(['applicants.application', 'ratings']);
+
+        $psb = new \App\Services\PsbScoring();
+        $traitKeys = array_keys(\App\Services\PsbScoring::INTERVIEW_WEIGHTS);
+        $byApplication = $interview->ratings->groupBy('application_id');
+
+        $candidates = $interview->applicants
+            ->filter(fn ($row) => $row->application)
+            ->map(function ($row) use ($byApplication, $psb, $traitKeys) {
+                $ratings = $byApplication->get($row->application_id, collect())
+                    ->filter(fn ($r) => $this->ratingComplete($r));
+
+                // Mean raw rating per trait across the panel.
+                $scores = [];
+                foreach ($traitKeys as $key) {
+                    $values = $ratings->map(fn ($r) => ($r->interview_scores[$key] ?? null))
+                        ->filter(fn ($v) => $v !== null && $v !== '');
+                    $scores[$key] = $values->isEmpty() ? null : round($values->avg(), 2);
+                }
+
+                return [
+                    'name'   => $this->applicantName($row->application),
+                    'scores' => $scores,
+                    'total'  => $ratings->isEmpty()
+                        ? null
+                        : $psb->panelAverage($ratings->pluck('interview_total')->all()),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return view('interview.psb-interview-form', [
+            'position'   => optional($interview->job)->title ?? '',
+            'candidates' => $candidates,
+            'backUrl'    => route('interviewEvaluationShow', $interview->id),
+        ]);
     }
 
     public function summaryRatingPdf($id)

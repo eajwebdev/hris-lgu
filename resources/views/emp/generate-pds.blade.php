@@ -166,7 +166,9 @@
             <thead>
                 <tr>
                     <th colspan="9" class="bg1">
-                        <img src="{{ pdf_image('Uploads/pds-header-2025.png') }}" width="100.1%" alt="" srcset="">
+                        {{-- The masthead carries the revision number, so it is versioned with
+                             the form. pds-header-2025.png is kept alongside for reference. --}}
+                        <img src="{{ pdf_image('Uploads/pds-header-2026.png') }}" width="100.1%" alt="" srcset="">
                     </th>
                 </tr>
             </thead>
@@ -295,8 +297,11 @@
                     </td>
                 </tr>
                 <tr>
+                    {{-- Falls back to the SSS number, which is what this row printed
+                         before employees.umid existed, so records captured under the
+                         old behaviour keep showing the number they always showed. --}}
                     <td class="bordered pl2 bg2">10. UMID ID NO.</td>
-                    <th class="bordered pl2" colspan="2">{{ $datas['employee']->sss ?? 'N/A' }}</th>
+                    <th class="bordered pl2" colspan="2">{{ $datas['employee']->umid ?: ($datas['employee']->sss ?? 'N/A') }}</th>
                     <td class="bordered pl2" colspan="5">
                         <div class="address-column">
                             <b>{{ strtoupper($datas['employee']->padd_village ?? 'N/A') }}</b><br>Subdivision/Village
@@ -574,7 +579,8 @@
                 </tr>
                 <tr>
                     <th class="bordered bg2"><em>SIGNATURE</em></th>
-                    <th class="bordered" colspan="3"></th>
+                    {{-- 2026 adds this caption under the page 1 signature. --}}
+                    <th class="bordered" colspan="3"><span style="font-size: 5px; display: block;">(e-signature or actual signature or digital certificate)</span></th>
                     <th class="bordered bg2" colspan="2"><em>DATE</em></th>
                     <th class="bordered" colspan="3">{{ \Carbon\Carbon::now()->format('d/m/Y') }}</th>
                 </tr>
@@ -637,9 +643,16 @@
             </thead>
             <tbody>
                 <tr>
+                    {{-- MONTHLY SALARY and SALARY/JOB/PAY GRADE are required by CS Form 212
+                         and were previously not printed at all, though both have always been
+                         captured on the work-experience form. Position title and department
+                         each give up one column to make room, so the section still spans ten
+                         columns and every other row in this table stays as it was. --}}
                     <td class="bordered f2 bg2" colspan="2">28. &nbsp;&nbsp;INCLUSIVE DATES<br><span style="margin-left: 30px;">(dd/mm/yyyy)</span></td>
-                    <td class="bordered vcenter f2 bg2" rowspan="2" colspan="3">POSITION TITLE <br> (Write in full/Do not abbreviate)</td>
-                    <td class="bordered vcenter f2 bg2" rowspan="2" colspan="3">DEPARTMENT / AGENCY / OFFICE / COMPANY <br> (Write in full/Do not abbreviate)</td>
+                    <td class="bordered vcenter f2 bg2" rowspan="2" colspan="2">POSITION TITLE <br> (Write in full/Do not abbreviate)</td>
+                    <td class="bordered vcenter f2 bg2" rowspan="2" colspan="2">DEPARTMENT / AGENCY / OFFICE / COMPANY <br> (Write in full/Do not abbreviate)</td>
+                    <td class="bordered vcenter f2 bg2" rowspan="2" width="42">MONTHLY<br>SALARY</td>
+                    <td class="bordered vcenter f2 bg2" rowspan="2" width="46">SALARY/ JOB/ PAY GRADE <span style="font-size:5px;">(If applicable)</span> &amp; STEP INCREMENT <span style="font-size:5px;">(Format: "00-0")</span></td>
                     <td class="bordered vcenter f2 bg2" rowspan="2">STATUS OF <br>APPOINTMENT</td>
                     <td class="bordered vcenter f2 bg2" rowspan="2" width="25">GOV'T <br>SERVICE <br>(Y/ N)</td>
                 </tr>
@@ -651,8 +664,10 @@
                     <tr>
                         <th class="bordered">{{ $experience->inc_date1 ? \Carbon\Carbon::parse($experience->inc_date1)->format('d/m/Y') : 'N/A' }}</th>
                         <th class="bordered">@if($experience->inc_date2 != null){{ $experience->inc_date2 ? \Carbon\Carbon::parse($experience->inc_date2)->format('d/m/Y') : 'N/A' }}@else PRESENT @endif</th>
-                        <th class="bordered" colspan="3">{{ strtoupper($experience->position ?? 'N/A') }}</th>
-                        <th class="bordered" colspan="3">{{ strtoupper($experience->department ?? 'N/A') }}</th>
+                        <th class="bordered" colspan="2">{{ strtoupper($experience->position ?? 'N/A') }}</th>
+                        <th class="bordered" colspan="2">{{ strtoupper($experience->department ?? 'N/A') }}</th>
+                        <th class="bordered">{{ $experience->salary !== null && $experience->salary !== '' ? number_format((float) str_replace(',', '', $experience->salary), 2) : 'N/A' }}</th>
+                        <th class="bordered">{{ $experience->sg_grade ?: 'N/A' }}</th>
                         <th class="bordered">{!! nl2br(e(preg_replace('/(\s|\/|,|-)/', "$1\n", strtoupper($experience->stat_app ?? 'N/A')) )) !!}</th>
                         <th class="bordered">{{ strtoupper($experience->service ?? 'N/A') }}</th>
                     </tr>
@@ -662,8 +677,10 @@
                     <tr>
                         <th class="bordered">N/A</th>
                         <th class="bordered">N/A</th>
-                        <th class="bordered" colspan="3">N/A</th>
-                        <th class="bordered" colspan="3">N/A</th>
+                        <th class="bordered" colspan="2">N/A</th>
+                        <th class="bordered" colspan="2">N/A</th>
+                        <th class="bordered">N/A</th>
+                        <th class="bordered">N/A</th>
                         <th class="bordered">N/A</th>
                         <th class="bordered">N/A</th>
                     </tr>
@@ -846,7 +863,7 @@
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[0]) && $otherinfo_question[0] == 1) ? 'checked' : ''}}><span>YES</span><br>
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[1]) && $otherinfo_question[1] == 1) ? 'checked' : ''}}><span>YES</span><br>
                             <div style="margin-left: 5px; margin-top: 5px;">If YES, give details:</div>
-                            <div style="margin-left: 5px; font-size: 8px !important; margin-top: {{ ($otherinfo_question[1] == 1) ? '5px;' : '17px;'}} width: 238px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[1]) && $otherinfo_question[1] == 1) ? $otherinfo_questiondetail[1] : ''}}</div>
+                            <div style="margin-left: 5px; font-size: 8px !important; margin-top: {{ (($otherinfo_question[1] ?? null) == 1) ? '5px;' : '17px;'}} width: 238px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[1]) && $otherinfo_question[1] == 1) ? $otherinfo_questiondetail[1] : ''}}</div>
                         </div>
                         <div style="float: right; margin-right: 17px; margin-top: 31px;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px; margin-left: -130px;" {{ (isset($otherinfo_question[0]) && $otherinfo_question[0] == 0) ? 'checked' : ''}}><span>NO</span><br>
@@ -862,7 +879,7 @@
                         <div style="float: left;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[2]) && $otherinfo_question[2] == 1) ? 'checked' : ''}}><span>YES</span><br>
                             <div style="margin-left: 5px; margin-top: 5px;">If YES, give details:</div>
-                            <div style="margin-left: 5px; font-size: 8px !important; margin-top: {{ ($otherinfo_question[2] == 1) ? '5px;' : '17px;'}} width: 238px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[2]) && $otherinfo_question[2] == 1) ? $otherinfo_questiondetail[2] : ''}}</div>
+                            <div style="margin-left: 5px; font-size: 8px !important; margin-top: {{ (($otherinfo_question[2] ?? null) == 1) ? '5px;' : '17px;'}} width: 238px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[2]) && $otherinfo_question[2] == 1) ? $otherinfo_questiondetail[2] : ''}}</div>
                         </div>
                         <div style="float: right; margin-right: 17px;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px; margin-left: -130px;" {{ (isset($otherinfo_question[2]) && $otherinfo_question[2] == 0) ? 'checked' : ''}}><span>NO</span><br>
@@ -893,7 +910,7 @@
                         <div style="float: left;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[4]) && $otherinfo_question[4] == 1) ? 'checked' : ''}}><span>YES</span><br>
                             <div style="margin-left: 5px; margin-top: 5px;">If YES, give details:</div>
-                            <div style="margin-left: 5px; font-size: 8px !important; margin-top: {{ ($otherinfo_question[4] == 1) ? '5px;' : '17px;'}} width: 238px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[4]) && $otherinfo_question[4] == 1) ? $otherinfo_questiondetail[4] : ''}}</div>
+                            <div style="margin-left: 5px; font-size: 8px !important; margin-top: {{ (($otherinfo_question[4] ?? null) == 1) ? '5px;' : '17px;'}} width: 238px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[4]) && $otherinfo_question[4] == 1) ? $otherinfo_questiondetail[4] : ''}}</div>
                         </div>
                         <div style="float: right; margin-right: 17px;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px; margin-left: -130px;" {{ (isset($otherinfo_question[4]) && $otherinfo_question[4] == 0) ? 'checked' : ''}}><span>NO</span><br>
@@ -908,7 +925,7 @@
                         <div style="float: left;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[5]) && $otherinfo_question[5] == 1) ? 'checked' : ''}}><span>YES</span><br>
                             <div style="margin-left: 5px; margin-top: 5px;">If YES, give details:</div>
-                            <div style="margin-left: 5px; font-size: 8px !important; margin-top: {{ ($otherinfo_question[5] == 1) ? '5px;' : '17px;'}} width: 238px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[5]) && $otherinfo_question[5] == 1) ? $otherinfo_questiondetail[5] : ''}}</div>
+                            <div style="margin-left: 5px; font-size: 8px !important; margin-top: {{ (($otherinfo_question[5] ?? null) == 1) ? '5px;' : '17px;'}} width: 238px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[5]) && $otherinfo_question[5] == 1) ? $otherinfo_questiondetail[5] : ''}}</div>
                         </div>
                         <div style="float: right; margin-right: 17px;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px; margin-left: -130px;" {{ (isset($otherinfo_question[5]) && $otherinfo_question[5] == 0) ? 'checked' : ''}}><span>NO</span><br>
@@ -923,7 +940,7 @@
                         <div style="float: left;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[6]) && $otherinfo_question[6] == 1) ? 'checked' : ''}}><span>YES</span><br>
                             <span style="margin-left: 5px;">If YES, give details:</span>
-                            <span style="margin-left: 93px; {{ ($otherinfo_questiondetail[6] != null) ? 'margin-top: -13px;' : ''}} width: 151px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[6]) && $otherinfo_question[6] == 1) ? $otherinfo_questiondetail[6] : ''}}</span>
+                            <span style="margin-left: 93px; {{ (($otherinfo_questiondetail[6] ?? null) != null) ? 'margin-top: -13px;' : ''}} width: 151px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[6]) && $otherinfo_question[6] == 1) ? $otherinfo_questiondetail[6] : ''}}</span>
                         </div>
                         <div style="float: right; margin-right: 17px;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px; margin-left: -130px;" {{ (isset($otherinfo_question[6]) && $otherinfo_question[6] == 0) ? 'checked' : ''}}><span>NO</span><br>
@@ -938,7 +955,7 @@
                         <div style="float: left;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[7]) && $otherinfo_question[7] == 1) ? 'checked' : ''}}><span>YES</span><br>
                             <span style="margin-left: 5px;">If YES, give details:</span>
-                            <span style="margin-left: 93px; {{ ($otherinfo_questiondetail[7] != null) ? 'margin-top: -13px;' : ''}} width: 151px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[7]) && $otherinfo_question[7] == 1) ? $otherinfo_questiondetail[7] : ''}}</span>
+                            <span style="margin-left: 93px; {{ (($otherinfo_questiondetail[7] ?? null) != null) ? 'margin-top: -13px;' : ''}} width: 151px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[7]) && $otherinfo_question[7] == 1) ? $otherinfo_questiondetail[7] : ''}}</span>
                         </div>
                         <div style="float: right; margin-right: 17px;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px; margin-left: -130px;" {{ (isset($otherinfo_question[7]) && $otherinfo_question[7] == 0) ? 'checked' : ''}}><span>NO</span><br>
@@ -953,7 +970,7 @@
                         <div style="float: left;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[8]) && $otherinfo_question[8] == 1) ? 'checked' : ''}}><span>YES</span><br>
                             <div style="margin-left: 5px; margin-top: 5px;">If YES, give details: (country): </div>
-                            <div style="margin-left: 5px; margin-top: {{ ($otherinfo_question[8] == 1) ? '5px;' : '17px;'}} width: 238px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[8]) && $otherinfo_question[8] == 1) ? $otherinfo_questiondetail[8] : ''}}</div>
+                            <div style="margin-left: 5px; margin-top: {{ (($otherinfo_question[8] ?? null) == 1) ? '5px;' : '17px;'}} width: 238px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[8]) && $otherinfo_question[8] == 1) ? $otherinfo_questiondetail[8] : ''}}</div>
                         </div>
                         <div style="float: right; margin-right: 17px;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px; margin-left: -130px;" {{ (isset($otherinfo_question[8]) && $otherinfo_question[8] == 0) ? 'checked' : ''}}><span>NO</span><br>
@@ -962,7 +979,10 @@
                 </tr>
                 <tr>
                     <td class="bordered h-5 bg2" width="65%" style="border-bottom: none !important;">
-                        <span>40. Pursuant to: (a) Indigenous People's Act (RA 8371); (b) Magna Carta for Disabled Persons (RA</span><br><span style="margin-left: 16px;">7277); and (c) Solo Parents Welfare Act of 2000 (RA 8972), please answer the following items:</span><br>
+                        {{-- 2026: RA 7277 cited "as amended", and the Solo Parents Welfare Act
+                             of 2000 (RA 8972) replaced by the Expanded Solo Parents Welfare Act
+                             (RA 11861). --}}
+                        <span>40. Pursuant to: (a) Indigenous People's Act (RA 8371); (b) Magna Carta for Disabled Persons (RA</span><br><span style="margin-left: 16px;">7277, as amended); and (c) Expanded Solo Parents Welfare Act (RA 11861), please answer the following items:</span><br>
                         <br><span style="margin-left: 16px;">a. Are you a member of any indigenous group?</span><br><br>
                         <br><span style="margin-left: 16px;">b. Are you a person with disability?</span><br><br>
                         <br><span style="margin-left: 16px;">c. Are you a solo parent?</span><br><br>
@@ -971,15 +991,15 @@
                         <div style="float: left; margin-top: 31px;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[9]) && $otherinfo_question[9] == 1) ? 'checked' : ''}}><span>YES</span><br>
                             <span style="margin-left: 5px;">If YES, please specify:</span>
-                            <span style="margin-left: 105px; {{ ($otherinfo_questiondetail[9] != null) ? 'margin-top: -12px;' : ''}} width: 139px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[9]) && $otherinfo_question[9] == 1) ? $otherinfo_questiondetail[9] : ''}}</span>
+                            <span style="margin-left: 105px; {{ (($otherinfo_questiondetail[9] ?? null) != null) ? 'margin-top: -12px;' : ''}} width: 139px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[9]) && $otherinfo_question[9] == 1) ? $otherinfo_questiondetail[9] : ''}}</span>
 
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[10]) && $otherinfo_question[10] == 1) ? 'checked' : ''}}><span>YES</span><br>
-                            <span style="margin-left: 5px;">If YES, please specify:</span>
-                            <span style="margin-left: 105px; {{ ($otherinfo_questiondetail[10] != null) ? 'margin-top: -12px;' : ''}} width: 139px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[10]) && $otherinfo_question[10] == 1) ? $otherinfo_questiondetail[10] : ''}}</span>
+                            <span style="margin-left: 5px;">If YES, please specify ID No:</span>
+                            <span style="margin-left: 105px; {{ (($otherinfo_questiondetail[10] ?? null) != null) ? 'margin-top: -12px;' : ''}} width: 139px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[10]) && $otherinfo_question[10] == 1) ? $otherinfo_questiondetail[10] : ''}}</span>
 
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px;" {{ (isset($otherinfo_question[11]) && $otherinfo_question[11] == 1) ? 'checked' : ''}}><span>YES</span><br>
-                            <span style="margin-left: 5px;">If YES, please specify:</span>
-                            <span style="margin-left: 105px; {{ ($otherinfo_questiondetail[11] != null) ? 'margin-top: -12px;' : ''}} width: 139px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[11]) && $otherinfo_question[11] == 1) ? $otherinfo_questiondetail[11] : ''}}</span>
+                            <span style="margin-left: 5px;">If YES, please specify ID No:</span>
+                            <span style="margin-left: 105px; {{ (($otherinfo_questiondetail[11] ?? null) != null) ? 'margin-top: -12px;' : ''}} width: 139px; display: inline-block; border-bottom: 1px solid black;">{{ (isset($otherinfo_question[11]) && $otherinfo_question[11] == 1) ? $otherinfo_questiondetail[11] : ''}}</span>
                         </div>
                         <div style="float: right; margin-right: 17px; margin-top: 31px;">
                             <input type="checkbox" class="checkbox1" style="margin-bottom: -8px; margin-left: -130px;" {{ (isset($otherinfo_question[9]) && $otherinfo_question[9] == 0) ? 'checked' : ''}}><span>NO</span><br><br><br>
@@ -1029,8 +1049,8 @@
                 </tr>
                 <tr>
                     <td class="bordered bg2" colspan="3" style="height: 72px !important; font-size: 10px !important;">
-                        <span>42. I declare under oath that I have personally accomplished this Personal Data Sheet which is a true, correct and</span><br>
-                        <span style="margin-left: 18px;">complete statement pursuant to the provisions of pertinent laws, rules and regulations of the Republic of the</span><br>
+                        <span>42. I declare under oath that I have personally accomplished this Personal Data Sheet which is a true, correct, and</span><br>
+                        <span style="margin-left: 18px;">complete statement pursuant to the provisions of pertinent laws, rules, and regulations of the Republic of the</span><br>
                         <span style="margin-left: 18px;">Philippines. I authorize the agency head/authorized representative to verify/validate the contents stated herein.</span><br>
                         <span style="margin-left: 18px;">I  agree that any misrepresentation made in this document and its attachments shall cause the filing of</span><br>
                         <span style="margin-left: 18px;">administrative/criminal case/s against me.</span><br>
@@ -1040,7 +1060,8 @@
                     <td colspan="3" style="height: 134px !important;">
                         <div style="border: 1px solid black; width: 251px; height: 120px; margin: 6px 6px 6px 6px; float: left;">
                             <div class="bg2" style="height: 25px; border-bottom: 1px solid black; padding: 2px;">
-                                <span>Government Issued ID </span><span style="font-size: 8.2px"> (i.e.Passport, GSIS, SSS, PRC, Driver's)</span><br>
+                                <span>Government Issued ID </span><span style="font-size: 8.2px"> (i.e.Passport, GSIS, SSS, PRC, Driver's License, etc.)</span><br>
+                                <span style="font-size: 8.2px">PLEASE INDICATE ID Number and Date of Issuance</span><br>
                                 <span>License, etc.)</span><em style="margin-left: 55px;">PLEASE INDICATE ID Number</em>
                             </div>
                             <div style="height: 25px; border-bottom: 1px solid black; padding: 2px;">
@@ -1110,7 +1131,7 @@ if (isset($pdf)) {
 
         $total_pages = $PAGE_COUNT - 1;
 
-        $footer_text = "CS FORM 212 (Revised 2025), Page " . $PAGE_NUM . " of " . $total_pages;
+        $footer_text = "CS FORM 212 (Revised 2026), Page " . $PAGE_NUM . " of " . $total_pages;
 
         $text_width = $fontMetrics->get_text_width($footer_text, $font, $size);
 

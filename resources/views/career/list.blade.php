@@ -41,11 +41,42 @@
                                     <span class="input-group-text"><i class="fas fa-tags"></i></span>
                                 </div>
                                 <select name="type" class="form-control form-control-sm" required>
-                                    <option value="">-- Select Job Type --</option>
-                                    <option value="1" {{ (isset($jEdit) && $jEdit->type == 1) ? 'selected' : '' }}>Non-Teaching</option>
-                                    <option value="2" {{ (isset($jEdit) && $jEdit->type == 2) ? 'selected' : '' }}>Teaching</option>
+                                    <option value="">-- Nature of Appointment --</option>
+                                    @foreach($types as $value => $label)
+                                        <option value="{{ $value }}" {{ (isset($jEdit) && $jEdit->type == $value) ? 'selected' : '' }}>{{ $label }}</option>
+                                    @endforeach
                                 </select>
                             </div>
+                        </div>
+
+                        {{-- Position Description (DBM-CSC Form No. 1).
+                             Selecting one copies its qualification standards into the
+                             fields below, so a posting and the signed description of the
+                             item cannot state different requirements. --}}
+                        <div class="form-group">
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="far fa-file-alt"></i></span>
+                                </div>
+                                <select name="position_description_id" id="pd-picker" class="form-control form-control-sm">
+                                    <option value="">-- No Position Description linked --</option>
+                                    @foreach($descriptions as $pd)
+                                        <option value="{{ $pd->id }}"
+                                                data-title="{{ $pd->position_title }}"
+                                                data-item="{{ $pd->item_number }}"
+                                                data-education="{{ $pd->qs_education }}"
+                                                data-eligibility="{{ $pd->qs_eligibility }}"
+                                                data-training="{{ $pd->qs_training }}"
+                                                data-experience="{{ $pd->qs_experience }}"
+                                                {{ (isset($jEdit) && $jEdit->position_description_id == $pd->id) ? 'selected' : '' }}>
+                                            {{ $pd->full_title }}{{ $pd->item_number ? ' — '.$pd->item_number : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <small class="form-text text-muted">
+                                <a href="{{ route('positionDescriptionList') }}" target="_blank">Manage position descriptions</a>
+                            </small>
                         </div>
 
                         {{-- Plantilla Item No. --}}
@@ -158,10 +189,13 @@
                                     <td class="align-middle">{{ $no++ }}</td>
                                     <td class="align-middle">
                                         {{ $job->title }}<br>
-                                        @if ($job->type == 1)
-                                            <span class="badge bg-success">Non-Teaching</span>
-                                        @else
-                                            <span class="badge bg-primary">Teaching</span>
+                                        <span class="badge badge-info">{{ $job->type }}</span>
+                                        @if($job->positionDescription)
+                                            <a href="{{ route('positionDescriptionPrint', $job->position_description_id) }}"
+                                               target="_blank" class="badge badge-light border"
+                                               title="DBM-CSC Form No. 1 for this item">
+                                                <i class="far fa-file-alt"></i> PDF
+                                            </a>
                                         @endif
                                     </td>
                                     <td class="align-middle">{{ $job->plantilla_item_no }}</td>
@@ -187,7 +221,15 @@
                                         </span>
                                     </td>
 
-                                    <td class="align-middle text-center">
+                                    <td class="align-middle text-center text-nowrap">
+                                        <a href="{{ route('psbAssessment', $job->id) }}"
+                                           class="btn btn-success btn-sm"
+                                           title="Comparative Assessment ({{ $job->applications_count }} applicant{{ $job->applications_count == 1 ? '' : 's' }})">
+                                            <i class="fas fa-scale-balanced"></i>
+                                            @if($job->comparativeAssessment && $job->comparativeAssessment->finalised_at)
+                                                <i class="fas fa-lock fa-xs"></i>
+                                            @endif
+                                        </a>
                                         <a href="{{ route('jEdit', $job->id) }}" class="btn btn-info btn-sm">
                                             <i class="fas fa-edit"></i>
                                         </a>
@@ -205,4 +247,36 @@
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var picker = document.getElementById('pd-picker');
+    if (!picker) return;
+
+    var form = picker.closest('form');
+
+    /* Selecting a Position Description copies its qualification standards onto
+       the posting. Only blank fields are filled on load; choosing a different
+       description overwrites them, because the posting must not advertise
+       requirements the signed description does not carry. */
+    picker.addEventListener('change', function () {
+        var opt = picker.options[picker.selectedIndex];
+        if (!opt || !opt.value) return;
+
+        var map = {
+            title:       opt.dataset.title,
+            plantilla_item_no: opt.dataset.item,
+            education:   opt.dataset.education,
+            eligibility: opt.dataset.eligibility,
+            training:    opt.dataset.training,
+            experience:  opt.dataset.experience
+        };
+
+        Object.keys(map).forEach(function (name) {
+            var field = form.querySelector('[name="' + name + '"]');
+            if (field && map[name]) { field.value = map[name]; }
+        });
+    });
+})();
+</script>
 @endsection

@@ -23,34 +23,69 @@ class DtrController extends Controller
         }
     }
 
+    /**
+     * Whose daily time records the signed-in user is allowed to look at.
+     *
+     * Returns [$employees, $acctstat] where $acctstat is the flag the DTR views
+     * already use to decide whether to draw the employee picker at all.
+     *
+     *   Admin / HR             — everyone.
+     *   Settings → DTR Full Access — their own office, and nobody outside it.
+     *                            The list grants HR-like reach over one office,
+     *                            not over the whole LGU.
+     *   Everyone else          — themselves only.
+     *
+     * Office-wide reach needs an office to scope to. An employee on the list
+     * whose emp_dept is not set falls back to their own record rather than
+     * matching every other employee with a blank office.
+     */
+    private function dtrScope(): array
+    {
+        $guard = $this->getGuard();
+        $user  = auth()->guard($guard)->user();
+
+        if ($user->role !== 'employee') {
+            return [Employee::all(), 1];
+        }
+
+        $own = Employee::where('emp_ID', $user->emp_ID)->get();
+        $emp = $own->first();
+
+        $setting = Setting::first();
+        // The column holds a comma-joined list of employees.id.
+        $list = $setting ? array_filter(explode(',', (string) $setting->dtr_acct)) : [];
+
+        if ($emp && $emp->emp_dept && in_array((string) $emp->id, $list, true)) {
+            return [Employee::where('emp_dept', $emp->emp_dept)->get(), 1];
+        }
+
+        return [$own, 0];
+    }
+
+    /**
+     * Refuse a DTR belonging to someone outside the caller's scope.
+     *
+     * The picker is filtered, but a filtered dropdown is presentation — this is
+     * the boundary. Hand-typing another office's emp_ID into the POST lands
+     * here.
+     */
+    private function assertMayViewDtr(?string $employeeId): void
+    {
+        if ($employeeId === null || $employeeId === '') {
+            return;
+        }
+
+        [$scope] = $this->dtrScope();
+
+        if (! $scope->contains('emp_ID', $employeeId)) {
+            abort(403, 'That employee is outside your DTR access.');
+        }
+    }
+
     public function dtrRead()
     {
         $guard = $this->getGuard();
-        $acctstat = 0;
-        if (auth()->guard($guard)->user()->role == "employee") {
-            $setting = Setting::first();
-        
-            if ($setting) {
-                $accntlist = explode(',', $setting->dtr_acct);
-                $empid = auth()->guard($guard)->user()->emp_ID;
-        
-                $emp = Employee::where('emp_ID', $empid)->first();
-        
-                if (in_array($emp->id, $accntlist)) {
-                    $employeeall = Employee::all();
-                    $acctstat = 1;
-                } else {
-                    $employeeall = Employee::where('emp_ID', $empid)->get();
-                    $acctstat = 0;
-                }
-            } else {
-                $employeeall = collect();
-                $acctstat = 0;
-            }
-        } else {
-            $employeeall = Employee::all();
-            $acctstat = 1;
-        }    
+        [$employeeall, $acctstat] = $this->dtrScope();
 
         return view('dtr.dtr', compact('guard', 'employeeall', 'acctstat'));
     }
@@ -66,8 +101,10 @@ class DtrController extends Controller
 
         $empid = $request->employee ?? auth()->guard($guard)->user()->emp_ID;
 
-        $employeeall = null;
-        $employeeall = Employee::all();
+        // The picker only offers what the caller may see; this refuses anything
+        // else, and re-derives acctstat instead of trusting the posted copy.
+        $this->assertMayViewDtr($empid);
+        [$employeeall, $acctstat] = $this->dtrScope();
 
         $employee = Employee::where('emp_ID', $empid)->first();
 
@@ -75,7 +112,6 @@ class DtrController extends Controller
         $period = $request->input('period');
         $date = $request->input('date');
         $overtime = $request->input('overtime');
-        $acctstat = $request->input('acctstat');
 
         $dtr = Dtr::where('emp_ID', $employ)
                 ->whereYear('date', substr($date, 0, 4)) 
@@ -98,7 +134,10 @@ class DtrController extends Controller
         $period = $request->input('period');
         $date = $request->input('date');
         $overtime = $request->input('overtime');
-    
+
+        // A printable DTR is the same disclosure as the on-screen one.
+        $this->assertMayViewDtr($employeeId);
+
         $year = substr($date, 0, 4);
         $month = substr($date, 5, 2);
 
@@ -396,36 +435,13 @@ class DtrController extends Controller
     {
         $guard = $this->getGuard();
         
-        $acctstat = 0;
-        if (auth()->guard($guard)->user()->role == "employee") {
-            $setting = Setting::first();
-        
-            if ($setting) {
-                $accntlist = explode(',', $setting->dtr_acct);
-                $empid = auth()->guard($guard)->user()->emp_ID;
-        
-                $emp = Employee::where('emp_ID', $empid)->first();
-        
-                if (in_array($emp->id, $accntlist)) {
-                    $employeeall = Employee::all();
-                    $acctstat = 1;
-                } else {
-                    $employeeall = Employee::where('emp_ID', $empid)->get();
-                    $acctstat = 0;
-                }
-            } else {
-                $employeeall = collect();
-                $acctstat = 0;
-            }
-        } else {
-            $employeeall = Employee::all();
-            $acctstat = 1;
-        }    
+        [$employeeall, $acctstat] = $this->dtrScope();
 
         $data = null;
 
         if ($request->isMethod('post')) {
             $employeeId = $request->input('employee') ?? auth()->guard($guard)->user()->emp_ID;
+            $this->assertMayViewDtr($employeeId);
             $dateFrom = $request->input('date_from', null);
             $dateTo = $request->input('date_to', null);
             $overtime = $request->input('overtime', null);
@@ -519,6 +535,10 @@ class DtrController extends Controller
     }
     public function logDtrView($employeeId, $dateFrom = null, $dateTo = null, $overtime = null)
     {
+        // The employee is named in the URL, so this one is reachable by simply
+        // editing the address bar.
+        $this->assertMayViewDtr($employeeId);
+
         $guard = $this->getGuard();
         $currentDate = Carbon::now()->toDateString();
 

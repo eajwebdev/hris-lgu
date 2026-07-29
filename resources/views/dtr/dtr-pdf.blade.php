@@ -364,7 +364,7 @@
             <span class="font" style="relative; display: inline-block; width: 100%; text-align: center; margin-top: -37px;">over Printed Name</span>
         </div>
         <p style="font-size: 8px; text-align: center;">
-            Doc Control Code: CPSU-F-HRMO-03-REV01 Effective Date: 09/04/2024 Page No:  1 of 1
+            Doc Control Code: LGU-MABINAY-F-HRMO-03-REV01 Effective Date: 09/04/2024 Page No:  1 of 1
         </p>
     </div>
     <div class="column2"> 
@@ -520,7 +520,7 @@
             <span class="font" style="relative; display: inline-block; width: 100%; text-align: center; margin-top: -37px;">over Printed Name</span>
         </div>
         <p style="font-size: 8px; text-align: center;">
-            Doc Control Code: CPSU-F-HRMO-03-REV01 Effective Date:  09/04/2024     Page No:  1 of 1
+            Doc Control Code: LGU-MABINAY-F-HRMO-03-REV01 Effective Date:  09/04/2024     Page No:  1 of 1
         </p>
     </div>
 </body>

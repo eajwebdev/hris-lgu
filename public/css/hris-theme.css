@@ -1195,3 +1195,132 @@ body.sidebar-collapse .main-sidebar:hover .nav-header {
 }
 
 
+
+/* ================================================== recruitment (PSB / PDF)
+   Shared surface for the Position Description Form, the Comparative
+   Assessment and the selection-board screens. Numbered sections mirror the
+   printed forms, so HR is filling in the same document they will sign.
+   ------------------------------------------------------------------ */
+.rec-page { max-width: 1180px; margin: 0 auto; }
+
+.rec-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.rec-head h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -.01em; margin: 0; color: var(--foreground); }
+.rec-head .sub { font-size: .82rem; color: var(--muted); margin-top: 3px; }
+.rec-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* A numbered block of the printed form */
+.rec-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+.rec-card > header {
+    display: flex; align-items: center; gap: 10px;
+    padding: .7rem 1rem;
+    background: linear-gradient(180deg, #fff, var(--muted-soft));
+    border-bottom: 1px solid var(--border);
+}
+.rec-card > header .n {
+    flex: 0 0 auto;
+    min-width: 26px; height: 26px; padding: 0 7px;
+    border-radius: 7px;
+    background: var(--accent); color: #fff;
+    font-size: .72rem; font-weight: 800;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.rec-card > header h2 {
+    margin: 0; font-size: .82rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .05em; color: var(--foreground);
+}
+.rec-card > header .hint { font-size: .72rem; color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
+.rec-card > .body { padding: 1rem; }
+
+.rec-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+.rec-grid > .f-12 { grid-column: span 12; }
+.rec-grid > .f-6  { grid-column: span 6; }
+.rec-grid > .f-4  { grid-column: span 4; }
+.rec-grid > .f-3  { grid-column: span 3; }
+@media (max-width: 820px) { .rec-grid > [class*="f-"] { grid-column: span 12; } }
+
+.rec-field label {
+    display: block; margin: 0 0 .3rem;
+    font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted);
+}
+.rec-field input[type="text"],
+.rec-field input[type="number"],
+.rec-field input[type="date"],
+.rec-field select,
+.rec-field textarea {
+    width: 100%;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: .45rem .6rem;
+    font-size: .87rem;
+    color: var(--foreground);
+    background: #fff;
+    box-shadow: var(--shadow-xs);
+}
+.rec-field textarea { min-height: 86px; resize: vertical; line-height: 1.5; }
+.rec-field input:focus, .rec-field select:focus, .rec-field textarea:focus {
+    outline: none; border-color: var(--accent); box-shadow: var(--ring);
+}
+
+/* Repeating rows (duties, supervised positions, competencies, board) */
+.rec-rows { width: 100%; border-collapse: separate; border-spacing: 0; }
+.rec-rows th {
+    font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--muted); text-align: left; padding: 0 .5rem .4rem; white-space: nowrap;
+}
+.rec-rows td { padding: 0 .35rem .5rem; vertical-align: top; }
+.rec-rows td:first-child, .rec-rows th:first-child { padding-left: 0; }
+.rec-rows td:last-child,  .rec-rows th:last-child  { padding-right: 0; }
+
+.rec-btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+    background: #fff; color: var(--foreground);
+    font-size: .8rem; font-weight: 600; padding: .45rem .8rem;
+    cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.rec-btn:hover { background: var(--muted-soft); color: var(--foreground); text-decoration: none; }
+.rec-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rec-btn.primary:hover { background: var(--accent-600); color: #fff; }
+.rec-btn.ghost-danger { border-color: transparent; color: var(--danger); padding: .35rem .5rem; }
+.rec-btn.ghost-danger:hover { background: #FEF2F2; }
+
+/* Running total for section 22 */
+.rec-total {
+    display: inline-flex; align-items: center; gap: .45rem;
+    font-size: .78rem; font-weight: 700;
+    padding: .3rem .7rem; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent-600);
+}
+.rec-total.over { background: #FEF2F2; color: var(--danger); }
+
+.rec-pill {
+    display: inline-block; padding: .18rem .55rem; border-radius: 999px;
+    font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+}
+.rec-pill.active   { background: var(--accent-soft); color: var(--accent-600); }
+.rec-pill.archived { background: var(--muted-soft);  color: var(--muted); }
+
+.rec-empty { text-align: center; padding: 46px 20px; color: var(--muted); }
+.rec-empty .big { font-size: 2rem; margin-bottom: 8px; opacity: .5; }
+
+.rec-sticky {
+    position: sticky; bottom: 0; z-index: 5;
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: .7rem 1rem; margin-top: 14px;
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+}
