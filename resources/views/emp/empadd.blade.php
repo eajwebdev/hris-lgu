@@ -26,9 +26,10 @@
                                 <div class="col-md-2">
                                     <label class="badge badge-secondary lbel">Employee ID <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
                                     <input type="text" name="emp_ID" id="emp_ID" class="form-control form-control-sm" placeholder="e.g. 1234-56" autocomplete="off" required>
-                                    {{-- Height is reserved so the availability message appearing
-                                         does not grow this column and shunt the next row down. --}}
-                                    <small id="emp_ID_feedback" class="form-text" style="min-height:1rem;line-height:1rem;margin-top:.15rem;"></small>
+                                    {{-- .field-note hangs below the input instead of sitting in the
+                                         column, so the availability message cannot lift this field
+                                         out of line with the rest of the row (see hris-theme.css). --}}
+                                    <small id="emp_ID_feedback" class="form-text field-note"></small>
                                 </div>
                                 <div class="col-md-2">
                                     <label class="badge badge-secondary lbel">Last Name <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>

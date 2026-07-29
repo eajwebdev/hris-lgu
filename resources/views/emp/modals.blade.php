@@ -72,7 +72,7 @@
                                                 <i class="fas fa-building"></i>
                                             </span>
                                         </div>
-                                        <select class="form-control select2" style="width: 90%;" name="Office">
+                                        <select class="form-control select2" name="Office">
                                             <option value=""> --- Select Here --- </option>
                                             @foreach ($offices as $q)
                                                 <option value="{{ $q->id }}">{{ $q->office_name }}</option>
@@ -136,7 +136,7 @@
                                                 <i class="fas fa-chart-line"></i>
                                             </span>
                                         </div>
-                                        <select class="form-control select2bs4" onchange="stat(this.value)" style="width: 88%;" name="Status" required>
+                                        <select class="form-control select2bs4" onchange="stat(this.value)" name="Status" required>
                                             <option value=""> --- Select Here --- </option>
                                             @foreach ($stat as $st)
                                                 <option value="{{ $st->id }}">{{ $st->status_name }}</option>

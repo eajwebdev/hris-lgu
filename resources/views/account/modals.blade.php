@@ -21,7 +21,7 @@
                                             <i class="fas fa-users"></i>
                                         </span>
                                     </div>
-                                    <select class="form-control select2" style="width: 90%;">
+                                    <select class="form-control select2">
                                         <option value=""> --- Select Here --- </option>
                                         @foreach ($employees as $emp)
                                             <option value="{{ $emp->id }}">{{ $emp->lname }} {{ $emp->fname }}</option>

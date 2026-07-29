@@ -511,7 +511,9 @@ body:not(.sidebar-collapse) .main-footer {
    ------------------------------------------------------------------ */
 .add-form .form-row {
     align-items: flex-end;
-    row-gap: .75rem;
+    /* Leaves room under each control for a .field-note, which hangs out of the
+       column rather than sitting in it. */
+    row-gap: 1.25rem;
 }
 /* Each field is its own column with the control pinned to the bottom, so a
    stray <br> or select2's injected markup cannot knock a field out of line. */
@@ -520,6 +522,23 @@ body:not(.sidebar-collapse) .main-footer {
     flex-direction: column;
     justify-content: flex-end;
     margin-bottom: 0;
+    position: relative;      /* anchors .field-note */
+}
+
+/* A note under a field (e.g. the Employee ID availability check).
+   It must not take part in the column's layout: these columns are bottom
+   aligned, so anything kept below the control pushes that column's label and
+   input up by its height and knocks the field out of line with the rest of
+   the row. Taking it out of flow keeps every column the same height. */
+.add-form .field-note {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: .15rem;
+    font-size: .72rem;
+    line-height: 1rem;
+    pointer-events: none;
 }
 
 /* The old grey "badge" labels become quiet captions */
@@ -583,6 +602,51 @@ label.lbel {
 }
 .add-form .select2-container .select2-selection--single .select2-selection__arrow {
     height: 36px !important;
+    top: 0;
+}
+
+/* ------------------------------------------- select2 inside an .input-group
+   Bootstrap lays an input-group out as a flex row and sizes the real control
+   with `flex: 1 1 auto; width: 1%`. select2 hides the <select> and paints a
+   .select2-container in its place, which Bootstrap has no rule for — so the
+   container kept the full width select2 hands it, could not share the line
+   with the prepended icon, and wrapped underneath it. That left the icon
+   stranded on its own line directly below the label.
+
+   Some forms tried to patch this with style="width:90%" on the <select>;
+   select2 copies that onto the container as an inline style, so it never
+   worked and it is what the !important below overrules. Treating the
+   container as the input-group child it stands in for fixes every one of
+   them from here (Office Head / OIC, Employee, Department, Position, Status,
+   Qualification).
+   ------------------------------------------------------------------ */
+.input-group > .select2-container {
+    position: relative;
+    flex: 1 1 auto;
+    width: 1% !important;
+    min-width: 0;
+    margin: 0 !important;
+}
+/* Bootstrap rounds only the outer corners of the group. The container is the
+   child it rounds, but the visible box is .select2-selection inside it. */
+.input-group > .select2-container:not(:first-child) .select2-selection {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+.input-group > .select2-container:not(:last-child) .select2-selection {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+/* select2's own box is ~28px; the addon next to it is 38px. Match them so the
+   icon and the select are the same height. */
+.input-group > .select2-container .select2-selection--single {
+    height: calc(1.5em + .75rem + 2px);
+}
+.input-group > .select2-container .select2-selection--single .select2-selection__rendered {
+    line-height: calc(1.5em + .75rem);
+}
+.input-group > .select2-container .select2-selection--single .select2-selection__arrow {
+    height: calc(1.5em + .75rem);
     top: 0;
 }
 
