@@ -24,18 +24,18 @@
                                     <input type="text" name="item_no" class="form-control form-control-sm" id="item_no" placeholder="N/A" autocomplete="off">
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Employee ID</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
+                                    <label class="badge badge-secondary lbel">Employee ID <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
                                     <input type="text" name="emp_ID" id="emp_ID" class="form-control form-control-sm" placeholder="e.g. 1234-56" autocomplete="off" required>
                                     {{-- Height is reserved so the availability message appearing
                                          does not grow this column and shunt the next row down. --}}
                                     <small id="emp_ID_feedback" class="form-text" style="min-height:1rem;line-height:1rem;margin-top:.15rem;"></small>
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Last Name</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
+                                    <label class="badge badge-secondary lbel">Last Name <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
                                     <input type="text" name="lname" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" required>
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">First Name</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
+                                    <label class="badge badge-secondary lbel">First Name <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
                                     <input type="text" name="fname" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" required>
                                 </div>
                                 <div class="col-md-2">
@@ -88,7 +88,7 @@
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Sex</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
+                                    <label class="badge badge-secondary lbel">Sex <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
                                     <select class="form-control form-control-sm" name="sex" autocomplete="off" required>
                                         <option disabled selected> Select </option>
                                         <option value="Male">Male</option>
@@ -334,7 +334,7 @@
                                 </div>                                
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Employe Status</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
+                                    <label class="badge badge-secondary lbel">Employe Status <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
                                     <select class="form-control form-control-sm select2" style="width: 100%;" name="emp_status" autocomplete="off" required>
                                         <option value=""> select </option>
                                         @foreach ($stat as $st)
@@ -344,12 +344,12 @@
                                 </div> 
                                 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Position</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
+                                    <label class="badge badge-secondary lbel">Position <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
                                     <input type="text" name="position" id="position" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" required>
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Department/Office</label><span class="text-danger"> <i class="fas fa-asterisk "></i></span>
+                                    <label class="badge badge-secondary lbel">Department/Office <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
                                     <select class="form-control form-control-sm select2" style="width: 100%;" name="emp_dept" autocomplete="off" required>
                                         <option value=""> select </option>
                                         @foreach ($offices as $q)
