@@ -45,8 +45,15 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <span class="badge badge-light border">ETE #{{ $interview->ete_id }}</span>
-                                    <small class="d-block text-muted">{{ $interview->eteEvaluation->office->office_name ?? '' }}</small>
+                                    @if($interview->job && $interview->job->positionDescription)
+                                        <a href="{{ route('positionDescriptionPrint', $interview->job->position_description_id) }}"
+                                           target="_blank" class="badge badge-light border" title="DBM-CSC Form No. 1">
+                                            <i class="far fa-file-alt"></i> Position Description
+                                        </a>
+                                        <small class="d-block text-muted">{{ $interview->job->positionDescription->bureau_office }}</small>
+                                    @else
+                                        <span class="text-muted">&mdash;</span>
+                                    @endif
                                 </td>
                                 <td>{{ $interview->interview_date ? $interview->interview_date->format('M. d, Y h:i A') : 'N/A' }}</td>
                                 <td>
@@ -111,15 +118,18 @@
                     <div class="row">
                         <div class="col-md-8">
                             <div class="form-group">
-                                <label>ETE Select</label>
-                                <select name="ete_id" class="form-control select2" required>
-                                    <option value="">Select ETE Evaluation</option>
-                                    @foreach($etes as $ete)
-                                        <option value="{{ $ete->id }}">
-                                            ETE #{{ $ete->id }} - {{ $ete->job->title ?? 'N/A' }}{{ $ete->job && $ete->job->plantilla_item_no ? ' - '.$ete->job->plantilla_item_no : '' }}{{ $ete->office ? ' - '.$ete->office->office_name : '' }}
+                                <label>Position</label>
+                                <select name="jid" class="form-control select2" required>
+                                    <option value="">Select the vacancy being interviewed for</option>
+                                    @foreach($jobs as $job)
+                                        <option value="{{ $job->id }}">
+                                            {{ $job->title }}{{ $job->plantilla_item_no ? ' — '.$job->plantilla_item_no : '' }}
                                         </option>
                                     @endforeach
                                 </select>
+                                <small class="form-text text-muted">
+                                    Only positions with applicants marked <em>Qualified / Ready for Interview</em> appear here.
+                                </small>
                             </div>
                         </div>
                         <div class="col-md-4">

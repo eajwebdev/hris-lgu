@@ -35,7 +35,6 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\PerformanceController;
 use App\Http\Controllers\JobHiringController;
 use App\Http\Controllers\ApplicationController;
-use App\Http\Controllers\EteEvaluationController;
 use App\Http\Controllers\InterviewEvaluationController;
 use App\Http\Controllers\FaceRegistrationController;
 use App\Http\Controllers\AttendancePortalController;
@@ -203,19 +202,6 @@ Route::group(['middleware' => ['login_auth', 'password.changed', NoCacheMiddlewa
         Route::post('/members', [ComparativeAssessmentController::class, 'membersSave'])->name('psbMembersSave');
     });
 
-    Route::prefix('ete')->group(function () {
-        Route::get('/ete-evaluations',[EteEvaluationController::class, 'eteEvaluationList'])->name('eteEvaluationList');
-        Route::post('/ete-evaluations/store',[EteEvaluationController::class, 'eteEvaluationStore'])->name('eteEvaluationStore');
-        Route::post('/ete-evaluations/{id}/delete',[EteEvaluationController::class, 'eteEvaluationDelete'])->name('eteEvaluationDelete');
-        Route::get('/ete-evaluations/{id}',[EteEvaluationController::class, 'eteEvaluationShow'])->name('eteEvaluationShow');
-        Route::get('/ete-evaluations/{id}/selected-consolidated',[EteEvaluationController::class, 'selectedApplicantConsolidated'])->name('eteSelectedApplicantConsolidated');
-        Route::get('/ete-evaluations/{id}/applicant/{applicationId}/pdf',[EteEvaluationController::class, 'applicantEvaluationPdf'])->name('eteApplicantEvaluationPdf');
-        Route::get('/ete-evaluations/{id}/rate',[EteEvaluationController::class, 'adminRating'])->name('eteAdminRating');
-        Route::post('/ete-evaluations/rating/update-ajax',[EteEvaluationController::class, 'eteRatingUpdateAjax'])->name('eteRatingUpdateAjax');
-        Route::post('/ete-evaluations/{id}/rating/copy',[EteEvaluationController::class, 'copyPreviousRating'])->name('eteCopyPreviousRating');
-        Route::get('/ete-evaluations/{id}/consolidated',[EteEvaluationController::class, 'consolidatedScreen'])->name('eteConsolidatedScreen');
-        Route::get('/ete-evaluations/{id}/consolidated-data',[EteEvaluationController::class, 'consolidatedData'])->name('eteConsolidatedData');
-    });
 
     Route::prefix('interview')->group(function () {
         Route::get('/my-assignments', [InterviewEvaluationController::class, 'assignments'])->name('interviewAssignments');

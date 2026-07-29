@@ -1253,11 +1253,20 @@ body.sidebar-collapse .main-sidebar:hover .nav-header {
     font-size: .68rem; font-weight: 700; letter-spacing: .06em;
     text-transform: uppercase; color: var(--muted);
 }
+/* Controls inside a repeating row (.rec-rows) are not wrapped in .rec-field —
+   there is no room for a label per cell — so they are listed here too. Without
+   this they fell through to raw browser defaults and were the only unstyled
+   thing on the page. */
 .rec-field input[type="text"],
 .rec-field input[type="number"],
 .rec-field input[type="date"],
 .rec-field select,
-.rec-field textarea {
+.rec-field textarea,
+.rec-rows td input[type="text"],
+.rec-rows td input[type="number"],
+.rec-rows td input[type="date"],
+.rec-rows td select,
+.rec-rows td textarea {
     width: 100%;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
@@ -1268,8 +1277,30 @@ body.sidebar-collapse .main-sidebar:hover .nav-header {
     box-shadow: var(--shadow-xs);
 }
 .rec-field textarea { min-height: 86px; resize: vertical; line-height: 1.5; }
-.rec-field input:focus, .rec-field select:focus, .rec-field textarea:focus {
+/* Row textareas hold one duty, so they start shorter than a section field. */
+.rec-rows td textarea { min-height: 58px; resize: vertical; line-height: 1.45; }
+
+.rec-field input:focus, .rec-field select:focus, .rec-field textarea:focus,
+.rec-rows td input:focus, .rec-rows td select:focus, .rec-rows td textarea:focus {
     outline: none; border-color: var(--accent); box-shadow: var(--ring);
+}
+
+/* Ticks and radios (sections 17 and 18) pick up the brand instead of the
+   browser's default blue, and get a real hit area. */
+.rec-card input[type="checkbox"],
+.rec-card input[type="radio"] {
+    accent-color: var(--accent);
+    width: 14px; height: 14px;
+    vertical-align: -2px;
+    margin-right: .25rem;
+    cursor: pointer;
+}
+
+/* The rules separating 21a-d from the competency tables */
+.rec-card hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 1.1rem 0 .9rem;
 }
 
 /* Repeating rows (duties, supervised positions, competencies, board) */

@@ -7,13 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Personnel Selection Board — Comparative Assessment Form.
  *
- * The consolidation sheet for one vacancy. Its rows are fed by the ETE
- * evaluation and the interview; see App\Services\PsbScoring for the weights.
+ * The consolidation sheet for one vacancy. Potential and psychosocial
+ * attributes come from the panel interview; the rest is scored on the sheet.
+ * See App\Services\PsbScoring for the weights.
  */
 class ComparativeAssessment extends Model
 {
     protected $fillable = [
-        'jid', 'ete_id', 'interview_id',
+        'jid', 'interview_id',
         'position_to_be_filled', 'item_no', 'location',
         'date_posted', 'date_published', 'rate_per_month',
         'finalised_at', 'created_by',

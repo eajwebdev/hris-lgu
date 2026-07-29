@@ -6,7 +6,6 @@ use App\Models\Application;
 use App\Models\ComparativeAssessment;
 use App\Models\ComparativeAssessmentRow;
 use App\Models\Employee;
-use App\Models\EteEvaluation;
 use App\Models\InterviewEvaluation;
 use App\Models\InterviewRating;
 use App\Models\JobHiring;
@@ -18,17 +17,19 @@ use Illuminate\Support\Facades\DB;
 /**
  * Personnel Selection Board — Comparative Assessment Form.
  *
- * This is the consolidation sheet for a vacancy. Four of the six preliminary
- * components are already measured elsewhere, so the sheet is *built* from them
- * rather than typed twice:
+ * This is the consolidation sheet for a vacancy, and the document the board
+ * signs. Two of the six preliminary components are already measured by the
+ * panel interview, so those are filled in automatically:
  *
- *   Education / Training / Experience  <- the ETE evaluation
- *   Potential                          <- the panel interview average
- *   Psychosocial attributes            <- the interview's potential rubric
- *   Performance rating                 <- keyed by HR (IPCR, internal candidates)
+ *   Potential               <- the panel's average interview score
+ *   Psychosocial attributes <- the interview's potential rubric
  *
- * Everything is rescaled onto the column's own weight by PsbScoring, so the
- * six columns always total 100 no matter what scale the feeder used.
+ * The rest are scored on the sheet itself, which is how the printed form
+ * works: HR keys the performance rating (from the IPCR, for internal
+ * candidates) and the education, training and experience points.
+ *
+ * The two automatic columns are rescaled onto their own weight by PsbScoring,
+ * so the six columns always total 100 no matter what scale the feeder used.
  */
 class ComparativeAssessmentController extends Controller
 {
@@ -90,10 +91,8 @@ class ComparativeAssessmentController extends Controller
         ]);
         $assessment->save();
 
-        $ete       = EteEvaluation::where('jid', $job->id)->latest('id')->first();
         $interview = InterviewEvaluation::where('jid', $job->id)->latest('id')->first();
 
-        $assessment->ete_id       = $ete?->id;
         $assessment->interview_id = $interview?->id;
         $assessment->save();
 
@@ -107,7 +106,7 @@ class ComparativeAssessmentController extends Controller
             ->orderBy('last_name')->orderBy('first_name')
             ->get();
 
-        DB::transaction(function () use ($applications, $assessment, $ete, $interview) {
+        DB::transaction(function () use ($applications, $assessment, $interview) {
             foreach ($applications as $i => $app) {
                 $row = ComparativeAssessmentRow::firstOrNew([
                     'comparative_assessment_id' => $assessment->id,
@@ -120,7 +119,6 @@ class ComparativeAssessmentController extends Controller
                 $row->civil_service_eligibility = $row->civil_service_eligibility ?: $app->eligibility;
                 $row->sort_order = $i;
 
-                $this->applyEteScores($row, $ete, $app);
                 $this->applyInterviewScores($row, $interview, $app);
 
                 $row->recalculate()->save();
@@ -133,30 +131,6 @@ class ComparativeAssessmentController extends Controller
             ->with('success', 'Comparative assessment built from '.$applications->count().' candidate(s).');
     }
 
-    /**
-     * Education / Training / Experience, rescaled from the ETE rating onto the
-     * 15 / 10 / 20 point columns of this form.
-     */
-    private function applyEteScores(ComparativeAssessmentRow $row, ?EteEvaluation $ete, Application $app): void
-    {
-        if (! $ete) {
-            return;
-        }
-
-        $rating = DB::table('ete_applicant_ratings')
-            ->where('ete_id', $ete->id)
-            ->where('application_id', $app->id)
-            ->first();
-
-        if (! $rating) {
-            return;
-        }
-
-        // The ETE sheet scores education/training/experience out of 10 each.
-        $row->education_points  = $this->psb->rescale((float) $rating->education_score, 10, 15);
-        $row->training_points   = $this->psb->rescale((float) $rating->training_score, 10, 10);
-        $row->experience_points = $this->psb->rescale((float) $rating->experience_score, 10, 20);
-    }
 
     /**
      * Potential and psychosocial attributes, from the panel interview.

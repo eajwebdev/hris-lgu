@@ -160,12 +160,6 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="{{ route('eteEvaluationList') }}" class="nav-link {{ request()->is('ete*') ? 'active' : '' }}">
-                            <i class="far fa-circle nav-icon"></i>
-                            <p>ETE Evaluation</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a href="{{ route('interviewEvaluationList') }}" class="nav-link {{ request()->is('interview*') ? 'active' : '' }}">
                             <i class="far fa-circle nav-icon"></i>
                             <p>Interview Assessment</p>

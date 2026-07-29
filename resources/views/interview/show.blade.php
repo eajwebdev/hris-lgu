@@ -29,12 +29,12 @@
     <div class="card mb-3">
         <div class="interview-manage-head">
             <div>
-                <small class="text-muted">Interview Assessment from ETE #{{ $interview->ete_id }}</small>
+                <small class="text-muted">Personnel Selection Board &middot; Interview Assessment</small>
                 <h4>{{ $interview->job->title ?? 'Position' }}</h4>
                 @if($interview->job && $interview->job->plantilla_item_no)
                     <div class="text-muted small">{{ $interview->job->plantilla_item_no }}</div>
                 @endif
-                <div class="text-muted small"><i class="fas fa-building mr-1"></i>{{ $interview->eteEvaluation->office->office_name ?? 'Office not set' }}</div>
+                <div class="text-muted small"><i class="fas fa-building mr-1"></i>{{ optional(optional($interview->job)->positionDescription)->bureau_office ?? $interview->job->assignment ?? 'Office not set' }}</div>
             </div>
             <div class="d-flex flex-wrap align-items-center" style="gap:8px;">
                 @if(auth()->guard('web')->check() && in_array(auth()->guard('web')->user()->role, ['Administrator', 'HR Administrator'], true))

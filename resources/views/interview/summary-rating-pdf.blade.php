@@ -262,7 +262,7 @@
         </div>
         <div class="meta-row">
             <span class="label">Office Assignment:</span>
-            <strong>{{ strtoupper($interview->eteEvaluation->office->office_name ?? $interview->job->assignment ?? 'N/A') }}</strong>
+            <strong>{{ strtoupper(optional(optional($interview->job)->positionDescription)->bureau_office ?? $interview->job->assignment ?? 'N/A') }}</strong>
         </div>
         <div class="meta-row">
             <span class="label">Date of Screening:</span>
