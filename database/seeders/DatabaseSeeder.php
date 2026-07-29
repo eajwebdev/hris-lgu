@@ -30,17 +30,20 @@ class DatabaseSeeder extends Seeder
         $default = config('auth.default_password');
 
         $this->command->newLine();
-        $this->command->info('Seeded. Employee accounts are held on the change-password screen until the default is replaced:');
+        $this->command->info('Seeded.');
         $this->command->table(
             ['Sign in at', 'Username / Email', 'Password', 'Role'],
             [
-                ['/hr-admin', 'admin',                    'admin123', 'Administrator'],
-                ['/hr-admin', 'hradmin',                  'admin123', 'HR Administrator'],
-                ['/',         'mayor@mabinay.gov.ph',     $default,   'Mayor (approves leave)'],
-                ['/',         'vicemayor@mabinay.gov.ph', $default,   'Vice Mayor (approves leave)'],
-                ['/',         'hr@mabinay.gov.ph',        $default,   'HR head'],
-                ['/',         'employee@mabinay.gov.ph',  $default,   'Employee'],
+                ['/hr-admin', 'admin',                       'admin123', 'Administrator'],
+                ['/hr-admin', 'hradmin',                     'admin123', 'HR Administrator'],
+                ['/',         "the employee's e-mail address", $default, 'Employee'],
             ]
+        );
+        $this->command->line(
+            'Employees are the real personnel from "HRIS EMPLOYEES - REGULAR .pdf". Each new '.
+            'account starts on the default password and is held on the change-password screen '.
+            'until it is replaced. Assign the Mayor, Vice Mayor and HR signatory under Settings '.
+            'before staff file leave.'
         );
     }
 }
