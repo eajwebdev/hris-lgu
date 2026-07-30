@@ -19,8 +19,12 @@ class PunchFlashImagesTest extends TestCase
         parent::setUp();
 
         // These fixtures post mode=face and are about flash provenance, not
-        // badge policy. See AttendancePortalTest for the badge requirement.
-        config(['face.require_qr' => false]);
+        // badge policy or geofencing. See AttendancePortalTest for the badge
+        // requirement and AttendanceGeoTest for the perimeter.
+        config([
+            'face.require_qr' => false,
+            'attendance.geofence.require_station' => false,
+        ]);
     }
 
     private function challenge(): array

@@ -69,6 +69,25 @@ return [
 
     'geofence' => [
         'enforce' => env('ATTENDANCE_GEOFENCE_ENFORCE', true),
+
+        /*
+        | Refuse a punch when NO active station is configured at all.
+        |
+        | Without this the perimeter fails OPEN: an empty stations table means
+        | there is nothing to be outside of, so every punch is allowed from
+        | anywhere — which is the state a fresh install is in, and it looks
+        | identical to a working geofence right up until someone checks where
+        | the punches came from.
+        |
+        | With it on, "you must be at a station" is true from the first day
+        | rather than from whenever somebody remembers to add one.
+        |
+        | !! THIS BLOCKS EVERY PUNCH UNTIL AT LEAST ONE STATION EXISTS !!
+        | Add one under Attendance Admin -> Stations. Set this to false if you
+        | deliberately want location-free punching (field staff with no fixed
+        | site), and accept that the perimeter then enforces nothing.
+        */
+        'require_station' => env('ATTENDANCE_REQUIRE_STATION', true),
     ],
 
     /*

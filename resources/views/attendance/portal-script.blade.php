@@ -38,6 +38,12 @@
         viewNear:  document.getElementById('view-near'),
         viewAll:   document.getElementById('view-all'),
         stationList: document.getElementById('stationlist'),
+        histBtn:   document.getElementById('hist-toggle'),
+        histSheet: document.getElementById('histsheet'),
+        histClose: document.getElementById('hist-close'),
+        histList:  document.getElementById('histlist'),
+        histName:  document.getElementById('hist-name'),
+        histDate:  document.getElementById('hist-date'),
         geohud:    document.getElementById('geohud'),
         geoDist:   document.getElementById('geo-distance'),
         geoNote:   document.getElementById('geo-note'),
@@ -995,6 +1001,258 @@
         el.namedPos.textContent  = employee.position || 'Employee';
         el.namedInit.textContent = employee.initials;
         el.named.classList.remove('d-none');
+
+        // The log button only means something once a badge has named somebody:
+        // before that there is no "today" to show. setMode() hides it again
+        // whenever the token is dropped.
+        el.histBtn.classList.remove('d-none');
+    }
+
+    // ---------------------------------------------------------------- voice
+
+    /**
+     * The spoken confirmation. Speech only — no chime.
+     *
+     * Nothing is fetched: the device's own synthesiser does the work, which
+     * matters because this portal has to run on the LGU LAN with no internet.
+     *
+     * SOUNDING NATURAL RATHER THAN "READ OUT" comes down to two things, and the
+     * bigger one is not the settings — it is WHICH VOICE gets picked. Left to
+     * itself the browser hands back the first voice in the list, which on
+     * Android is usually the flat legacy eSpeak-style engine. The modern neural
+     * voices ("Google …", "… Natural", "Premium", "Enhanced") are present on
+     * the same device and sound completely different, so pickVoice() below sorts
+     * for them explicitly.
+     *
+     * The second is phrasing. Short, complete sentences read well; a sentence
+     * with a name concatenated onto it does not, because the engine has no
+     * pause to place and runs the two together. So the utterance is exactly the
+     * confirmation and nothing else.
+     */
+    var voice = { chosen: null, ready: false };
+
+    /**
+     * Rank the installed voices and keep the best English one.
+     *
+     * Scored rather than matched on a fixed name, because the inventory differs
+     * on every device and a hard-coded "Google UK English Female" simply is not
+     * there on most of them.
+     */
+    function pickVoice() {
+        if (!('speechSynthesis' in window)) return;
+
+        var voices = [];
+
+        try {
+            voices = window.speechSynthesis.getVoices() || [];
+        } catch (e) {
+            return;
+        }
+
+        if (!voices.length) return;   // not loaded yet; voiceschanged will fire
+
+        var best = null;
+        var bestScore = -1;
+
+        voices.forEach(function (v) {
+            var lang = (v.lang || '').toLowerCase();
+
+            // English only — the phrases are English, and a Filipino or Spanish
+            // engine pronouncing them is markedly worse than the plainest
+            // English one.
+            if (lang.indexOf('en') !== 0) return;
+
+            var name  = (v.name || '').toLowerCase();
+            var score = 0;
+
+            // The neural/cloud engines. This is the difference between "modern"
+            // and "reading".
+            if (name.indexOf('natural') >= 0) score += 60;
+            if (name.indexOf('neural')  >= 0) score += 60;
+            if (name.indexOf('premium') >= 0) score += 50;
+            if (name.indexOf('enhanced') >= 0) score += 50;
+            if (name.indexOf('google')  >= 0) score += 40;
+            if (name.indexOf('siri')    >= 0) score += 40;
+
+            // Known-good system voices on Apple devices.
+            if (name.indexOf('samantha') >= 0 || name.indexOf('karen') >= 0
+                || name.indexOf('moira') >= 0 || name.indexOf('tessa') >= 0) score += 30;
+
+            // The flat legacy engines, actively avoided.
+            if (name.indexOf('espeak') >= 0 || name.indexOf('pico') >= 0
+                || name.indexOf('compact') >= 0) score -= 50;
+
+            // en-PH first (this is a Philippine LGU), then en-US/en-GB.
+            if (lang.indexOf('en-ph') === 0) score += 12;
+            else if (lang.indexOf('en-us') === 0 || lang.indexOf('en-gb') === 0) score += 8;
+
+            // A local voice cannot be cut off by the network dropping, which on
+            // an LGU LAN is worth a nudge but not worth overriding quality for.
+            if (v.localService) score += 5;
+
+            if (score > bestScore) {
+                bestScore = score;
+                best = v;
+            }
+        });
+
+        voice.chosen = best;
+        voice.ready  = true;
+    }
+
+    if ('speechSynthesis' in window) {
+        pickVoice();
+        // The list is populated asynchronously and is routinely empty on the
+        // first call, so this is where the pick usually really happens.
+        window.speechSynthesis.addEventListener('voiceschanged', pickVoice);
+    }
+
+    /**
+     * Some engines will not speak until they have been addressed once inside a
+     * user gesture. Called from the action tap, which is that gesture — by the
+     * time the punch resolves several seconds later there is none left to use.
+     */
+    function unlockVoice() {
+        try {
+            if (!('speechSynthesis' in window)) return;
+
+            if (!voice.ready) pickVoice();
+
+            // A silent utterance: enough to wake the engine, inaudible either way.
+            var warm = new SpeechSynthesisUtterance(' ');
+
+            warm.volume = 0;
+            if (voice.chosen) warm.voice = voice.chosen;
+
+            window.speechSynthesis.resume();
+            window.speechSynthesis.speak(warm);
+        } catch (e) {
+            /* no voice on this device; never fatal */
+        }
+    }
+
+    function speak(text) {
+        try {
+            if (!('speechSynthesis' in window)) return;
+
+            if (!voice.ready) pickVoice();
+
+            var u = new SpeechSynthesisUtterance(text);
+
+            if (voice.chosen) {
+                u.voice = voice.chosen;
+                u.lang  = voice.chosen.lang;
+            }
+
+            // Just under conversational. The default 1.0 is a shade brisk for a
+            // room with noise in it, and slowing it further is what starts to
+            // sound like dictation rather than speech.
+            u.rate   = 0.95;
+            u.pitch  = 1.05;   // a touch brighter reads as friendlier, not shrill
+            u.volume = 1.0;
+
+            window.speechSynthesis.cancel();   // never queue behind a stale one
+            window.speechSynthesis.speak(u);
+        } catch (e) {
+            /* no voice on this device */
+        }
+    }
+
+    // ---------------------------------------------------------------- history
+
+    /**
+     * Today's punches for the scanned badge.
+     *
+     * Fetched on open rather than cached with the QR check: most people never
+     * tap it, and someone who punches and then reopens it should see the punch
+     * they just made rather than a snapshot from before it.
+     *
+     * The token is what identifies the employee — never an id. The kiosk has no
+     * employee id to send and that is deliberate; see the endpoint's note.
+     */
+    async function openHistory() {
+        if (!state.qrToken) return;
+
+        el.histSheet.classList.remove('d-none');
+        el.histSheet.setAttribute('aria-hidden', 'false');
+        el.histList.innerHTML = '<div class="histempty"><i class="fas fa-circle-notch fa-spin"></i>Loading today\'s log…</div>';
+
+        try {
+            var response = await fetch(CONFIG.urls.history, {
+                method: 'POST',
+                headers: jsonHeaders(),
+                body: JSON.stringify({ qr: state.qrToken }),
+            });
+
+            var body = await response.json();
+
+            if (!response.ok) {
+                el.histList.innerHTML = '<div class="histempty"><i class="fas fa-triangle-exclamation"></i>' +
+                    escapeHtml(body.message || 'Could not load the log.') + '</div>';
+                return;
+            }
+
+            el.histName.textContent = body.employee ? body.employee.name : '';
+            el.histDate.textContent = body.date ? '· ' + body.date : '';
+
+            renderHistory(body.entries || []);
+        } catch (e) {
+            el.histList.innerHTML = '<div class="histempty"><i class="fas fa-plug-circle-xmark"></i>Could not reach the server.</div>';
+        }
+    }
+
+    function closeHistory() {
+        el.histSheet.classList.add('d-none');
+        el.histSheet.setAttribute('aria-hidden', 'true');
+    }
+
+    /**
+     * One row per punch, in the words the employee expects.
+     *
+     * The SERVER decides the label — in particular which overtime entry opens a
+     * stretch and which closes it, since overtime lives in a single
+     * comma-separated column and the pairing is positional. Deciding that here
+     * would risk the kiosk telling somebody a different story from the DTR they
+     * are paid from.
+     */
+    function renderHistory(entries) {
+        if (!entries.length) {
+            el.histList.innerHTML = '<div class="histempty"><i class="fas fa-calendar-day"></i>' +
+                'No punches recorded today yet.</div>';
+            return;
+        }
+
+        var icons = {
+            'login':  'fa-right-to-bracket',
+            'logout': 'fa-right-from-bracket',
+            'ot-in':  'fa-moon',
+            'ot-out': 'fa-moon',
+        };
+
+        el.histList.innerHTML = entries.map(function (e) {
+            var where = e.station ? 'at ' + escapeHtml(e.station) : 'Location not recorded';
+
+            return '' +
+                '<div class="histrow histrow--' + escapeHtml(e.kind) + '">' +
+                    '<div class="histrow__ico"><i class="fas ' + (icons[e.kind] || 'fa-clock') + '"></i></div>' +
+                    '<div class="histrow__body">' +
+                        '<div class="histrow__what">' + escapeHtml(e.label) + '</div>' +
+                        '<div class="histrow__where">' + where + '</div>' +
+                    '</div>' +
+                    '<div class="histrow__time">' + escapeHtml(e.time) + '</div>' +
+                '</div>';
+        }).join('');
+    }
+
+    /**
+     * Station names come from the database and land in innerHTML above, so they
+     * are escaped rather than trusted. Everything else here is server-generated,
+     * but escaping the lot is cheaper than remembering which is which.
+     */
+    function escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
     }
 
     /**
@@ -1044,6 +1302,19 @@
                 ? '<i class="fas fa-right-from-bracket"></i>'
                 : '<i class="fas fa-check"></i>';
 
+        // Plain language, and only claimed when something was actually written.
+        // A duplicate inside the cooldown returns 200 with recorded:false, and
+        // telling that employee "clocked in successfully" would be a lie they
+        // would only discover on their payslip.
+        var headline = ! body.recorded
+            ? 'Already recorded'
+            : ot
+                ? 'Overtime recorded successfully'
+                : out
+                    ? 'Clocked out successfully'
+                    : 'Clocked in successfully';
+
+        document.getElementById('result-headline').textContent = headline;
         document.getElementById('result-action').textContent = body.action;
         document.getElementById('result-name').textContent   = body.employee.name;
         document.getElementById('result-pos').textContent    = body.employee.position || 'Employee';
@@ -1052,6 +1323,18 @@
         document.getElementById('result-note').textContent   = body.recorded ? locationNote(body.location) : 'Already recorded earlier.';
 
         el.result.classList.remove('d-none');
+
+        // Spoken only for a real punch, for the same reason as the wording
+        // above: the employee is usually already turning away, and this is the
+        // one thing that will reach them.
+        //
+        // The headline verbatim, with nothing appended. Adding the employee's
+        // name is what makes a synthesiser sound like it is reading a label —
+        // it has no pause to place between a sentence and a proper noun and
+        // runs them together.
+        if (body.recorded) {
+            speak(headline);
+        }
 
         setTimeout(reset, CONFIG.resetAfter * 1000);
     }
@@ -1100,6 +1383,12 @@
         if (mode !== 'qrface') {
             el.named.classList.add('d-none');
             state.qrToken = null;
+
+            // The log belongs to the badge that was scanned, so it goes when the
+            // token does — otherwise the next person at the kiosk could open the
+            // previous employee's day.
+            el.histBtn.classList.add('d-none');
+            closeHistory();
         }
 
         await startCamera(qr ? 'environment' : 'user');
@@ -1224,6 +1513,13 @@
     function geofencePreflight() {
         if (!geofenceEnforced()) return null;
 
+        // Nothing to be inside of. The server refuses this too — see
+        // geofenceBlock() — but saying so here saves the employee a full camera
+        // pass and a colour flash before being told the same thing.
+        if (CONFIG.geofence.requireStation && !(CONFIG.stations || []).length) {
+            return 'No attendance station has been set up yet. Please ask HR to add one.';
+        }
+
         var geo = freshGeo();
 
         if (!geo) {
@@ -1245,6 +1541,11 @@
     el.actions.forEach(function (btn) {
         btn.addEventListener('click', function () {
             if (state.busy) return; // not mid-sequence
+
+            // This tap is the user gesture some speech engines require before
+            // they will say anything. Done here rather than at the result, by
+            // which point there is no gesture left to borrow.
+            unlockVoice();
 
             state.action = btn.dataset.action;
 
@@ -1931,6 +2232,9 @@
 
     el.mapBtn.addEventListener('click', function () { map.open(); });
     el.mapClose.addEventListener('click', function () { map.close(); });
+
+    el.histBtn.addEventListener('click', function () { openHistory(); });
+    el.histClose.addEventListener('click', function () { closeHistory(); });
 
     // ---------------------------------------------------------------- boot
 

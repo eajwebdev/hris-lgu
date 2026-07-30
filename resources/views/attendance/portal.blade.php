@@ -50,11 +50,14 @@
         html, body {
             margin: 0;
             padding: 0;
-            /* min-height, not height: the column is normally exactly one screen
-               tall, but on a short handset the stage's floor can push it past
-               that and a fixed height would clip the action buttons off the
-               bottom rather than letting the page scroll to them. */
-            min-height: 100%;
+            /* Installed as a web app, so it is a FIXED ONE-SCREEN surface, not a
+               document. Nothing here scrolls: the readout floats over the video
+               rather than taking its own row, which is what lets the column
+               always fit. overscroll-behavior below additionally kills the
+               rubber-band bounce that makes a standalone PWA feel like a
+               web page. */
+            height: 100%;
+            overflow: hidden;
             background: var(--ink);
             color: var(--text);
             font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -66,11 +69,12 @@
         .portal {
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
-            min-height: 100dvh; /* newer engines; the vh line above is the fallback */
+            height: 100vh;
+            height: 100dvh; /* newer engines; the vh line above is the fallback */
             max-width: 560px;
             margin: 0 auto;
             position: relative;
+            overflow: hidden;   /* one screen, always — nothing scrolls */
         }
 
         /* ---------------------------------------------------------------- header */
@@ -98,12 +102,11 @@
             border-radius: 22px;
             overflow: hidden;
             background: #000;
-            /* A floor, not 0. The readout below used to be painted ON the video
-               and so cost it nothing; now that it takes its own space the stage
-               is the flex child that pays, and on a short screen it would
-               otherwise shrink until the employee cannot see their own framing.
-               Below this the column scrolls instead — see .portal. */
-            min-height: 240px;
+            /* Back to 0. The readout floats over the video again rather than
+               taking a row of its own, so the stage is free to absorb whatever
+               a short screen leaves it — which is what guarantees the column
+               fits in one viewport and never scrolls. */
+            min-height: 0;
         }
         .stage video {
             width: 100%;
@@ -393,9 +396,39 @@
         .mapbtn:active:not(:disabled) { transform: scale(.94); }
         .camswap.d-none ~ .mapbtn { top: 14px; }
 
+        /* Today's punches, third in the corner column beneath the map button.
+           Same 44px round shape, but no pulse ring — one thing on this screen
+           asking for attention is enough, and the map's ring is the one that
+           matters (it is telling you whether you are in range). */
+        .histbtn {
+            position: absolute;
+            top: 122px;  /* mapbtn top (68) + its height (44) + a 10px gap */
+            right: 14px;
+            z-index: 6;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 1px solid var(--line);
+            background: rgba(11, 18, 32, .78);
+            color: var(--text);
+            font-size: 16px;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .histbtn:active:not(:disabled) { transform: scale(.94); }
+        /* Follows the map button up when the camera switch is hidden. */
+        .camswap.d-none ~ .histbtn { top: 68px; }
+        /* Only meaningful once a badge names somebody — there is no "today" to
+           show before that. JS un-hides it when the QR resolves. */
+        .histbtn.d-none { display: none; }
+
         /* When the capture cue banner is up it owns the top strip; the switches
            step aside rather than sitting on the text. */
         .cue:not(.d-none) ~ .camswap,
+        .cue:not(.d-none) ~ .histbtn,
         .cue:not(.d-none) ~ .mapbtn { display: none; }
 
         /* ------------------------------------------------------------ map sheet */
@@ -549,6 +582,92 @@
         .mapsheet.is-ok  .mapsheet__dist { color: #86EFAC; }
         .mapsheet.is-far .mapsheet__dist { color: #FCD34D; }
 
+        /* --------------------------------------------------------- history sheet */
+
+        /* Same full-cover sheet as the map, so the two panels feel like one
+           idea. Reuses .mapsheet__top / __title / __close for the header rather
+           than inventing a parallel set. */
+        .histsheet {
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(120% 90% at 50% 0%, #10213B 0%, #0B1220 55%, #070C16 100%);
+            animation: sheet-in .25s ease;
+        }
+        .histsheet__who {
+            padding: 0 16px 10px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .histsheet__who strong { color: var(--text); font-size: 13px; }
+        /* The one scrollable region in the app. A long day genuinely can run
+           past the screen, and this is a panel the employee opened rather than
+           the fixed kiosk surface underneath it. */
+        .histlist {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 0 14px calc(env(safe-area-inset-bottom) + 14px);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .histrow {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 11px 12px;
+            border-radius: 14px;
+            background: var(--ink-soft);
+            border: 1px solid var(--line);
+        }
+        .histrow__ico {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 auto;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            font-size: 14px;
+        }
+        /* Colour-matched to the buttons that create them, so a row reads as the
+           same action the employee tapped: green in, amber out, purple OT. */
+        .histrow--login  .histrow__ico { background: rgba(34, 197, 94, .16);  color: #86EFAC; }
+        .histrow--logout .histrow__ico { background: rgba(239, 144, 23, .16); color: var(--amber); }
+        .histrow--ot-in  .histrow__ico,
+        .histrow--ot-out .histrow__ico { background: rgba(124, 92, 214, .18); color: #A78BFA; }
+
+        .histrow__body { min-width: 0; flex: 1 1 auto; }
+        .histrow__what {
+            font-size: 13.5px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+        .histrow__where {
+            font-size: 11px;
+            color: var(--muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .histrow__time {
+            flex: 0 0 auto;
+            font-size: 14px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+        .histempty {
+            margin: 26px 14px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .histempty i { display: block; font-size: 26px; margin-bottom: 10px; opacity: .5; }
+
         /* ------------------------------------------------------------ geo HUD */
 
         /* Live location readout over the bottom of the camera: how far from the
@@ -557,34 +676,55 @@
         .geohud {
             display: flex;
             flex-direction: column;
-            gap: 3px;
-            padding: 8px 12px;
+            gap: 2px;
+            padding: 6px 10px;
             border-radius: 12px;
-            background: var(--ink-soft);
+            background: rgba(11, 18, 32, .82);
             border: 1px solid var(--line);
-            font-size: 12px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            font-size: 11px;
         }
         .geohud__row {
             display: flex;
             align-items: center;
-            gap: 7px;
+            gap: 6px;
             font-weight: 600;
+            min-width: 0;
         }
-        .geohud__row i { flex: 0 0 auto; }
+        .geohud__row i { flex: 0 0 auto; font-size: 10px; }
+        /* Takes the space, and gives it up by truncating rather than by
+           wrapping — a wrapped station name would grow this panel upward into
+           the face, which is the whole thing this layout is avoiding. */
+        .geohud__dist {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .geohud__note {
-            font-size: 10.5px;
+            font-size: 10px;
             color: #FDE68A;
             display: none;
         }
-        /* Diagnostic, not information the employee acts on — it exists so HR has
-           the raw fix when a punch is disputed. Demoted accordingly: it used to
-           be set at the same weight as the employee's own name. */
+        /* Diagnostic, not something the employee acts on — it exists so HR has
+           the raw fix when a punch is disputed. Trails the distance on the SAME
+           row (it used to own a line of its own, a third of this panel) and is
+           the first thing dropped when there is no room for it. */
         .geohud__coords {
-            font-size: 9.5px;
+            margin-left: auto;
+            flex: 0 1 auto;
+            font-size: 9px;
             color: var(--muted);
             font-variant-numeric: tabular-nums;
             letter-spacing: .02em;
-            opacity: .75;
+            opacity: .7;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        @media (max-width: 360px) {
+            .geohud__coords { display: none; }
         }
         .geohud--ok  .geohud__row { color: #86EFAC; }
         .geohud--far .geohud__row { color: #FCD34D; }
@@ -592,40 +732,59 @@
 
         /* ---------------------------------------------------------------- name card */
 
-        /* Name card + location, in normal flow UNDER the camera.
-           Previously absolutely positioned inside the stage, where on a phone
-           they covered the subject's own face. flex:0 0 auto so they take only
-           what they need and the video keeps the rest. */
+        /* Floating readout pinned to the bottom edge of the video.
+           It overlays the frame — which keeps the app exactly one screen tall
+           with nothing to scroll — so the whole job of this block is to stay
+           SMALL. A portrait frame puts the face in the middle; anything tall
+           here climbs into it. Roughly half the height it used to be. */
         .readout {
-            flex: 0 0 auto;
-            margin: 10px 16px 0;
+            position: absolute;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            z-index: 4;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
+            pointer-events: none;   /* the map button behind stays tappable */
         }
+        .readout > * { pointer-events: auto; }
 
         .named {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 10px 12px;
-            border-radius: 14px;
-            background: var(--ink-soft);
-            border: 1px solid var(--line);
-        }
-        .avatar {
-            width: 38px;
-            height: 38px;
-            flex: 0 0 auto;
+            gap: 10px;
+            padding: 7px 10px;
             border-radius: 12px;
+            background: rgba(11, 18, 32, .82);
+            border: 1px solid var(--line);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        /* min-width:0 lets a long name ellipsis instead of stretching the card
+           and pushing the whole panel taller by wrapping onto a third line. */
+        .named__text { min-width: 0; }
+        .avatar {
+            width: 30px;
+            height: 30px;
+            flex: 0 0 auto;
+            border-radius: 10px;
             display: grid;
             place-items: center;
             font-weight: 800;
-            font-size: 15px;
+            font-size: 12px;
             background: linear-gradient(135deg, var(--green), var(--green-dark));
         }
-        .named__name { font-weight: 700; font-size: 14.5px; line-height: 1.25; }
-        .named__pos  { font-size: 11.5px; color: var(--muted); }
+        /* Both truncate. A long name wrapping is what would silently make this
+           panel taller and start covering the face again. */
+        .named__name,
+        .named__pos {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .named__name { font-weight: 700; font-size: 13px; line-height: 1.25; }
+        .named__pos  { font-size: 10.5px; color: var(--muted); line-height: 1.25; }
 
         /* ---------------------------------------------------------------- result */
 
@@ -656,6 +815,17 @@
         .result--out .result__mark { background: rgba(239, 144, 23, .14); color: var(--amber); }
         .result--ot  .result__mark { background: rgba(124, 92, 214, .16); color: #A78BFA; }
         @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* The confirmation, sized to be read at a glance from arm's length —
+           this is the thing an employee looks for before walking away. */
+        .result__headline {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--ok);
+            margin-bottom: -2px;
+        }
+        .result--out .result__headline { color: var(--amber); }
+        .result--ot  .result__headline { color: #A78BFA; }
 
         .result__name   { font-size: 21px; font-weight: 800; }
         .result__pos    { font-size: 12.5px; color: var(--muted); margin-top: -8px; }
@@ -788,6 +958,13 @@
             <i class="fas fa-map-location-dot"></i>
         </button>
 
+        {{-- Today's punches for whoever's badge was just scanned. Hidden until
+             the QR resolves, because until then the kiosk does not know whose
+             history it would be showing. --}}
+        <button type="button" class="histbtn d-none" id="hist-toggle" title="Today's log" aria-label="Show today's attendance log">
+            <i class="fas fa-clock-rotate-left"></i>
+        </button>
+
         {{-- Everything that lives along the bottom of the live view, in ONE
              stack rather than several things each absolutely positioned to the
              same corner. The name card and the location HUD were both pinned to
@@ -796,50 +973,45 @@
              column keeps them clear of each other without anyone having to know
              how tall the other one is, and collapses cleanly when the name card
              is hidden. --}}
+        {{-- Floating readout, hugging the BOTTOM EDGE of the video.
+             Deliberately slim: it sits over the frame so the app stays exactly
+             one screen tall with nothing to scroll, but the face occupies the
+             middle of a portrait frame and this must stay clear of it. Roughly
+             half its old height — a 30px avatar instead of 42, one line of
+             location instead of three, and no gap between them to spare. --}}
+        <div class="readout">
+            {{-- Shown after a QR scan resolves, so the person sees their name
+                 before the face step rather than after it. --}}
+            <div class="named d-none" id="named">
+                <div class="avatar" id="named-initials">--</div>
+                <div class="named__text">
+                    <div class="named__name" id="named-name">—</div>
+                    <div class="named__pos" id="named-pos">—</div>
+                </div>
+            </div>
+
+            {{-- ONE line. The distance leads; the raw fix trails it in the same
+                 row, small and muted — it is diagnostic (what HR is given when
+                 a punch is disputed), not something the employee acts on, and
+                 as its own line it was costing a third of this panel's height.
+                 The note only appears when out of range, written by
+                 updateGeoHud() which knows whether the perimeter is enforced. --}}
+            <div class="geohud" id="geohud">
+                <div class="geohud__row">
+                    <i class="fas fa-location-dot"></i>
+                    <span class="geohud__dist" id="geo-distance">Waiting for location…</span>
+                    <span class="geohud__coords" id="geo-coords">Lat —, Lng —</span>
+                </div>
+                <div class="geohud__note" id="geo-note"></div>
+            </div>
+        </div>
+
         <div class="veil" id="veil">
             <i class="fas fa-spinner fa-spin fa-2x"></i>
             <div id="veil-text">Starting camera…</div>
         </div>
     </main>
 
-    {{-- The name card and the location readout, BELOW the camera rather than
-         floating on top of it.
-
-         They used to be absolutely positioned inside the stage, which meant
-         that on a phone — where the video is portrait and the face fills it —
-         they sat squarely over the subject's mouth and chin. An employee could
-         not see whether they were framed properly because the thing telling
-         them who they were was in the way. Nothing overlaps the video now
-         except the fixed aiming oval and the map button in the corner.
-
-         Cost is vertical space, paid for by letting the stage shrink (it is the
-         flex:1 child, so it gives up exactly this much and no more). --}}
-    <div class="readout">
-        {{-- Shown after a QR scan resolves, so the person sees their name
-             before the face step rather than after it. --}}
-        <div class="named d-none" id="named">
-            <div class="avatar" id="named-initials">--</div>
-            <div>
-                <div class="named__name" id="named-name">—</div>
-                <div class="named__pos" id="named-pos">—</div>
-            </div>
-        </div>
-
-        {{-- Live location. The note line is written by updateGeoHud(), which
-             knows whether the perimeter is being enforced — do not hardcode a
-             policy here. The raw fix is kept (it is what HR is given when a
-             punch is disputed) but demoted to the smallest thing on screen:
-             it is diagnostic, and it was previously as prominent as the
-             employee's own name. --}}
-        <div class="geohud" id="geohud">
-            <div class="geohud__row">
-                <i class="fas fa-location-dot"></i>
-                <span id="geo-distance">Waiting for location…</span>
-            </div>
-            <div class="geohud__note" id="geo-note"></div>
-            <div class="geohud__coords" id="geo-coords">Lat —, Lng —</div>
-        </div>
-    </div>
 
     {{-- Nearest-station map. A self-contained animated canvas (no tiles, no CDN —
          it must work on the LGU LAN with no internet): stations are blinking
@@ -878,6 +1050,29 @@
             <div class="mapsheet__dist" id="map-dist">Locating…</div>
             <div class="mapsheet__sub"  id="map-sub">Finding the station closest to you.</div>
         </footer>
+    </div>
+
+    {{-- Today's punches for the scanned badge. Rows are built by renderHistory()
+         from what the SERVER computed — the kiosk does not decide which overtime
+         entry is a start and which is an end, because that pairing has to agree
+         with the DTR the employee will be paid from. --}}
+    <div class="histsheet d-none" id="histsheet" aria-hidden="true">
+        <header class="mapsheet__top">
+            <div class="mapsheet__title">
+                <i class="fas fa-clock-rotate-left"></i>
+                <span>Today's log</span>
+            </div>
+            <button type="button" class="mapsheet__close" id="hist-close" aria-label="Close log">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </header>
+
+        <div class="histsheet__who">
+            <strong id="hist-name">—</strong>
+            <span id="hist-date"></span>
+        </div>
+
+        <div class="histlist" id="histlist"></div>
     </div>
 
     <div class="hint" id="hint">
@@ -921,6 +1116,10 @@
     {{-- Result takes over the whole screen, then hands it back. --}}
     <div class="result d-none" id="result">
         <div class="result__mark" id="result-mark"><i class="fas fa-check"></i></div>
+        {{-- The plain-language confirmation. The line under it is the action in
+             the system's own words (CLOCK IN / OVERTIME); this one is what the
+             employee actually reads from arm's length as they walk away. --}}
+        <div class="result__headline" id="result-headline">Clocked in successfully</div>
         <div class="result__action" id="result-action">CLOCK IN</div>
         <div class="result__name" id="result-name">—</div>
         <div class="result__pos"  id="result-pos">—</div>
@@ -938,6 +1137,7 @@
         'urls'       => [
             'punch'     => route('attendancePunch'),
             'qrCheck'   => route('attendanceQrCheck'),
+            'history'   => route('attendanceHistory'),
             'challenge' => route('attendanceChallenge'),
         ],
         'resetAfter' => (int) config('attendance.portal.reset_after', 5),
@@ -954,6 +1154,10 @@
         // judgement from the same config and station table at punch time.
         'geofence'   => [
             'enforce' => (bool) config('attendance.geofence.enforce', true),
+            // Whether an empty station list closes the kiosk. Mirrored here so
+            // the refusal happens before the camera runs; the server enforces
+            // the same rule regardless.
+            'requireStation' => (bool) config('attendance.geofence.require_station', true),
         ],
         // How many frontal frames to gather, and how long to let the screen
         // settle on a flash colour before trusting the frame. Every threshold

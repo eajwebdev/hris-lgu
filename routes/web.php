@@ -66,6 +66,10 @@ Route::prefix('attendance')->group(function () {
 
     Route::get('/', [AttendancePortalController::class, 'show'])->name('attendancePortal');
     Route::post('/qr-check', [AttendancePortalController::class, 'checkQr'])->middleware($limit)->name('attendanceQrCheck');
+    // Today's punches for the badge holder. Throttled like the rest: it takes
+    // the encrypted token, so it cannot be walked through employee ids, but it
+    // should not be a free lookup either.
+    Route::post('/history', [AttendancePortalController::class, 'history'])->middleware($limit)->name('attendanceHistory');
     Route::post('/challenge', [AttendancePortalController::class, 'challenge'])->middleware($limit)->name('attendanceChallenge');
     Route::post('/punch', [AttendancePortalController::class, 'punch'])->middleware($limit)->name('attendancePunch');
 });
