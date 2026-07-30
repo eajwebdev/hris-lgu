@@ -50,7 +50,11 @@
         html, body {
             margin: 0;
             padding: 0;
-            height: 100%;
+            /* min-height, not height: the column is normally exactly one screen
+               tall, but on a short handset the stage's floor can push it past
+               that and a fixed height would clip the action buttons off the
+               bottom rather than letting the page scroll to them. */
+            min-height: 100%;
             background: var(--ink);
             color: var(--text);
             font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -62,8 +66,8 @@
         .portal {
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            height: 100dvh; /* newer engines; the vh line above is the fallback */
+            min-height: 100vh;
+            min-height: 100dvh; /* newer engines; the vh line above is the fallback */
             max-width: 560px;
             margin: 0 auto;
             position: relative;
@@ -94,7 +98,12 @@
             border-radius: 22px;
             overflow: hidden;
             background: #000;
-            min-height: 0; /* lets the flex child actually shrink on short screens */
+            /* A floor, not 0. The readout below used to be painted ON the video
+               and so cost it nothing; now that it takes its own space the stage
+               is the flex child that pays, and on a short screen it would
+               otherwise shrink until the employee cannot see their own framing.
+               Below this the column scrolls instead — see .portal. */
+            min-height: 240px;
         }
         .stage video {
             width: 100%;
@@ -548,14 +557,12 @@
         .geohud {
             display: flex;
             flex-direction: column;
-            gap: 5px;
-            padding: 9px 12px;
+            gap: 3px;
+            padding: 8px 12px;
             border-radius: 12px;
-            background: rgba(11, 18, 32, .72);
+            background: var(--ink-soft);
             border: 1px solid var(--line);
-            backdrop-filter: blur(8px);
             font-size: 12px;
-            pointer-events: none;
         }
         .geohud__row {
             display: flex;
@@ -569,52 +576,46 @@
             color: #FDE68A;
             display: none;
         }
+        /* Diagnostic, not information the employee acts on — it exists so HR has
+           the raw fix when a punch is disputed. Demoted accordingly: it used to
+           be set at the same weight as the employee's own name. */
         .geohud__coords {
-            font-size: 10px;
+            font-size: 9.5px;
             color: var(--muted);
             font-variant-numeric: tabular-nums;
-            letter-spacing: .03em;
+            letter-spacing: .02em;
+            opacity: .75;
         }
         .geohud--ok  .geohud__row { color: #86EFAC; }
         .geohud--far .geohud__row { color: #FCD34D; }
         .geohud--far .geohud__note { display: block; }
 
-        /* The QR name card and the HUD share the bottom edge; when the card is
-           visible the HUD steps up so both stay readable. */
-        .named:not(.d-none) ~ .geohud { bottom: 84px; }
-
         /* ---------------------------------------------------------------- name card */
 
-        /* The bottom overlay stack: name card above location HUD, laid out by
-           flex so neither needs to know the other's height and the HUD drops
-           to the floor of the stage when no badge has been scanned. */
-        .stagebottom {
-            position: absolute;
-            left: 12px;
-            right: 12px;
-            bottom: 12px;
-            z-index: 4;
+        /* Name card + location, in normal flow UNDER the camera.
+           Previously absolutely positioned inside the stage, where on a phone
+           they covered the subject's own face. flex:0 0 auto so they take only
+           what they need and the video keeps the rest. */
+        .readout {
+            flex: 0 0 auto;
+            margin: 10px 16px 0;
             display: flex;
             flex-direction: column;
             gap: 8px;
-            pointer-events: none;   /* the map button behind stays tappable */
         }
-        .stagebottom > * { pointer-events: auto; }
 
         .named {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 12px 14px;
-            border-radius: 16px;
-            background: rgba(11, 18, 32, .88);
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: var(--ink-soft);
             border: 1px solid var(--line);
-            backdrop-filter: blur(8px);
-            z-index: 4;
         }
         .avatar {
-            width: 42px;
-            height: 42px;
+            width: 38px;
+            height: 38px;
             flex: 0 0 auto;
             border-radius: 12px;
             display: grid;
@@ -795,36 +796,50 @@
              column keeps them clear of each other without anyone having to know
              how tall the other one is, and collapses cleanly when the name card
              is hidden. --}}
-        <div class="stagebottom">
-            {{-- Shown after a QR scan resolves, so the person sees their name
-                 before the face step rather than after it. --}}
-            <div class="named d-none" id="named">
-                <div class="avatar" id="named-initials">--</div>
-                <div>
-                    <div class="named__name" id="named-name">—</div>
-                    <div class="named__pos" id="named-pos">—</div>
-                </div>
-            </div>
-
-            {{-- Live location: distance to the nearest station + the raw fix.
-                 The note line is written by updateGeoHud(), which knows whether
-                 the perimeter is being enforced — do not hardcode a policy
-                 here. --}}
-            <div class="geohud" id="geohud">
-                <div class="geohud__row">
-                    <i class="fas fa-location-dot"></i>
-                    <span id="geo-distance">Waiting for location…</span>
-                </div>
-                <div class="geohud__note" id="geo-note"></div>
-                <div class="geohud__coords" id="geo-coords">Lat —, Lng —</div>
-            </div>
-        </div>
-
         <div class="veil" id="veil">
             <i class="fas fa-spinner fa-spin fa-2x"></i>
             <div id="veil-text">Starting camera…</div>
         </div>
     </main>
+
+    {{-- The name card and the location readout, BELOW the camera rather than
+         floating on top of it.
+
+         They used to be absolutely positioned inside the stage, which meant
+         that on a phone — where the video is portrait and the face fills it —
+         they sat squarely over the subject's mouth and chin. An employee could
+         not see whether they were framed properly because the thing telling
+         them who they were was in the way. Nothing overlaps the video now
+         except the fixed aiming oval and the map button in the corner.
+
+         Cost is vertical space, paid for by letting the stage shrink (it is the
+         flex:1 child, so it gives up exactly this much and no more). --}}
+    <div class="readout">
+        {{-- Shown after a QR scan resolves, so the person sees their name
+             before the face step rather than after it. --}}
+        <div class="named d-none" id="named">
+            <div class="avatar" id="named-initials">--</div>
+            <div>
+                <div class="named__name" id="named-name">—</div>
+                <div class="named__pos" id="named-pos">—</div>
+            </div>
+        </div>
+
+        {{-- Live location. The note line is written by updateGeoHud(), which
+             knows whether the perimeter is being enforced — do not hardcode a
+             policy here. The raw fix is kept (it is what HR is given when a
+             punch is disputed) but demoted to the smallest thing on screen:
+             it is diagnostic, and it was previously as prominent as the
+             employee's own name. --}}
+        <div class="geohud" id="geohud">
+            <div class="geohud__row">
+                <i class="fas fa-location-dot"></i>
+                <span id="geo-distance">Waiting for location…</span>
+            </div>
+            <div class="geohud__note" id="geo-note"></div>
+            <div class="geohud__coords" id="geo-coords">Lat —, Lng —</div>
+        </div>
+    </div>
 
     {{-- Nearest-station map. A self-contained animated canvas (no tiles, no CDN —
          it must work on the LGU LAN with no internet): stations are blinking

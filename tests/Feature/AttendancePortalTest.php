@@ -491,6 +491,170 @@ class AttendancePortalTest extends TestCase
         $this->assertNull($this->todayFor($this->alice));
     }
 
+    /**
+     * pose_count = 0 means NO gestures, which is what this kiosk ships with:
+     * the punch is QR + look at the camera, and nobody is told to turn their
+     * head.
+     *
+     * This is a regression test for a real one. issue() floored the count at
+     * max(1, $count), so setting the config to 0 still named one pose, the
+     * kiosk still demanded it on screen and the server still enforced it — the
+     * off switch silently did nothing and employees kept being asked to turn.
+     */
+    public function test_the_gesture_challenge_is_off_at_pose_count_zero(): void
+    {
+        config(['face.liveness.pose_count' => 0]);
+
+        $this->assertSame([], $this->challenge()['poses']);
+    }
+
+    /** ...and a nonzero count still issues exactly that many distinct gestures. */
+    public function test_a_nonzero_pose_count_still_issues_gestures(): void
+    {
+        config(['face.liveness.pose_count' => 2]);
+
+        $poses = $this->challenge()['poses'];
+
+        $this->assertCount(2, $poses);
+        $this->assertSame($poses, array_unique($poses), 'the gestures must be distinct');
+    }
+
+    /**
+     * The whole point of turning them off: a punch with no gesture frames at
+     * all is accepted, and liveness is carried by the flash instead.
+     */
+    public function test_a_punch_with_no_gesture_frames_is_accepted(): void
+    {
+        config(['face.liveness.pose_count' => 0]);
+
+        $this->enrol($this->alice, 126);
+
+        $challenge = $this->challenge();
+
+        $this->assertSame([], $challenge['poses']);
+
+        $payload = $this->livePayload(126, $challenge, 'in');
+
+        $this->assertSame(
+            [],
+            array_values(array_filter($payload['frames'], fn ($f) => $f['stage'] === 'pose')),
+            'the fixture should carry no pose frames when none were demanded'
+        );
+
+        $this->punch($payload)->assertOk()->assertJsonPath('recorded', true);
+    }
+
+    /**
+     * A photograph is still refused with the gesture challenge switched OFF.
+     *
+     * This is the test the existing photo cases were not making. Both of those
+     * post frames and nothing else, so with a flash sequence outstanding they
+     * are refused for having sent no illumination samples at all — true, but it
+     * proves nothing about detecting a photo. And before pose_count = 0 genuinely
+     * took effect they were refused earlier still, for not performing a gesture.
+     *
+     * Here the payload is complete and otherwise perfect: a full flash response
+     * modelled on a real face, and anti-spoof scores claiming a live one. The
+     * ONLY thing wrong with it is that the identity frames barely differ, the
+     * way a still photograph's do. min_variation is what has to catch that now
+     * that no gesture will.
+     */
+    public function test_a_photo_is_refused_with_the_gesture_challenge_off(): void
+    {
+        config(['face.liveness.pose_count' => 0]);
+
+        $this->enrol($this->alice, 127);
+
+        $challenge = $this->challenge();
+
+        $this->assertSame([], $challenge['poses'], 'this must be testing the no-gesture path');
+
+        $res = $this->punch([
+            'mode'           => 'face',
+            'action'         => 'in',
+            'nonce'          => $challenge['nonce'],
+            'frames'         => $this->photoFrames(127),
+            // Everything a real punch would carry, so nothing else can be what
+            // does the refusing.
+            'flash'          => $this->flashPayload(127, $challenge),
+            'liveness_score' => 0.97,
+            'liveness_min'   => 0.90,
+        ])->assertStatus(403);
+
+        // Pinned to the reason, not just the status: a 403 for some unrelated
+        // reason would leave this test passing while the photo defence rotted.
+        $this->assertStringContainsString(
+            'not a photo',
+            strtolower($res->json('message') ?? ''),
+            'the frame-variation check should be what refuses this'
+        );
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /**
+     * A VIDEO CALL of the real employee, held up to the kiosk, with gestures off.
+     *
+     * The hardest of the spoofs and the one the gesture challenge was worst
+     * against: a person on a live call can be coached to turn their head, so
+     * removing the gestures cost nothing here. What a call cannot do is beat
+     * the physics the flash reads.
+     *
+     * Everything an attacker controls is set to whatever helps them most:
+     *
+     *   - the frames VARY naturally, because it is a live human being — so
+     *     min_variation, which is what catches a still photograph, is no help
+     *     at all here and this must be refused by something else;
+     *   - the identity is genuinely the enrolled employee, because it is
+     *     really them on the call;
+     *   - the anti-spoof scores claim a live face, as a patched client would.
+     *
+     * The only tells are the two the server measures from the light:
+     *
+     *   - the background tracks the face, because the phone's display IS the
+     *     whole frame and lights both regions equally; and
+     *   - the face never takes the segment's colour, because the recording was
+     *     made before the server chose the sequence.
+     */
+    public function test_a_video_call_on_a_screen_is_refused_with_gestures_off(): void
+    {
+        config(['face.liveness.pose_count' => 0]);
+
+        $this->enrol($this->alice, 128);
+
+        $challenge = $this->challenge();
+
+        $this->assertSame([], $challenge['poses'], 'this must be testing the no-gesture path');
+
+        // A phone screen: face and background carry the same emitted light, and
+        // the colour balance is whatever was recorded rather than what was asked
+        // for a moment ago.
+        $face = [];
+        $bg   = [];
+
+        foreach (['white', 'dark', 'red', 'green', 'blue'] as $seg) {
+            $emitted    = [150.0, 150.0, 150.0];
+            $face[$seg] = $emitted;
+            $bg[$seg]   = $emitted;
+        }
+
+        $res = $this->punch($this->livePayload(128, $challenge, 'in', [
+            'flash' => $this->flashPayload(128, $challenge, ['face' => $face, 'bg' => $bg]),
+            // The client insisting it saw a live person.
+            'liveness_score' => 0.99,
+            'liveness_min'   => 0.98,
+        ]))->assertStatus(403);
+
+        // Refused on the light, not on some incidental malformity.
+        $this->assertStringContainsString(
+            'photo or screen',
+            strtolower($res->json('message') ?? ''),
+            'the illumination checks should be what refuses a replay device'
+        );
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
     /** flash_count = 0 turns the whole check off, poses and all else unchanged. */
     public function test_the_illumination_check_can_be_disabled(): void
     {
