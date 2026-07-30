@@ -58,6 +58,11 @@ class AttendancePortalTest extends TestCase
         config([
             'face.require_qr' => false,
             'face.liveness_flash_frames.require_images' => false,
+            // This class configures no stations, and an empty station table now
+            // closes the kiosk. Geofencing is AttendanceGeoTest's subject, not
+            // this one's — here it would only stand between every fixture and
+            // the liveness logic under test.
+            'attendance.geofence.require_station' => false,
         ]);
 
         $this->faces = app(FaceEmbeddingService::class);

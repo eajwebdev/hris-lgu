@@ -107,6 +107,36 @@ class AttendancePortalController extends Controller
     }
 
     /**
+     * Today's punches for the employee named by a QR badge.
+     *
+     * Takes the TOKEN, never an employee id — same rule as every other endpoint
+     * here. An id in the body would turn this into a way to read any employee's
+     * movements by counting upwards, whereas the token is encrypted and cannot
+     * be forged, so the only history anyone can pull is the one whose badge they
+     * are physically holding.
+     *
+     * Read-only and deliberately separate from checkQr(): the kiosk should not
+     * pay for this query on every scan when most people never open the panel.
+     */
+    public function history(Request $request): JsonResponse
+    {
+        $request->validate(['qr' => ['required', 'string', 'max:512']]);
+
+        $employee = $this->employeeFromQr($request->input('qr'));
+
+        if (! $employee) {
+            return $this->fail('This QR code is not valid.', 404);
+        }
+
+        return response()->json([
+            'status'   => 200,
+            'employee' => $this->card($employee),
+            'date'     => now()->format('l, F j, Y'),
+            'entries'  => app(\App\Services\AttendanceHistoryService::class)->today($employee),
+        ]);
+    }
+
+    /**
      * Identify, prove the face is alive, and punch — in one indivisible step.
      *
      * Splitting this up would create exactly the hole the design exists to avoid:
@@ -489,10 +519,17 @@ class AttendancePortalController extends Controller
         $result = $verifier->verify($issued ?: $sequence, $measured);
 
         if (! $result['ok']) {
+            // The measured numbers travel with the refusal. These thresholds can
+            // only be tuned against real cameras in real rooms, and without the
+            // values a rejected employee is unreproducible — which is how a
+            // check that refused every live face on a green segment stayed
+            // invisible. 'detail' carries flash_delta, face_bg_delta and the
+            // per-colour hue shift with the baseline it was measured against.
             Log::warning('Punch refused by server-side flash verification.', [
-                'reason' => $result['reason'],
-                'detail' => $result['detail'],
-                'ip'     => request()->ip(),
+                'reason'   => $result['reason'],
+                'detail'   => $result['detail'],
+                'sequence' => $issued ?: $sequence,
+                'ip'       => request()->ip(),
             ]);
 
             return $verifier->explain($result['reason']);
@@ -682,17 +719,26 @@ class AttendancePortalController extends Controller
             return null;
         }
 
-        if ($lat === null || $lng === null) {
-            if (! AttendanceStation::active()->exists()) {
+        $hasStation = AttendanceStation::active()->exists();
+
+        // No station configured. Previously this fell through and ALLOWED the
+        // punch — the perimeter failed open, so a fresh install accepted a
+        // punch from anywhere while looking exactly like a working geofence.
+        if (! $hasStation) {
+            if (! config('attendance.geofence.require_station', true)) {
                 return null;
             }
 
+            return 'No attendance station has been set up yet, so clocking in is closed. Please ask HR to add one.';
+        }
+
+        if ($lat === null || $lng === null) {
             return 'Location is required to clock in here. Please enable location access and try again.';
         }
 
         // resolve() already answers "was there anything to compare against":
-        // station_id stays null only when no active station exists, since a
-        // real fix always matches some nearest one once any station does.
+        // station_id stays null only when no active station exists, which the
+        // branch above has now dealt with.
         if ($tag['station_id'] === null) {
             return null;
         }

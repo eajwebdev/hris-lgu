@@ -338,8 +338,15 @@ class AttendanceGeoTest extends TestCase
             ->assertJsonPath('location.out_of_range', false);
     }
 
+    /**
+     * A disabled station is not a station. With require_station off — the
+     * "we deliberately have no perimeter" configuration — that means there is
+     * nothing to compare against and the punch is tagged with nothing.
+     */
     public function test_an_inactive_station_does_not_count(): void
     {
+        config(['attendance.geofence.require_station' => false]);
+
         $this->enrol($this->alice, 530);
         $this->station(['active' => false]);
 
@@ -348,6 +355,18 @@ class AttendanceGeoTest extends TestCase
             ->assertOk()
             ->assertJsonPath('location.station_name', null)
             ->assertJsonPath('location.out_of_range', null);
+    }
+
+    /** ...and with require_station ON, a disabled station closes the kiosk. */
+    public function test_an_inactive_station_closes_the_kiosk_when_a_station_is_required(): void
+    {
+        $this->enrol($this->alice, 531);
+        $this->station(['active' => false]);
+
+        $this->livePunch(531, ['lat' => self::HALL_LAT, 'lng' => self::HALL_LNG])
+            ->assertStatus(403);
+
+        $this->assertNull($this->todayFor($this->alice));
     }
 
     /**
@@ -385,13 +404,50 @@ class AttendanceGeoTest extends TestCase
         $this->assertNull($log->out_of_range);
     }
 
-    public function test_no_stations_configured_means_no_flag_either_way(): void
+    /**
+     * The perimeter used to FAIL OPEN: an empty stations table meant there was
+     * nothing to be outside of, so a punch from anywhere was accepted while
+     * looking exactly like a working geofence. That is now a refusal, and this
+     * test pins the old behaviour to the flag that deliberately asks for it.
+     */
+    public function test_no_stations_configured_means_no_flag_when_stations_are_optional(): void
     {
+        config(['attendance.geofence.require_station' => false]);
+
         $this->enrol($this->alice, 550);
 
         $this->livePunch(550, ['lat' => self::HALL_LAT, 'lng' => self::HALL_LNG])
             ->assertOk()
             ->assertJsonPath('location.out_of_range', null);
+    }
+
+    /** The shipped default: no station configured, no punching. */
+    public function test_no_stations_configured_closes_the_kiosk_by_default(): void
+    {
+        $this->enrol($this->alice, 551);
+
+        $response = $this->livePunch(551, ['lat' => self::HALL_LAT, 'lng' => self::HALL_LNG])
+            ->assertStatus(403);
+
+        // The refusal has to point at the fix, or an operator sees a dead kiosk
+        // with no idea that a station is what it wants.
+        $this->assertStringContainsString(
+            'station',
+            strtolower($response->json('message') ?? '')
+        );
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /** Once a station exists and you are standing at it, punching resumes. */
+    public function test_adding_a_station_reopens_the_kiosk(): void
+    {
+        $this->enrol($this->alice, 552);
+        $this->station();
+
+        $this->livePunch(552, ['lat' => self::HALL_LAT, 'lng' => self::HALL_LNG])
+            ->assertOk()
+            ->assertJsonPath('recorded', true);
     }
 
     public function test_nonsense_coordinates_are_rejected(): void

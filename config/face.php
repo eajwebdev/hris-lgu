@@ -797,9 +797,27 @@ return [
         // decode a frame and every punch fails closed.
         'require_images'    => env('FACE_FLASH_IMAGES_REQUIRED', true),
 
+        // These two are confirmed working on real hardware: a live employee
+        // cleared both, and only the hue check below refused them. Do not
+        // loosen them to chase a hue failure.
         'min_delta'         => 6.0,
         'min_face_bg_delta' => 3.0,
-        'min_hue_shift'     => 0.02,
+
+        // 0.02 -> 0.015, alongside the baseline correction in
+        // FlashFrameVerifier::verify().
+        //
+        // This number now means something different, so the old value does not
+        // carry over. It used to be measured against a flat 1/3 — a test real
+        // skin could not pass on a green or blue segment at all, because skin
+        // is red-dominant and its green share never reaches a third. It is now
+        // the RISE in that channel against the face's own colour under neutral
+        // light, which is a much smaller quantity for the same physical effect.
+        //
+        // Eased slightly on top of that because a phone screen in a bright room
+        // is a weak light source next to daylight. Raise it if a recording ever
+        // gets through; the logged 'hue_*' values on each refusal are what to
+        // tune against.
+        'min_hue_shift'     => 0.015,
     ],
 
 ];

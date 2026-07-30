@@ -87,6 +87,122 @@ class FlashFrameVerifierTest extends TestCase
         return $this->v->verify($issued, $measured);
     }
 
+    /**
+     * A frame modelled on the situation this actually runs in: REAL SKIN, lit
+     * mostly by the room, with the phone screen adding only a little on top.
+     *
+     * The fixtures above paint a neutral grey "face" under a saturated light,
+     * which is why the bug this covers went unseen. Skin is red-dominant, and
+     * the screen is a weak source next to daylight — both matter.
+     *
+     * @param  array  $skin  per-channel reflectance, red-leading as skin is
+     */
+    private function skinFrame(string $segment, int $n, array $skin = [1.00, 0.72, 0.62]): string
+    {
+        [$sr, $sg, $sb] = $this->segment($segment);
+
+        $ambient  = 120.0;  // the room, neutral and dominant
+        $faceGain = 25.0;   // the screen: present, but nothing like the room
+        $bgGain   = 4.0;    // and much weaker again on the wall behind
+        $bgRefl   = 0.60;
+
+        $im = imagecreatetruecolor(320, 240);
+
+        $bg = imagecolorallocate($im,
+            (int) min(255, ($ambient + $bgGain * $sr) * $bgRefl),
+            (int) min(255, ($ambient + $bgGain * $sg) * $bgRefl),
+            (int) min(255, ($ambient + $bgGain * $sb) * $bgRefl));
+        imagefilledrectangle($im, 0, 0, 320, 240, $bg);
+
+        $face = imagecolorallocate($im,
+            (int) min(255, ($ambient + $faceGain * $sr) * $skin[0]),
+            (int) min(255, ($ambient + $faceGain * $sg) * $skin[1]),
+            (int) min(255, ($ambient + $faceGain * $sb) * $skin[2]));
+        imagefilledellipse($im, 160 + ($n % 3) - 1, 120 + (($n + 1) % 3) - 1, 120, 150, $face);
+
+        for ($i = 0; $i < 40; $i++) {
+            imagesetpixel($im, 110 + ($i * 7 + $n * 3) % 100, 60 + ($i * 11 + $n * 5) % 120,
+                imagecolorallocate($im, 20 + $n, 20 + $n, 20 + $n));
+        }
+
+        ob_start();
+        imagejpeg($im, null, 92);
+        $bin = ob_get_clean();
+        imagedestroy($im);
+
+        return $bin;
+    }
+
+    private function skinAttempt(array $sequence, array $skin = [1.00, 0.72, 0.62]): array
+    {
+        $measured = [];
+
+        foreach ($sequence as $i => $s) {
+            $measured[] = $this->v->measure($this->skinFrame($s, $i, $skin), $this->box);
+        }
+
+        return $this->v->verify($sequence, $measured);
+    }
+
+    /**
+     * REGRESSION. A live, red-dominant face on a GREEN segment was refused, and
+     * the employee was told a photograph or recording could not be used.
+     *
+     * The hue test compared the channel's share of the face against a flat 1/3
+     * and required it to come out above. Skin never does that on green or blue —
+     * red keeps leading whatever the screen is doing — so every real employee
+     * failed whenever the randomly drawn colour was not red. It looked
+     * intermittent, because a red draw passed.
+     *
+     * The question is now "did green RISE when the screen turned green", judged
+     * against the face's own colour under neutral light.
+     */
+    public function test_a_real_skin_toned_face_passes_on_a_green_segment(): void
+    {
+        $result = $this->skinAttempt(['white', 'green', 'dark']);
+
+        $this->assertTrue(
+            $result['ok'],
+            'a live skin-toned face must not be refused as a photograph; reason: '.($result['reason'] ?? '')
+        );
+    }
+
+    public function test_a_real_skin_toned_face_passes_on_a_blue_segment(): void
+    {
+        $result = $this->skinAttempt(['white', 'blue', 'dark']);
+
+        $this->assertTrue($result['ok'], 'reason: '.($result['reason'] ?? ''));
+    }
+
+    /** Darker skin is the same physics and must behave the same way. */
+    public function test_a_darker_skin_toned_face_passes(): void
+    {
+        $result = $this->skinAttempt(['white', 'green', 'dark'], [0.55, 0.40, 0.34]);
+
+        $this->assertTrue($result['ok'], 'reason: '.($result['reason'] ?? ''));
+    }
+
+    /**
+     * The fix must not have blunted the check: a face whose colour does NOT move
+     * with the screen is still refused, skin tone or not.
+     */
+    public function test_a_skin_toned_face_that_ignores_the_colour_is_still_refused(): void
+    {
+        // Every segment rendered as if the screen were showing plain white, so
+        // the colour segment produces no shift at all — a recording.
+        $measured = [];
+
+        foreach (['white', 'green', 'dark'] as $i => $s) {
+            $shown = $s === 'green' ? 'white' : $s;
+            $measured[] = $this->v->measure($this->skinFrame($shown, $i), $this->box);
+        }
+
+        $result = $this->v->verify(['white', 'green', 'dark'], $measured);
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('no_colour_response', $result['reason']);
+    }
+
     public function test_a_live_face_reacting_to_the_sequence_passes(): void
     {
         $seq = ['white', 'red', 'dark', 'blue'];

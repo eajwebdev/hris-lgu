@@ -40,6 +40,7 @@ class PunchIdentityScoringTest extends TestCase
             // requirement and PunchFlashImagesTest for the image path.
             'face.require_qr'             => false,
             'face.liveness_flash_frames.require_images' => false,
+            'attendance.geofence.require_station' => false,
         ]);
     }
 

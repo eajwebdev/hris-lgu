@@ -211,10 +211,27 @@ class FlashFrameVerifier
             }
         }
 
-        // ---- 3. Hue response. The strongest check: under a red segment the
-        // face's red share must lead, and so on. A recording made before the
-        // sequence was chosen cannot satisfy this, however well it was coached.
+        // ---- 3. Hue response: does a channel's share of the face RISE when the
+        // screen turns that colour?
+        //
+        // MEASURED AGAINST THE FACE'S OWN COLOUR, not against a flat 1/3.
+        //
+        // This used to compare the share to a fixed 1/3 baseline and demand it
+        // come out above it. That is wrong for the only subject this system ever
+        // sees. Human skin is strongly red-dominant, so under a GREEN segment a
+        // real face's green share still sits below a third — red keeps leading —
+        // and the check refused every live employee whenever the randomly drawn
+        // colour was green or blue. A red draw passed, which is what made it
+        // look intermittent rather than broken.
+        //
+        // The physical question was never "is this channel over a third of the
+        // face". It is "did this channel GAIN when the screen turned that
+        // colour", which is skin-tone independent: whatever the face's natural
+        // balance, the screen's light has to shift it. The baseline is therefore
+        // the same channel's share under the segments that are NOT that colour
+        // (white and dark are ideal — neutral light of two intensities).
         $hueChecked = 0;
+
         foreach (self::HUE as $colour => $channel) {
             if (! isset($byName[$colour])) {
                 continue;
@@ -227,12 +244,23 @@ class FlashFrameVerifier
                 return $this->fail('frame_unreadable', ['segment' => $colour]);
             }
 
+            $baseline = $this->baselineShare($byName, $colour, $channel);
+
+            // Nothing to compare against — a sequence of one colour and nothing
+            // else. issueFlash() always seeds white and dark so this should not
+            // arise, but guessing a baseline would be worse than not testing.
+            if ($baseline === null) {
+                continue;
+            }
+
             $share = $rgb[$channel] / $total;
-            $baseline = 1 / 3;
-            $detail["hue_{$colour}"] = round($share - $baseline, 4);
+            $shift = $share - $baseline;
+
+            $detail["hue_{$colour}"] = round($shift, 4);
+            $detail["hue_{$colour}_base"] = round($baseline, 4);
             $hueChecked++;
 
-            if ($share - $baseline < (float) ($limits['min_hue_shift'] ?? 0.02)) {
+            if ($shift < (float) ($limits['min_hue_shift'] ?? 0.02)) {
                 return $this->fail('no_colour_response', $detail);
             }
         }
@@ -249,6 +277,44 @@ class FlashFrameVerifier
         }
 
         return ['ok' => true, 'reason' => null, 'detail' => $detail];
+    }
+
+    /**
+     * The face's natural share of one channel, taken from every segment that is
+     * NOT the colour being tested.
+     *
+     * White and dark carry it in practice: they are neutral light at two
+     * intensities, so they describe the subject's own colouring rather than
+     * anything the screen imposed. Averaging both means a face that happens to
+     * be over- or under-exposed in one of them does not skew the baseline.
+     *
+     * @param  array<string, array<int, array>>  $byName  measurements per segment
+     * @return float|null  null when there is nothing to compare against
+     */
+    private function baselineShare(array $byName, string $colour, int $channel): ?float
+    {
+        $shares = [];
+
+        foreach ($byName as $segment => $frames) {
+            if ($segment === $colour) {
+                continue;
+            }
+
+            foreach ($frames as $frame) {
+                $rgb   = $frame['face'] ?? null;
+                $total = is_array($rgb) ? array_sum($rgb) : 0;
+
+                if ($total > 0) {
+                    $shares[] = $rgb[$channel] / $total;
+                }
+            }
+        }
+
+        if (! $shares) {
+            return null;
+        }
+
+        return array_sum($shares) / count($shares);
     }
 
     /** Operator-facing wording. */
