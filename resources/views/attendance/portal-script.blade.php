@@ -71,6 +71,30 @@
     var scratch    = document.createElement('canvas');
     var scratchCtx = scratch.getContext('2d', { willReadFrequently: true });
 
+    // Size and quality of the frame posted with each flash sample. The server
+    // averages colour over regions rather than recognising anything, so 320px is
+    // ample; a full-resolution frame would multiply the payload for no gain.
+    // Measured at ~3 KB per frame, so a four-segment burst adds ~12 KB.
+    var FLASH_SNAP_W = 320;
+    var FLASH_SNAP_Q = 0.72;
+
+    // Size and quality of the frame posted with each IDENTITY capture, when
+    // server-side punch scoring is on. Larger than the flash snapshots because
+    // the server is recognising a face in these, not averaging colour over a
+    // region: the face has to survive as enough pixels for ArcFace, and
+    // face.scoring.enrolment.min_face_px alone wants 90. At 640 wide a face
+    // filling a fifth of the frame still lands near 130px.
+    //
+    // ~25 KB per frame, so the default five neutral frames plus two gestures
+    // add roughly 175 KB to a punch.
+    var RECOG_SNAP_W = 640;
+    var RECOG_SNAP_Q = 0.82;
+
+    // Whether to attach those frames at all. Off and the server has only the
+    // browser's word for who this is; the flag is server-rendered so the two
+    // sides cannot disagree about it.
+    var SEND_FRAMES = {{ config('face.scoring.enabled') && config('face.scoring.punch.enabled') ? 'true' : 'false' }};
+
     var luma = document.createElement('canvas');
     luma.width = luma.height = 32;
     var lumaCtx = luma.getContext('2d', { willReadFrequently: true });
@@ -461,6 +485,7 @@
                 pose: null,
                 t: Math.round(performance.now() - t0),
                 descriptor: Array.from(frame.descriptor),
+                image: frame.snapshot,
             });
 
             if (typeof frame.real === 'number') reals.push(frame.real);
@@ -490,6 +515,7 @@
                 pose: pose,
                 t: Math.round(performance.now() - t0),
                 descriptor: Array.from(posed.descriptor),
+                image: posed.snapshot,
             });
 
             if (typeof posed.real === 'number') reals.push(posed.real);
@@ -560,11 +586,18 @@
                 showFlash(seg);
                 await sleep(settle);
 
+                // The readings below are a courtesy to older servers and to the
+                // on-screen hints; the snapshot is what the server actually
+                // judges, because it can re-measure it for itself.
+                var snap = snapshotFor(box);
+
                 samples.push({
-                    seg:  seg,
-                    t:    Math.round(performance.now() - t0),
-                    face: sampleRegion(box),
-                    bg:   sampleBackground(box),
+                    seg:   seg,
+                    t:     Math.round(performance.now() - t0),
+                    face:  sampleRegion(box),
+                    bg:    sampleBackground(box),
+                    image: snap ? snap.image : null,
+                    box:   snap ? snap.box : null,
                 });
 
                 // Mid-burst, while a colour is still up: proves the face the
@@ -631,6 +664,12 @@
             var full = (await detectFull())[0];
 
             if (full && poseHolds(full.landmarks, pose, baselinePitch)) {
+                // Taken FIRST, before the two inference passes below, so the
+                // pixels the server judges are the pixels the pose was just
+                // confirmed on. The embed and anti-spoof calls cost tens of
+                // milliseconds each and the head keeps moving through them.
+                full.snapshot = recogSnapshot();
+
                 full.descriptor = await FaceEngine.embed(el.video, full);
                 // Same frame, judged by the anti-spoof model. null when the model
                 // is not loaded, in which case the check simply does not apply.
@@ -689,6 +728,72 @@
      * because a 16x16 average is all the precision this needs and it costs
      * almost nothing to take.
      */
+    /**
+     * The current video frame as a small JPEG, plus the face box translated into
+     * that JPEG's pixel space.
+     *
+     * Sent alongside each flash sample so the SERVER can measure the light
+     * response itself rather than trusting sampleRegion()/sampleBackground()
+     * below — those run here, in a browser an attacker controls, and a tampered
+     * client can simply report whatever readings would pass.
+     *
+     * Downscaled to FLASH_SNAP_W because the server is measuring average colour
+     * over regions, not recognising anything: a 320px frame answers that just as
+     * well as a 1080p one and keeps the payload small enough to post several of.
+     *
+     * The box MUST be scaled by the same factor. Sending video-space coordinates
+     * with a downscaled image would have the server measuring the wrong region —
+     * which fails the face-vs-background test rather than passing it, but fails
+     * it for the wrong reason and for every honest employee too.
+     */
+    function snapshotFor(box) {
+        var v = el.video;
+
+        if (!v.videoWidth || !v.videoHeight) return null;
+
+        var scale = Math.min(1, FLASH_SNAP_W / v.videoWidth);
+        var w = Math.max(1, Math.round(v.videoWidth * scale));
+        var h = Math.max(1, Math.round(v.videoHeight * scale));
+
+        scratch.width = w;
+        scratch.height = h;
+        scratchCtx.drawImage(v, 0, 0, w, h);
+
+        return {
+            image: scratch.toDataURL('image/jpeg', FLASH_SNAP_Q).split(',')[1],
+            box: [
+                Math.max(0, box.x * scale),
+                Math.max(0, box.y * scale),
+                Math.min(w, (box.x + box.width) * scale),
+                Math.min(h, (box.y + box.height) * scale)
+            ]
+        };
+    }
+
+    /**
+     * The current video frame as a JPEG, for the server to recognise from.
+     *
+     * No box travels with it: the server runs its own detector, which is the
+     * point — a box supplied by the client would be one more number to trust.
+     * Returns null when frames are not being sent, so the caller can attach the
+     * result unconditionally.
+     */
+    function recogSnapshot() {
+        var v = el.video;
+
+        if (!SEND_FRAMES || !v.videoWidth || !v.videoHeight) return null;
+
+        var scale = Math.min(1, RECOG_SNAP_W / v.videoWidth);
+        var w = Math.max(1, Math.round(v.videoWidth * scale));
+        var h = Math.max(1, Math.round(v.videoHeight * scale));
+
+        scratch.width = w;
+        scratch.height = h;
+        scratchCtx.drawImage(v, 0, 0, w, h);
+
+        return scratch.toDataURL('image/jpeg', RECOG_SNAP_Q).split(',')[1];
+    }
+
     function sampleRegion(rect) {
         var v = el.video;
         var sx = Math.max(0, Math.round(rect.x));

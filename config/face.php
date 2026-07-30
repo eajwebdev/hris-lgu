@@ -82,6 +82,27 @@ return [
     |
     */
 
+    /*
+    | Pass-1 index shape
+    |
+    | The index is cached, and CACHE_DRIVER here is 'file', so its shape is
+    | serialised to disk and read back on EVERY punch. Held as a nested PHP
+    | array of 512 floats per employee that round trip was the whole cost:
+    |
+    |     employees   blob      unserialize   scan     per punch
+    |        89       1.3 MB        21 ms      1.0 ms      22 ms
+    |       500       7.0 MB       113 ms      5.6 ms     119 ms
+    |      2000      28.1 MB       513 ms     25.2 ms     538 ms
+    |
+    | It is now one packed float32 blob: 3.9 MB at 2000 employees, ~3 ms to
+    | read, and identify() end-to-end measures 48 ms instead of 538 ms with peak
+    | memory down from 126 MB to 54 MB. See FaceEmbeddingService::vectorIndex().
+    |
+    | 'shortlist' is how many candidates pass 1 hands to pass 2. Pass 2 re-scores
+    | those at full precision against each employee's four captures, which is
+    | why float32 in pass 1 costs nothing in accuracy.
+    */
+
     'match' => [
         'distance'  => 1.10,
         'ratio'     => 0.78,
@@ -359,6 +380,162 @@ return [
         // nose-offset yaw sign came out mirrored: the app was asking for the turn
         // opposite to the arrow shown.
         'yaw_invert' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Server-side scoring
+    |--------------------------------------------------------------------------
+    |
+    | The browser computes a descriptor, an anti-spoof score and flash luma
+    | readings, then posts the numbers. Every one of those is an assertion by
+    | code an attacker controls, so the gestures, the flash and the anti-spoof
+    | model were all guarding a door that could be walked around by posting
+    | fabricated values.
+    |
+    | With this enabled, the raw frame goes to the Python sidecar in
+    | face-service/ instead, which runs the same three ONNX models the browser
+    | does and returns a result the client cannot influence.
+    |
+    | 'required' fails CLOSED: if the sidecar is unreachable, the capture is
+    | refused rather than falling back to trusting the client — which would
+    | reopen the exact hole this closes. Turn it off only where the sidecar
+    | genuinely cannot run, and accept the old trust model if you do.
+    |
+    | The sidecar must stay on localhost. Anything that can reach it can ask it
+    | to score arbitrary images.
+    |
+    */
+
+    'scoring' => [
+        'enabled'  => env('FACE_SCORING_ENABLED', false),
+        'required' => env('FACE_SCORING_REQUIRED', true),
+        'url'      => env('FACE_SCORING_URL', 'http://127.0.0.1:8078'),
+        'token'    => env('FACE_SERVICE_TOKEN', ''),
+        'timeout'  => (int) env('FACE_SCORING_TIMEOUT', 20),
+
+        // Frames per call to the sidecar. Must not exceed the service's own
+        // FACE_MAX_BATCH; FaceScoringClient chunks anything larger, so this is
+        // a throughput knob rather than a limit anyone has to respect.
+        'max_batch' => (int) env('FACE_SCORING_MAX_BATCH', 8),
+
+        /*
+        | THE PUNCH PATH
+        |
+        | Registration was server-scored before this; the punch was not. That
+        | asymmetry was the remaining hole, and it was the wider one: enrolment
+        | happens once under supervision, while the punch is the unauthenticated
+        | endpoint anyone can reach. With scoring off for the punch, the browser
+        | still asserts both halves of the answer — the descriptor that says WHO
+        | this is, and the anti-spoof score that says it is a live person — so a
+        | tampered client could post a stolen descriptor with a perfect score and
+        | the server had nothing to check it against.
+        |
+        | With this on, the punch endpoint sends the captured frames to the
+        | sidecar and REPLACES both: every identity descriptor and the flash
+        | burst's descriptor become vectors the server computed, and the
+        | anti-spoof average and minimum are recomputed from the pixels. The
+        | gesture challenge, the flash challenge and the 1:N search downstream
+        | are all unchanged — they simply stop running on numbers the client
+        | chose.
+        |
+        | 'required' fails CLOSED. A punch whose frames cannot be scored is
+        | refused rather than falling back to the browser's word, because
+        | falling back is precisely the hole being closed.
+        |
+        | COST: one sidecar pass per frame, so about 25 ms x (neutral frames +
+        | gestures + 1). At the default 5 + 2 that is roughly 200 ms added to a
+        | punch, in one batched call. face.scoring.timeout is sized for that.
+        */
+        'punch' => [
+            'enabled'  => env('FACE_PUNCH_SCORING_ENABLED', false),
+            'required' => env('FACE_PUNCH_SCORING_REQUIRED', true),
+        ],
+
+        // Gates applied to an enrolment frame. A bad template matches badly for
+        // as long as it is on file, so these are deliberately strict.
+        //
+        // 'min_focus' is the blur gate, and it replaced a raw edge-variance one
+        // that could not work. Raw Laplacian variance scales with how much
+        // contrast a picture happens to have, so a crisp capture of a dark face
+        // scores below a blurred capture of a bright one: measured over real
+        // photographs, sharp frames spanned 17-3414 and visibly blurred ones
+        // 6-58, which overlap, and no threshold on that number separates them.
+        // Dividing by the crop's own intensity variance removes the contrast
+        // term. On the same frames that gives sharp 0.009-1.054 against blurred
+        // 0.003-0.013, so 0.02 sits about 1.5x above the worst blurred frame
+        // and below every sharp one but a single dark, soft capture — which was
+        // measured at brightness 59 and raw detail 17 against medians of 140
+        // and 230, i.e. genuinely poor and worth refusing at enrolment rather
+        // than living with as a template.
+        //
+        // 'min_sharpness' is kept as a floor on the raw number only to catch a
+        // frame with almost no edge content at all (a lens cap, a wall). It is
+        // deliberately far below the real-face range and is NOT the blur gate.
+        'enrolment' => [
+            'min_face_px'    => 90,    // shortest side of the detected face box
+            'min_focus'      => 0.02,  // contrast-normalised Laplacian variance
+            'min_sharpness'  => 5,     // raw floor; near-featureless frames only
+            'min_brightness' => 45,
+            'max_brightness' => 235,
+            'min_antispoof'  => 0.70,  // same floor as face.antispoof.min_real
+        ],
+
+        // Refuse a capture the sidecar's forensic checks flagged as a display
+        // or a print, independently of what the anti-spoof CNN said about it.
+        // The sidecar already reports antispoof=0 for a flagged frame, so this
+        // is belt-and-braces: it makes the refusal reason specific ("this looks
+        // like a screen") instead of a generic "not live", which is the
+        // difference between an operator retrying pointlessly and understanding
+        // what was rejected.
+        'reject_forensic_flags' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Flash frame verification (shared hosting)
+    |--------------------------------------------------------------------------
+    |
+    | Thresholds for App\Services\FlashFrameVerifier, which measures the
+    | screen-flash response from the submitted IMAGE FRAMES using GD, in pure
+    | PHP. No ONNX, no Python, no sidecar, no long-running process — so this is
+    | the one meaningful hardening available on shared web hosting.
+    |
+    | It replaces trust in numbers the browser reported with a measurement the
+    | server takes itself. Three checks, because each catches what the others
+    | miss (figures below are from tests/Feature/FlashFrameVerifierTest.php):
+    |
+    |   min_delta          The face brightens under a bright segment. A held-up
+    |                      print brightens too (~105), so this alone admits it.
+    |
+    |   min_face_bg_delta  The face brightens MORE than the background, because
+    |                      light falls off with distance. A print is flat, so
+    |                      both brighten equally (~0) and it is refused here.
+    |
+    |   min_hue_shift      The face takes the segment's colour cast. The
+    |                      strongest check: a recording is of a real 3-D person
+    |                      and passes both checks above, but its colours were
+    |                      fixed before the server chose the sequence.
+    |
+    | Raise these if genuine punches are being refused; lower them only with a
+    | physical retest, since they are what stands between a photo and a punch.
+    |
+    */
+
+    'liveness_flash_frames' => [
+        // When true the punch endpoint REQUIRES an image per flash sample and
+        // measures the light response itself, ignoring the numbers the browser
+        // reports. Fail-closed: a client that omits the images is refused.
+        //
+        // Left off by default because the portal script must be updated to send
+        // frames first — turning it on before that refuses every punch. Once the
+        // client sends them, turn it on: until you do, liveness is still only as
+        // trustworthy as the browser claiming it.
+        'require_images'    => env('FACE_FLASH_IMAGES_REQUIRED', false),
+
+        'min_delta'         => 6.0,
+        'min_face_bg_delta' => 3.0,
+        'min_hue_shift'     => 0.02,
     ],
 
 ];

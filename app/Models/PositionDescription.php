@@ -50,6 +50,18 @@ class PositionDescription extends Model
         return $this->hasMany(JobHiring::class, 'position_description_id');
     }
 
+    /**
+     * The current advertisement of this item, if any.
+     *
+     * A position can be advertised more than once over the years; the newest
+     * round is the one the positions list and the editor's publication card
+     * show. Earlier rounds keep their own applicants and assessment.
+     */
+    public function latestPosting()
+    {
+        return $this->hasOne(JobHiring::class, 'position_description_id')->latestOfMany();
+    }
+
     /** Section 22 must account for the whole working week. */
     public function dutiesPercentageTotal(): float
     {

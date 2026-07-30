@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Office;
+use App\Models\JobHiring;
 use App\Models\PositionDescription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,7 @@ class PositionDescriptionController extends Controller
         $search = trim((string) $request->get('q', ''));
 
         $descriptions = PositionDescription::withCount(['duties', 'postings'])
+            ->with(['latestPosting' => fn ($q) => $q->withCount('applications')])
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($w) use ($search) {
                     $w->where('position_title', 'like', "%{$search}%")
@@ -90,7 +92,68 @@ class PositionDescriptionController extends Controller
             'internal'    => self::INTERNAL_CONTACTS,
             'external'    => self::EXTERNAL_CONTACTS,
             'frequencies' => self::FREQUENCIES,
+            // The most recent advertisement of this item, if any. Editing it
+            // here is what replaces the separate Job Openings screen.
+            'posting'     => $description->exists
+                ? $description->postings()->orderByDesc('id')->first()
+                : null,
+            'types'       => JobHiringController::APPOINTMENT_TYPES,
         ];
+    }
+
+    /**
+     * Publish or re-publish this position as a vacancy.
+     *
+     * A posting is a point-in-time advertisement, so the descriptive fields are
+     * copied onto it rather than read live: revising the Position Description
+     * next year must not rewrite what this round's applicants applied to.
+     *
+     * "Publish as a new round" writes a second posting for the same item, which
+     * is how the same plantilla item is advertised again later without mixing
+     * the two applicant pools.
+     */
+    private function persistPosting(Request $request, PositionDescription $description): void
+    {
+        // Nothing to do unless the publication card was filled in.
+        if (! $request->filled('posted_at') || ! $request->filled('expiration_at')) {
+            return;
+        }
+
+        $data = $request->validate([
+            'posted_at'     => 'required|date',
+            'expiration_at' => 'required|date|after_or_equal:posted_at',
+            'vacancy_status' => 'required|in:Open,Closed',
+            'type'          => 'required|string|max:100',
+            'salary'        => 'nullable|numeric|min:0',
+            'new_round'     => 'nullable|boolean',
+        ], [
+            'expiration_at.after_or_equal' => 'The closing date cannot be before the date posted.',
+        ]);
+
+        $latest = $description->postings()->orderByDesc('id')->first();
+        $posting = ($latest && ! $request->boolean('new_round'))
+            ? $latest
+            : new JobHiring(['position_description_id' => $description->id]);
+
+        $posting->fill([
+            'position_description_id' => $description->id,
+            'type'          => $data['type'],
+            'posted_at'     => $data['posted_at'],
+            'expiration_at' => $data['expiration_at'],
+            'status'        => $data['vacancy_status'],
+            'salary'        => $data['salary'] ?? $posting->salary ?? 0,
+
+            // Snapshot of what is being advertised.
+            'title'             => $description->position_title,
+            'plantilla_item_no' => $description->item_number,
+            'assignment'        => $description->bureau_office,
+            'education'         => $description->qs_education,
+            'eligibility'       => $description->qs_eligibility,
+            'training'          => $description->qs_training,
+            'experience'        => $description->qs_experience,
+        ]);
+
+        $posting->save();
     }
 
     public function store(Request $request)
@@ -100,6 +163,7 @@ class PositionDescriptionController extends Controller
         $description = new PositionDescription();
         $description->created_by = auth()->guard('web')->id();
         $this->persist($request, $description);
+        $this->persistPosting($request, $description);
 
         return redirect()->route('positionDescriptionEdit', $description->id)
             ->with('success', 'Position Description created.');
@@ -111,6 +175,7 @@ class PositionDescriptionController extends Controller
 
         $description = PositionDescription::findOrFail($id);
         $this->persist($request, $description);
+        $this->persistPosting($request, $description);
 
         return redirect()->route('positionDescriptionEdit', $description->id)
             ->with('success', 'Position Description saved.');

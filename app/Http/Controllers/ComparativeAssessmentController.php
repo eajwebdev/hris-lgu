@@ -119,6 +119,7 @@ class ComparativeAssessmentController extends Controller
                 $row->civil_service_eligibility = $row->civil_service_eligibility ?: $app->eligibility;
                 $row->sort_order = $i;
 
+                $this->applyApplicantDetails($row, $app);
                 $this->applyInterviewScores($row, $interview, $app);
 
                 $row->recalculate()->save();
@@ -131,6 +132,32 @@ class ComparativeAssessmentController extends Controller
             ->with('success', 'Comparative assessment built from '.$applications->count().' candidate(s).');
     }
 
+
+    /**
+     * The candidate's present position column, and their performance rating.
+     *
+     * Both come off the application. For an internal applicant those details
+     * were taken from the 201 file when they applied, so the second column of
+     * the form fills itself and the 35-point Performance Rating has a source.
+     *
+     * An external applicant has neither, which is correct — there is no prior
+     * service to rate. Their sheet simply carries no performance points, and
+     * the other five components still total the remaining 65.
+     *
+     * A value already keyed by hand is never overwritten: HR may have recorded
+     * an IPCR the applicant could not supply.
+     */
+    private function applyApplicantDetails(ComparativeAssessmentRow $row, Application $app): void
+    {
+        $row->present_position   = $row->present_position   ?: $app->present_position;
+        $row->salary_grade       = $row->salary_grade       ?: $app->salary_grade;
+        $row->appointment_status = $row->appointment_status ?: $app->appointment_status;
+
+        if ($row->performance_rating === null && $app->performance_rating !== null) {
+            // An IPCR is rated out of 5; the column is worth 35.
+            $row->performance_rating = $this->psb->rescale((float) $app->performance_rating, 5, 35);
+        }
+    }
 
     /**
      * Potential and psychosocial attributes, from the panel interview.

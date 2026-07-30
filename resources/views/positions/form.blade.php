@@ -393,6 +393,79 @@
                 </div>
             </div>
 
+            {{-- Publication. This is what used to be the separate "Job Openings"
+                 screen: the same position, advertised. Everything descriptive is
+                 taken from the sections above, so nothing is typed twice. --}}
+            <div class="rec-card">
+                <header>
+                    <span class="n"><i class="fas fa-bullhorn"></i></span>
+                    <h2>Publication &mdash; advertise this position</h2>
+                    <span class="hint">
+                        @if($posting)
+                            currently {{ strtolower($posting->status) }} &middot;
+                            {{ $posting->applications()->count() }} applicant(s)
+                        @else
+                            optional &mdash; fill this in when the item becomes vacant
+                        @endif
+                    </span>
+                </header>
+                <div class="body">
+                    <div class="rec-grid">
+                        <div class="rec-field f-3">
+                            <label>Nature of appointment</label>
+                            <select name="type">
+                                @foreach($types as $value => $label)
+                                    <option value="{{ $value }}" @selected(optional($posting)->type === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="rec-field f-3">
+                            <label>Monthly salary</label>
+                            <input type="number" step="0.01" min="0" name="salary" value="{{ optional($posting)->salary }}">
+                        </div>
+                        <div class="rec-field f-3">
+                            <label>Date posted</label>
+                            <input type="date" name="posted_at" value="{{ optional($posting)->posted_at }}">
+                        </div>
+                        <div class="rec-field f-3">
+                            <label>Closing date</label>
+                            <input type="date" name="expiration_at" value="{{ optional($posting)->expiration_at }}">
+                        </div>
+                        <div class="rec-field f-3">
+                            <label>Vacancy status</label>
+                            <select name="vacancy_status">
+                                <option value="Open"   @selected(optional($posting)->status !== 'Closed')>Open — accepting applications</option>
+                                <option value="Closed" @selected(optional($posting)->status === 'Closed')>Closed</option>
+                            </select>
+                        </div>
+
+                        @if($posting)
+                            <div class="f-9" style="padding-top:1.35rem;">
+                                <label style="font-weight:500;font-size:.85rem;">
+                                    <input type="checkbox" name="new_round" value="1">
+                                    Publish as a <b>new recruitment round</b> rather than editing the current one
+                                </label>
+                                <small class="d-block text-muted" style="font-size:.76rem;">
+                                    Use this when re-advertising the item later. The existing round keeps its own
+                                    applicants, interview panel and Comparative Assessment.
+                                </small>
+                            </div>
+                        @endif
+                    </div>
+
+                    @if($posting)
+                        <div style="margin-top:.9rem;display:flex;gap:8px;flex-wrap:wrap;">
+                            <a href="{{ route('psbAssessment', $posting->id) }}" class="rec-btn">
+                                <i class="fas fa-scale-balanced"></i> Comparative Assessment
+                            </a>
+                            <a href="{{ route('careersPortal') }}" target="_blank" class="rec-btn">
+                                <i class="fas fa-up-right-from-square"></i> View on careers portal
+                            </a>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
             <div class="rec-sticky">
                 <div style="margin-right:auto;">
                     <select name="status" class="form-control form-control-sm" style="width:150px;">

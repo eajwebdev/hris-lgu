@@ -89,6 +89,27 @@
         background: #fff4d3;
         color: #8b6b00;
     }
+    /* The trailing tick/cross is a status glyph, not a second action icon —
+       none of the tile styling above applies to it. */
+    .quick-action .quick-action-status {
+        width: auto;
+        height: auto;
+        margin-left: auto;
+        background: none;
+        border-radius: 0;
+        font-size: 1.05rem;
+    }
+    .face-prompt-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #eaf7f0;
+        color: #187744;
+        font-size: 28px;
+    }
     .dashboard-table td {
         vertical-align: middle;
     }
@@ -327,6 +348,16 @@
                     <a class="quick-action mb-2" href="{{ route('empPDS') }}">
                         <i class="fas fa-clipboard"></i>
                         <span>Open PDS</span>
+                    </a>
+                    {{-- Face enrolment lives here rather than in the PDS submenu:
+                         the PDS is the HR-facing record, and this is the page an
+                         employee actually opens. The tick or cross is the whole
+                         point — "am I set up for the attendance kiosk" should be
+                         answerable at a glance. --}}
+                    <a class="quick-action mb-2" href="{{ route('faceRecognition') }}">
+                        <i class="fas fa-user-shield"></i>
+                        <span>Face Registration</span>
+                        <i class="quick-action-status fas {{ $faceRegistered ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }}"></i>
                     </a>
                     @if($isRegularEmployee)
                         <a class="quick-action mb-2" href="{{ route('leavesReadEmp') }}">
@@ -622,6 +653,50 @@
         history.go(1);
     };
 </script>
+{{-- Shown once per sign-in, to an employee with no face on file.
+
+     The flag is set in LoginAuthController::afterLogin and consumed by
+     MasterController::dashboard, so this markup is only rendered on the first
+     dashboard load after logging in — not on every visit. Dismissable on
+     purpose: enrolment needs a camera and reasonable light, and somebody
+     signing in from a phone on the road should be reminded, not trapped. The
+     Quick Actions tile keeps the cross showing until it is done. --}}
+@if($guard == 'employee' && ($promptFaceRegistration ?? false))
+<div class="modal fade" id="facePromptModal" tabindex="-1" role="dialog"
+     aria-labelledby="facePromptLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content" style="border-radius: 12px; border: none;">
+            <div class="modal-body text-center p-4">
+                <div class="face-prompt-icon mb-3">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <h5 class="font-weight-bold mb-2" id="facePromptLabel">Register your face</h5>
+                <p class="text-muted mb-4">
+                    You have no face registered yet. Registering lets you clock in and
+                    out at the attendance kiosk without typing anything. It takes about
+                    a minute and needs a camera with decent light.
+                </p>
+                <a href="{{ route('faceRecognition') }}" class="btn btn-block text-white font-weight-bold"
+                   style="background: #187744; border-radius: 8px;">
+                    Register now
+                </a>
+                <button type="button" class="btn btn-link btn-block text-muted" data-dismiss="modal">
+                    Remind me next time
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // AdminLTE ships jQuery + Bootstrap 4; if either is missing the prompt
+        // simply does not appear rather than throwing on every dashboard load.
+        if (window.jQuery && jQuery.fn.modal) {
+            jQuery('#facePromptModal').modal('show');
+        }
+    });
+</script>
+@endif
 @if($guard == 'employee')
 <script>
     document.addEventListener('DOMContentLoaded', function () {

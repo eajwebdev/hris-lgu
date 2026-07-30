@@ -345,12 +345,32 @@ class MasterController extends Controller
                 return $dtr;
             });
 
+            // Face enrolment state, for the Quick Actions tick and for the
+            // one-time prompt below.
+            $faceRegistered = $employee->faceSummary()['registered'];
+
+            // Pulled, not read: the flag is set once at sign-in and consumed the
+            // first time the dashboard renders, so the modal appears once per
+            // login rather than on every visit. A prompt that reappears on every
+            // navigation is one people learn to dismiss without reading.
+            //
+            // The registration check is re-applied here because the flag was set
+            // before the employee had a chance to act on it — somebody who
+            // enrolled and came back to the dashboard in the same session should
+            // not be asked again.
+            $promptFaceRegistration = session()->pull(
+                \App\Listeners\FlagMissingFaceRegistration::SESSION_KEY,
+                false
+            ) && ! $faceRegistered;
+
             return view("home.dashboard", compact(
                 'offCount',
                 'userCount',
                 'chartEmployee',
                 'guard',
                 'employee',
+                'faceRegistered',
+                'promptFaceRegistration',
                 'todayDtr',
                 'todayTimeIn',
                 'todayTimeOut',

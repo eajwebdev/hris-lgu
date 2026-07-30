@@ -141,16 +141,12 @@
                     </p>
                 </a>
                 <ul class="nav nav-treeview">
+                    {{-- One entry, not two. A vacancy is published from the position
+                         it belongs to, so "Job Openings" no longer exists separately. --}}
                     <li class="nav-item">
-                        <a href="{{ route('positionDescriptionList') }}" class="nav-link {{ request()->is('position-descriptions*') ? 'active' : '' }}">
+                        <a href="{{ route('positionDescriptionList') }}" class="nav-link {{ request()->is('position-descriptions*') || request()->is('career') ? 'active' : '' }}">
                             <i class="far fa-circle nav-icon"></i>
-                            <p>Position Descriptions</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('jlist') }}" class="nav-link {{ request()->is('career') ? 'active' : '' }}">
-                            <i class="far fa-circle nav-icon"></i>
-                            <p>Job Openings</p>
+                            <p>Positions &amp; Vacancies</p>
                         </a>
                     </li>
                     <li class="nav-item">

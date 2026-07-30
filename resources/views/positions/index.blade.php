@@ -57,7 +57,7 @@
                                     <th style="width:70px;">SG</th>
                                     <th>Office</th>
                                     <th class="text-center" style="width:80px;">Duties</th>
-                                    <th class="text-center" style="width:90px;">Postings</th>
+                                    <th style="width:210px;">Vacancy</th>
                                     <th class="text-center" style="width:90px;">Status</th>
                                     <th style="width:170px;"></th>
                                 </tr>
@@ -74,7 +74,30 @@
                                         <td>{{ $d->salary_grade ?: '—' }}</td>
                                         <td>{{ $d->bureau_office ?: '—' }}</td>
                                         <td class="text-center">{{ $d->duties_count }}</td>
-                                        <td class="text-center">{{ $d->postings_count }}</td>
+                                        <td>
+                                            @if($d->latestPosting)
+                                                @php
+                                                    $p = $d->latestPosting;
+                                                    $expired = $p->expiration_at && $p->expiration_at < now()->toDateString();
+                                                    $live = $p->status === 'Open' && ! $expired;
+                                                @endphp
+                                                <span class="rec-pill {{ $live ? 'active' : 'archived' }}">
+                                                    {{ $live ? 'Open' : ($expired ? 'Expired' : 'Closed') }}
+                                                </span>
+                                                <a href="{{ route('psbAssessment', $p->id) }}" class="ml-1" style="font-size:.78rem;"
+                                                   title="Comparative Assessment">
+                                                    {{ $p->applications_count }} applicant{{ $p->applications_count == 1 ? '' : 's' }}
+                                                </a>
+                                                <small class="d-block text-muted">
+                                                    closes {{ \Carbon\Carbon::parse($p->expiration_at)->format('M d, Y') }}
+                                                    @if($d->postings_count > 1)
+                                                        &middot; {{ $d->postings_count }} rounds
+                                                    @endif
+                                                </small>
+                                            @else
+                                                <small class="text-muted">Not advertised</small>
+                                            @endif
+                                        </td>
                                         <td class="text-center">
                                             <span class="rec-pill {{ $d->status }}">{{ $d->status }}</span>
                                         </td>

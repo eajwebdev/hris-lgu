@@ -47,19 +47,16 @@ class JobHiringController extends Controller
         'Contract of Service'  => 'Contract of Service',
     ];
 
+    /**
+     * The separate "Job Openings" screen is retired.
+     *
+     * A vacancy is now published from the position it belongs to — the DBM
+     * Position Description — because all but four of this table's fields simply
+     * repeated that form. Old links and bookmarks land on the positions list.
+     */
     public function jlist()
     {
-        $guard = $this->getGuaard();
-        $jobs = JobHiring::with(['positionDescription', 'comparativeAssessment'])
-            ->withCount('applications')
-            ->orderByDesc('id')
-            ->get();
-
-        return view("career.list", compact('jobs', 'guard') + [
-            'descriptions' => \App\Models\PositionDescription::where('status', 'active')
-                ->orderBy('position_title')->get(),
-            'types'        => self::APPOINTMENT_TYPES,
-        ]);
+        return redirect()->route('positionDescriptionList');
     }
 
     public function jCreate(Request $request)

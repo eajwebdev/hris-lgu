@@ -187,6 +187,14 @@ class ApplicationController extends Controller
             'tor' => 'required|mimes:pdf|max:20480',
             'coe' => 'nullable|mimes:pdf|max:20480',
             'cert_training.*' => 'nullable|mimes:pdf|max:20480',
+
+            // Internal applicants identify themselves by Employee ID; the
+            // Comparative Assessment needs their present position and a
+            // performance rating, and neither applies to an outside applicant.
+            'is_internal' => 'nullable|boolean',
+            'emp_ID' => 'nullable|string|required_if:is_internal,1',
+        ], [
+            'emp_ID.required_if' => 'Please give your Employee ID number, or select that you are applying from outside the LGU.',
         ]);
 
         // 🧩 Prevent duplicate application
@@ -233,7 +241,7 @@ class ApplicationController extends Controller
         $applicationNumber = "APP-{$year}-{$randomDigits}{$randomLetter}";
 
         // 💾 Save application
-        $application = Application::create(array_merge($request->only([
+        $application = new Application(array_merge($request->only([
             'jid', 'first_name', 'middle_name', 'last_name',
             'age', 'sex', 'mobile', 'email', 'address',
         ]), [
@@ -241,6 +249,20 @@ class ApplicationController extends Controller
             'education' => $educationString,
             'eligibility' => $eligibilityString,
         ], $paths));
+
+        // An internal applicant's present position, grade and status are read
+        // from the 201 file rather than typed — an applicant should not be
+        // stating their own salary grade on a document the board scores. An
+        // unrecognised Employee ID is not fatal: the application still stands,
+        // HR simply completes the column by hand.
+        if ($request->boolean('is_internal') && $request->filled('emp_ID')) {
+            $employee = \App\Models\Employee::where('emp_ID', trim($request->emp_ID))->first();
+            if ($employee) {
+                $application->snapshotFromEmployee($employee);
+            }
+        }
+
+        $application->save();
 
         // 📧 Send email to HR and applicant
         try {
