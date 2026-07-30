@@ -410,7 +410,7 @@
         drawBox(gate.detection, gate.ok);
         el.guide.classList.toggle('guide--ok', gate.ok);
 
-        setHint(gate.ok ? 'Ready — tap CLOCK IN or CLOCK OUT' : gate.message, gate.ok ? 'ok' : 'bad');
+        setHint(gate.ok ? 'Ready — tap CLOCK IN, CLOCK OUT or OVERTIME' : gate.message, gate.ok ? 'ok' : 'bad');
     }
 
     async function idleQr() {
@@ -1028,13 +1028,21 @@
         stopCamera();
         hideCue();
 
+        // Three outcomes now, not two. Overtime gets its own mark and colour so
+        // an employee glancing at the kiosk can tell at once that they recorded
+        // OT rather than an ordinary clock-in — the two are easy to confuse
+        // when the buttons sit next to each other and the punch is this quick.
         var out = body.action === 'CLOCK OUT';
+        var ot  = body.action === 'OVERTIME';
 
         el.result.classList.toggle('result--out', out);
+        el.result.classList.toggle('result--ot', ot);
 
-        document.getElementById('result-mark').innerHTML = out
-            ? '<i class="fas fa-right-from-bracket"></i>'
-            : '<i class="fas fa-check"></i>';
+        document.getElementById('result-mark').innerHTML = ot
+            ? '<i class="fas fa-moon"></i>'
+            : out
+                ? '<i class="fas fa-right-from-bracket"></i>'
+                : '<i class="fas fa-check"></i>';
 
         document.getElementById('result-action').textContent = body.action;
         document.getElementById('result-name').textContent   = body.employee.name;

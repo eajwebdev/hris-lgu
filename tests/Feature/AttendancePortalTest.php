@@ -650,6 +650,71 @@ class AttendancePortalTest extends TestCase
         $this->assertEmpty($row->time_in);
     }
 
+    public function test_a_live_face_records_overtime(): void
+    {
+        $this->enrol($this->alice, 215);
+
+        $this->livePunch(215, 'ot')
+            ->assertOk()
+            ->assertJsonPath('action', 'OVERTIME');
+
+        $row = $this->todayFor($this->alice);
+
+        // Its own column, and it must not leak into the ordinary day's times.
+        $this->assertNotEmpty($row->time_over);
+        $this->assertEmpty($row->time_in);
+        $this->assertEmpty($row->time_out);
+    }
+
+    /**
+     * Overtime is ONE column: the start and the end of the stretch both append
+     * to time_over and are told apart by order, so a second OT punch extends
+     * the list rather than writing anywhere else.
+     */
+    public function test_a_second_overtime_punch_appends_to_the_same_column(): void
+    {
+        config(['attendance.cooldown_seconds' => 0]);
+
+        $this->enrol($this->alice, 216);
+
+        $this->livePunch(216, 'ot')->assertOk()->assertJsonPath('recorded', true);
+
+        // Times are stored to the second, and the service drops an exact
+        // duplicate. Without this the two punches land in the same second and
+        // the second one is correctly discarded — which made this test pass or
+        // fail depending on where the wall clock happened to be.
+        $this->travel(2)->seconds();
+
+        $this->livePunch(216, 'ot')->assertOk()->assertJsonPath('recorded', true);
+
+        $row = $this->todayFor($this->alice);
+
+        $this->assertCount(2, explode(',', $row->time_over));
+        $this->assertEmpty($row->time_in);
+        $this->assertEmpty($row->time_out);
+    }
+
+    /**
+     * Overtime is a punch like any other — the new button is not a new door.
+     * A still photograph fails the same frontal-variation check it fails on a
+     * clock-in.
+     */
+    public function test_overtime_still_requires_a_live_face(): void
+    {
+        $this->enrol($this->alice, 217);
+
+        $challenge = $this->challenge();
+
+        $this->punch([
+            'mode'   => 'face',
+            'action' => 'ot',
+            'nonce'  => $challenge['nonce'],
+            'frames' => $this->photoFrames(217),
+        ])->assertStatus(403);
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
     public function test_clocking_out_right_after_clocking_in_is_allowed(): void
     {
         $this->enrol($this->alice, 220);

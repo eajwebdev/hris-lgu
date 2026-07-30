@@ -127,7 +127,7 @@ class AttendancePortalController extends Controller
 
         $validated = $request->validate([
             'mode'                 => ['required', Rule::in($modes)],
-            'action'               => ['required', Rule::in(['in', 'out'])],
+            'action'               => ['required', Rule::in(['in', 'out', 'ot'])],
             'nonce'                => ['required', 'string', 'max:64'],
             'frames'               => ['required', 'array', 'min:3', 'max:' . $maxFrames],
             // Straight-ahead 'neutral' frames first, then one 'pose' frame per
@@ -329,9 +329,13 @@ class AttendancePortalController extends Controller
             return $this->fail('This employee record is inactive. Please see HR.', 403);
         }
 
-        $action = $validated['action'] === 'out'
-            ? AttendanceService::CLOCK_OUT
-            : AttendanceService::CLOCK_IN;
+        // 'ot' writes to the DTR's single time_over column, where the start and
+        // the end of an overtime stretch both live and are told apart by order.
+        $action = match ($validated['action']) {
+            'out'   => AttendanceService::CLOCK_OUT,
+            'ot'    => AttendanceService::OVERTIME,
+            default => AttendanceService::CLOCK_IN,
+        };
 
         $result = $this->attendance->punch($employee->emp_ID, $action);
 
