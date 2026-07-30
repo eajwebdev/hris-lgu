@@ -21,6 +21,23 @@ class AttendanceService
     public const CLOCK_OUT = 2;
 
     /**
+     * Overtime, which the DTR keeps in ONE column rather than two.
+     *
+     * time_in/time_out are a pair: an arrival and a departure in separate
+     * fields. Overtime is not modelled that way here — every OT punch, whether
+     * it is the start or the end of the stretch, is appended to time_over and
+     * the pairing is read off the order later. That is the existing shape the
+     * reports already read (see MasterController::arrangedDtrPunches, which
+     * labels every time_over entry 'OT'), so this follows it rather than
+     * inventing a second convention.
+     *
+     * Practical consequence: the cooldown and the daily cap below count OT
+     * punches as one series, not as separate in/out series. An employee
+     * starting and ending overtime uses two of the day's allowance.
+     */
+    public const OVERTIME  = 3;
+
+    /**
      * Record a punch, or explain why it was refused.
      *
      * Runs under a row lock: two devices punching the same employee in the same
@@ -31,8 +48,15 @@ class AttendanceService
     {
         $zoneId = (string) ($zoneId ?? config('attendance.zone_id', 0));
 
-        $field       = $action === self::CLOCK_OUT ? 'time_out'      : 'time_in';
-        $deviceField = $action === self::CLOCK_OUT ? 'device_id_out' : 'device_id_in';
+        // Which pair of columns this action writes to. Everything below is
+        // driven off these two names, so overtime needs no special-casing
+        // beyond naming its column — the locking, cooldown, dedupe and daily
+        // cap all apply to it exactly as they do to a clock-in.
+        [$field, $deviceField] = match ($action) {
+            self::CLOCK_OUT => ['time_out',  'device_id_out'],
+            self::OVERTIME  => ['time_over', 'device_id_over'],
+            default         => ['time_in',   'device_id_in'],
+        };
 
         $now  = now();
         $date = $now->toDateString();
@@ -100,7 +124,11 @@ class AttendanceService
             'recorded' => $result['recorded'],
             'wait'     => $result['wait'],
             'limit'    => $result['limit'] ?? false,
-            'action'   => $action === self::CLOCK_OUT ? 'CLOCK OUT' : 'CLOCK IN',
+            'action'   => match ($action) {
+                self::CLOCK_OUT => 'CLOCK OUT',
+                self::OVERTIME  => 'OVERTIME',
+                default         => 'CLOCK IN',
+            },
             'time'     => $now->format('g:i:s A'),
             'date'     => $now->format('l, F j, Y'),
         ];

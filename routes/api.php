@@ -62,7 +62,7 @@ Route::prefix('app')->group(function() {
     Route::get('/authlogin', [DtrController::class, 'appdtrauthLogin'])->name('appdtrauthLogin');
     Route::get('/check-coordinates', [DtrController::class, 'checkCoordinates'])->name('checkCoordinates');
     
-    // CPSU TIME ENTRY
+    // LGU Mabinay TIME ENTRY
     // ── Health / readiness ─────────────────────────────────────────────
     Route::post('/health', fn(Request $r) => response()->noContent());
 

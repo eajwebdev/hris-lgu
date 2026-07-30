@@ -428,7 +428,7 @@
                 <td class="bordered text-center">{{ ($emp_esign != 0) ? $leaveApplication->total_sl - $leaveApplication->less_sl : 0}}</td>
             </tr>
         </table>
-        <span style="font-size: 9px; text-align: center; margin-left: 26%; margin-top: -5px; opacity: 0.8">Doc Control Code: CPSU-F-HRMO-15 REV-01 Effective Date: 08/31/2022 Page No. <b>1</b> of <b>2</b><br>
+        <span style="font-size: 9px; text-align: center; margin-left: 26%; margin-top: -5px; opacity: 0.8">Doc Control Code: LGU-MABINAY-F-HRMO-15 REV-01 Effective Date: 08/31/2022 Page No. <b>1</b> of <b>2</b><br>
             {{-- <img src="{{ asset($leaveApplication->transnum.'.png') }}" style="width: 100px; margin-left: 5px; margin-top: -6%; height: 20px;"></span> --}}
     </div>
     
@@ -437,7 +437,7 @@
         <span style="color:rgb(59, 59, 59); font-size: 9.3px; margin-top: -75px; position: absolute; z-index: 999; top: 88%; left: 5%; width: 90%; font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;">
             *For leave of absence for thirty (30) calendar days or more and terminal leave, application shall be accompanied by a <u> clearance from money, property and work-related accountabilities</u> (pursuant to CSC Memorandum Circular No. 2, s. 1985)
         </span>
-        <span style="font-size: 9px; text-align: center; margin-left: 26%; margin-top: -110px;">Doc Control Code: CPSU-F-HRMO-15 REV-01 Effective Date: 08/31/2022 Page No. <b>2</b> of <b>2</b></span>
+        <span style="font-size: 9px; text-align: center; margin-left: 26%; margin-top: -110px;">Doc Control Code: LGU-MABINAY-F-HRMO-15 REV-01 Effective Date: 08/31/2022 Page No. <b>2</b> of <b>2</b></span>
     </div>
 
 </body>

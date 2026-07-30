@@ -464,6 +464,22 @@ body.auth-body {
 /* ================================================================
    Responsive
    ================================================================ */
+/* ================================================================
+   Solo card (no hero beside it)
+   ================================================================
+   The default .auth-shell is the SIGN-IN layout: a hero pane in the 1fr
+   column and the card in a fixed 440px one beside it. A page that renders
+   the card on its own — change-password — therefore dropped its card into
+   that right-hand column and left the 1fr empty, so the card sat pushed to
+   the right of the screen instead of in the middle of it.
+
+   One column, centred, and the card keeps its own max-width. */
+.auth-shell--solo {
+    grid-template-columns: minmax(0, 440px);
+    justify-content: center;
+    justify-items: center;
+}
+
 @media (max-width: 991.98px) {
     body.auth-body { overflow: auto; }
     .auth-shell {
@@ -473,7 +489,43 @@ body.auth-body {
         padding: 2.5rem 1.25rem;
         justify-items: center;
     }
+    /* The desktop rule above pins this to 440px, which on a narrow phone is
+       wider than the viewport and forces a sideways scroll. */
+    .auth-shell--solo { grid-template-columns: 1fr; }
     .auth-hero { display: none; }
     .auth-card { max-width: 420px; padding: 2rem 1.5rem; }
     .auth-card__logo { display: block; }
+}
+
+/* ----------------------------------------------------------------
+   Small phones
+   ----------------------------------------------------------------
+   There was no breakpoint below 992px, so a 360px handset got the tablet
+   treatment: 1.25rem of shell padding plus 1.5rem of card padding ate 44px
+   a side before any content, and the vertical rhythm was sized for a screen
+   with room to spare. Tightened rather than redesigned. */
+@media (max-width: 575.98px) {
+    .auth-shell {
+        padding: 1.5rem .85rem;
+        align-items: start;      /* long forms start at the top, not clipped mid-card */
+    }
+    .auth-card {
+        max-width: 100%;
+        padding: 1.6rem 1.15rem;
+        border-radius: 18px;
+    }
+}
+
+/* Very small / landscape handsets: give the content its space back rather
+   than keeping decoration that pushes the form below the fold. */
+@media (max-width: 380px), (max-height: 480px) {
+    .auth-card { padding: 1.35rem 1rem; }
+    .auth-card__logo { width: 54px; height: 54px; margin-bottom: .5rem; }
+}
+
+/* Touch targets. The eye toggles and the submit button are the only things
+   on these screens anyone taps, and 44px is the accessibility floor. */
+@media (pointer: coarse) {
+    .auth-toggle { min-width: 44px; min-height: 44px; }
+    .btn-auth    { min-height: 48px; }
 }

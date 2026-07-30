@@ -18,7 +18,7 @@ class Employee extends Authenticatable
         'fname', 'mname', 'lname', 'position', 'profile', 'area_id', 'emp_ID', 'android_id', 'emp_status', 'emp_salary', 'emp_dept', 'item_no',
         'username', 'verification_code', 'password', 'role', 'date_hired', 'prefix', 'title_prefix', 'suffix', 'bdate', 'age',
         'b_place', 'sex', 'civil_status', 'height_cm', 'height_m', 'weight_kg', 'weight_lb', 'b_type',
-        'gsis', 'pagibig', 'philhealth', 'sss', 'tin', 'citizenship', 'c_category', 'country', 'telephone', 'mobile',
+        'gsis', 'pagibig', 'philhealth', 'sss', 'umid', 'philsys', 'tin', 'citizenship', 'c_category', 'country', 'telephone', 'mobile',
         'org_email', 'add_block', 'add_street', 'add_village', 'add_brgy', 'add_city', 'supervisor',
         'add_region', 'add_prov', 'add_zcode', 'padd_block', 'padd_street', 'padd_village', 'padd_brgy',
         'padd_city', 'padd_region', 'padd_prov', 'padd_zcode', 'sl', 'vl', 'mat_leave', 'special_pl', 'solo_pl', 
@@ -63,6 +63,36 @@ class Employee extends Authenticatable
         return Office::where('office_head_id', $this->id)
             ->orWhere('oic_id', $this->id)
             ->exists();
+    }
+
+    /**
+     * May this employee file leave?
+     *
+     * Permanent and Casual today; see config/leave.php for which employment
+     * statuses qualify and why Job Order is not among them.
+     */
+    public function isLeaveEligible(): bool
+    {
+        return in_array(
+            (int) $this->emp_status,
+            array_map('intval', (array) config('leave.eligible_statuses', [1])),
+            true
+        );
+    }
+
+    /**
+     * Restrict a query to employees who may file leave.
+     *
+     * Used for HR's employee pickers on the leave pages — a Casual employee was
+     * previously absent from those lists entirely, so HR could not open their
+     * leave record even to look at it.
+     */
+    public function scopeLeaveEligible($query)
+    {
+        return $query->whereIn(
+            'emp_status',
+            array_map('intval', (array) config('leave.eligible_statuses', [1]))
+        );
     }
 
     /**

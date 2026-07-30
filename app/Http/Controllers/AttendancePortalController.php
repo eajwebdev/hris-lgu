@@ -118,9 +118,16 @@ class AttendancePortalController extends Controller
         $dimension = (int) config('face.dimension', 128);
         $maxFrames = (int) config('face.liveness.max_frames', 12);
 
+        // The badge is mandatory unless face.require_qr is switched off. Applied
+        // as a validation rule so the refusal is uniform with every other
+        // malformed punch, and applied HERE rather than in the kiosk script
+        // because the script is editable by whoever holds the device — the
+        // hidden "use face only" button is presentation, the rule is policy.
+        $modes = config('face.require_qr', true) ? ['qr'] : ['face', 'qr'];
+
         $validated = $request->validate([
-            'mode'                 => ['required', Rule::in(['face', 'qr'])],
-            'action'               => ['required', Rule::in(['in', 'out'])],
+            'mode'                 => ['required', Rule::in($modes)],
+            'action'               => ['required', Rule::in(['in', 'out', 'ot'])],
             'nonce'                => ['required', 'string', 'max:64'],
             'frames'               => ['required', 'array', 'min:3', 'max:' . $maxFrames],
             // Straight-ahead 'neutral' frames first, then one 'pose' frame per
@@ -130,6 +137,13 @@ class AttendancePortalController extends Controller
             'frames.*.t'           => ['required', 'numeric'],
             'frames.*.descriptor'  => ['required', 'array', 'size:' . $dimension],
             'frames.*.descriptor.*'=> ['required', 'numeric'],
+            // The frame the descriptor above was taken from. When punch scoring
+            // is on the server re-derives the descriptor from this and throws
+            // the client's copy away; see verifyIdentityFromFrames().
+            'frames.*.image'       => [
+                config('face.scoring.enabled') && config('face.scoring.punch.enabled') ? 'required' : 'nullable',
+                'string', 'max:400000',
+            ],
             // The active-illumination samples: what the face and the
             // background reflected under each screen colour, plus one
             // embedding taken during the burst to bind those readings to the
@@ -144,6 +158,16 @@ class AttendancePortalController extends Controller
             'flash.samples.*.face.*'=> ['required', 'numeric', 'between:0,255'],
             'flash.samples.*.bg'   => ['required', 'array', 'size:3'],
             'flash.samples.*.bg.*' => ['required', 'numeric', 'between:0,255'],
+            // The frame each sample was taken from, so the server can measure
+            // the light response itself instead of believing the two arrays
+            // above. Required when face.liveness_flash_frames.require_images is
+            // on; see verifyFlashFromFrames().
+            'flash.samples.*.image' => [
+                config('face.liveness_flash_frames.require_images') ? 'required' : 'nullable',
+                'string', 'max:400000',
+            ],
+            'flash.samples.*.box'   => ['nullable', 'array', 'size:4'],
+            'flash.samples.*.box.*' => ['required_with:flash.samples.*.box', 'numeric'],
             'flash.descriptor'     => ['nullable', 'array', 'size:' . $dimension],
             'flash.descriptor.*'   => ['required', 'numeric'],
             'qr'                   => ['nullable', 'string', 'max:512', 'required_if:mode,qr'],
@@ -178,6 +202,25 @@ class AttendancePortalController extends Controller
 
         if (! $challenge) {
             return $this->fail('This attempt expired. Please try again.', 419);
+        }
+
+        // Re-measure the flash response from the submitted frames, so the rest
+        // of this method judges the light on numbers the server took rather than
+        // numbers the browser reported. Everything downstream is unchanged — it
+        // is the same checkFlash(), fed trustworthy input.
+        if ($refusal = $this->verifyFlashFromFrames($validated, $challenge)) {
+            return $this->fail($refusal, 422);
+        }
+
+        // Re-derive WHO this is, and whether it is a live person, from the
+        // pixels. Until this ran, both answers were the browser's to invent.
+        // Like the flash step above, nothing downstream changes — identify(),
+        // LivenessVerifier and the anti-spoof floor all run exactly as before,
+        // on numbers the server now owns.
+        [$refusal, $status] = $this->verifyIdentityFromFrames($validated);
+
+        if ($refusal !== null) {
+            return $this->fail($refusal, $status);
         }
 
         $frames = $validated['frames'];
@@ -286,9 +329,13 @@ class AttendancePortalController extends Controller
             return $this->fail('This employee record is inactive. Please see HR.', 403);
         }
 
-        $action = $validated['action'] === 'out'
-            ? AttendanceService::CLOCK_OUT
-            : AttendanceService::CLOCK_IN;
+        // 'ot' writes to the DTR's single time_over column, where the start and
+        // the end of an overtime stretch both live and are told apart by order.
+        $action = match ($validated['action']) {
+            'out'   => AttendanceService::CLOCK_OUT,
+            'ot'    => AttendanceService::OVERTIME,
+            default => AttendanceService::CLOCK_IN,
+        };
 
         $result = $this->attendance->punch($employee->emp_ID, $action);
 
@@ -351,6 +398,284 @@ class AttendancePortalController extends Controller
      * somebody has not filled in the stations table would be a misconfiguration
      * taking attendance down, not a security control.
      */
+    /**
+     * Measure the screen-flash response from the submitted frames, server-side,
+     * and overwrite the client's readings with what was actually in the pixels.
+     *
+     * The challenge was never the weak part: LivenessVerifier issues a shuffled,
+     * single-use colour sequence an attacker cannot predict. The weak part was
+     * that the BROWSER measured how the face reacted and posted the numbers, so
+     * a tampered client simply reported the answer the server wanted.
+     *
+     * Here the server decodes each frame with GD and takes its own measurement.
+     * The existing checkFlash() thresholds then run against those, so the
+     * downstream logic and the tuning in config/face.php are untouched — only
+     * the provenance of the numbers changes.
+     *
+     * On top of the brightness test checkFlash() already does, FlashFrameVerifier
+     * adds two things only the pixels can answer: whether the face brightened
+     * MORE than the background (a flat print does not), and whether it took the
+     * segment's colour cast (a recording made before the sequence was chosen
+     * cannot). See tests/Feature/FlashFrameVerifierTest.php.
+     *
+     * @param  array  $validated  the request payload, mutated in place
+     * @return string|null  refusal message, or null to continue
+     */
+    private function verifyFlashFromFrames(array &$validated, array $challenge): ?string
+    {
+        $required = (bool) config('face.liveness_flash_frames.require_images', false);
+        $samples = $validated['flash']['samples'] ?? [];
+
+        if (! $samples) {
+            // No flash stage in this attempt; nothing to re-measure. Whether the
+            // flash is mandatory at all is already decided by checkFlash().
+            return null;
+        }
+
+        $withImages = array_filter($samples, fn ($s) => ! empty($s['image']));
+
+        if (count($withImages) !== count($samples)) {
+            // Fail closed when images are mandatory: a client that omits them
+            // would otherwise be back to being believed.
+            return $required
+                ? 'This device did not send the images needed to verify liveness. Please try again.'
+                : null;
+        }
+
+        $verifier = app(\App\Services\FlashFrameVerifier::class);
+
+        $measured = [];
+        $sequence = [];
+
+        foreach ($samples as $i => $sample) {
+            $binary = base64_decode($this->stripDataUrl($sample['image']), true);
+
+            if ($binary === false || $binary === '') {
+                return 'A captured frame could not be read. Please try again.';
+            }
+
+            // The box the client says the face occupies. A wrong box measures the
+            // wrong region, which fails the face-vs-background test rather than
+            // passing it — so lying here does not help an attacker.
+            $box = $sample['box'] ?? null;
+
+            if (! is_array($box) || count($box) !== 4) {
+                return $required
+                    ? 'This device did not report where the face was. Please try again.'
+                    : null;
+            }
+
+            $reading = $verifier->measure($binary, array_map('floatval', array_values($box)));
+
+            if ($reading === null) {
+                return 'A captured frame could not be read. Please try again.';
+            }
+
+            // Replace what the browser claimed with what the server measured.
+            $validated['flash']['samples'][$i]['face'] = $reading['face'];
+            $validated['flash']['samples'][$i]['bg'] = $reading['bg'];
+
+            $measured[] = $reading;
+            $sequence[] = (string) $sample['seg'];
+        }
+
+        // The sequence the server issued, not the one the client says it showed.
+        $issued = array_values((array) ($challenge['flash'] ?? []));
+
+        if ($issued && $sequence !== $issued) {
+            return 'The captured frames did not match the light sequence. Please try again.';
+        }
+
+        $result = $verifier->verify($issued ?: $sequence, $measured);
+
+        if (! $result['ok']) {
+            Log::warning('Punch refused by server-side flash verification.', [
+                'reason' => $result['reason'],
+                'detail' => $result['detail'],
+                'ip'     => request()->ip(),
+            ]);
+
+            return $verifier->explain($result['reason']);
+        }
+
+        return null;
+    }
+
+    /**
+     * Re-derive every face descriptor, and the anti-spoof scores, from the
+     * submitted frames — so identity stops being something the client asserts.
+     *
+     * WHY THIS EXISTS
+     * ---------------
+     * Registration has been server-scored for a while; the punch had not been,
+     * and that was the wider hole of the two. Enrolment happens once, in front
+     * of HR. The punch is the unauthenticated endpoint the whole municipality
+     * can reach, and it was taking the browser's word for BOTH halves of the
+     * answer: the descriptor saying who this is, and the anti-spoof score
+     * saying it is a live person. A tampered client could post a stolen
+     * descriptor alongside a 0.99 "real" score and nothing here could disagree.
+     *
+     * The gestures, the flash sequence and the 1:N search were never the weak
+     * part — they were all reasoning correctly about numbers the attacker
+     * supplied. This replaces the numbers.
+     *
+     * WHAT IS REPLACED
+     *   * Every frame's descriptor, with one the sidecar computed from that
+     *     frame's pixels.
+     *   * The flash burst's descriptor, taken from a flash frame that has
+     *     already been decoded for the light measurement.
+     *   * liveness_score and liveness_min, recomputed across the frames.
+     *
+     * WHAT IS NOT
+     * Nothing downstream. identify(), LivenessVerifier and the anti-spoof floor
+     * all run exactly as they did — which is the point. The security property
+     * changes; the logic does not, so the tuning in config/face.php keeps its
+     * meaning.
+     *
+     * @param  array  $validated  the request payload, mutated in place
+     * @return array{0:?string,1:int}  refusal message and HTTP status, or [null, 200]
+     */
+    private function verifyIdentityFromFrames(array &$validated): array
+    {
+        $scoring = app(\App\Services\FaceScoringClient::class);
+
+        if (! $scoring->enabled() || ! config('face.scoring.punch.enabled', false)) {
+            return [null, 200];
+        }
+
+        $required = (bool) config('face.scoring.punch.required', true);
+        $frames = $validated['frames'];
+
+        $images = [];
+
+        foreach ($frames as $i => $frame) {
+            if (empty($frame['image'])) {
+                // Fail closed: a client that omits the pixels is a client asking
+                // to be believed, which is the whole thing being prevented.
+                return $required
+                    ? ['This device did not send the images needed to verify identity. Please reload and try again.', 422]
+                    : [null, 200];
+            }
+
+            $images[$i] = $this->stripDataUrl($frame['image']);
+        }
+
+        // The flash burst carries its own descriptor binding the light readings
+        // to a face. Derive that from a flash frame too, preferring the white
+        // segment: the coloured and dark segments are deliberately badly lit,
+        // and recognition on them is needlessly poor.
+        $samples = $validated['flash']['samples'] ?? [];
+        $flashSlot = null;
+
+        if ($samples) {
+            $pick = null;
+
+            foreach ($samples as $j => $sample) {
+                if (empty($sample['image'])) {
+                    continue;
+                }
+                if ($pick === null || ($sample['seg'] ?? '') === 'white') {
+                    $pick = $j;
+                }
+                if (($sample['seg'] ?? '') === 'white') {
+                    break;
+                }
+            }
+
+            if ($pick !== null) {
+                $flashSlot = count($images);
+                $images[] = $this->stripDataUrl($samples[$pick]['image']);
+            }
+        }
+
+        $scored = $scoring->scoreMany(array_values($images));
+
+        $reals = [];
+
+        foreach (array_keys($frames) as $position => $i) {
+            $result = $scored[$position] ?? null;
+
+            if ($result === null || (! empty($result['unavailable']))) {
+                Log::error('Punch refused: face scoring service unavailable.', [
+                    'reason' => $result['reason'] ?? 'missing_result',
+                    'ip'     => request()->ip(),
+                ]);
+
+                return $required
+                    ? ['The face security service is unavailable. Please try again shortly.', 503]
+                    : [null, 200];
+            }
+
+            if (! $result['ok']) {
+                return [$scoring->explain($result['reason']), 422];
+            }
+
+            // A frame the forensic checks call a display is refused here, by
+            // name. The anti-spoof floor further down would catch it too — the
+            // sidecar reports such a frame at 0 — but this says what was seen.
+            if (! empty($result['flags']) && config('face.scoring.reject_forensic_flags', true)) {
+                Log::warning('Punch refused by frame forensics.', [
+                    'flags'     => $result['flags'],
+                    'forensics' => $result['forensics'] ?? null,
+                    'ip'        => request()->ip(),
+                ]);
+
+                return [$scoring->explain((string) $result['flags'][0]), 403];
+            }
+
+            if (! $this->faces->isValidVector($result['embedding'] ?? [])) {
+                return ['A face reading could not be computed. Please try again.', 422];
+            }
+
+            // The server's vector replaces the browser's. Everything after this
+            // line — the 1:N search, the pose shifts, the neutral spread — is
+            // reasoning about pixels rather than about assertions.
+            $validated['frames'][$i]['descriptor'] = $result['embedding'];
+
+            if ($result['antispoof'] !== null) {
+                $reals[] = (float) $result['antispoof'];
+            }
+        }
+
+        if ($flashSlot !== null) {
+            $flashResult = $scored[$flashSlot] ?? null;
+
+            // A flash frame that cannot be recognised is not fatal on its own —
+            // it was taken under a deliberately odd light — but the descriptor
+            // must then be absent rather than the client's, or omitting a
+            // readable frame would be a way to keep asserting one.
+            if ($flashResult !== null && ($flashResult['ok'] ?? false)
+                && $this->faces->isValidVector($flashResult['embedding'] ?? [])) {
+                $validated['flash']['descriptor'] = $flashResult['embedding'];
+            } else {
+                unset($validated['flash']['descriptor']);
+            }
+        }
+
+        // The anti-spoof statistics are recomputed the same way the browser
+        // computed them — mean and worst — so face.antispoof's thresholds keep
+        // meaning what they meant. Flash frames are excluded on purpose:
+        // MiniFASNet is calibrated on normally-lit faces, and folding a
+        // deliberately over- or under-exposed one in would drag the average
+        // down for honest employees.
+        if ($reals) {
+            $validated['liveness_score'] = array_sum($reals) / count($reals);
+            $validated['liveness_min'] = min($reals);
+        }
+
+        return [null, 200];
+    }
+
+    /** Accepts a bare base64 payload or a full data: URL. */
+    private function stripDataUrl(string $value): string
+    {
+        if (str_starts_with($value, 'data:') && ($comma = strpos($value, ',')) !== false) {
+            return substr($value, $comma + 1);
+        }
+
+        return $value;
+    }
+
     private function geofenceBlock(?float $lat, ?float $lng, array $tag): ?string
     {
         if (! config('attendance.geofence.enforce', true)) {

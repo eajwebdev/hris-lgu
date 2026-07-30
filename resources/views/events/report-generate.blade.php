@@ -126,7 +126,7 @@
 
     <!-- Footer (This will appear on every page) -->
     <div class="footer-content">
-      <span>Doc Control Code: CPSU-F-QA-19 Effective Date: 09/12/20218</span> <span>Page {{ $pageNumber }} of {{ count($chunkedEvents) }}</span>
+      <span>Doc Control Code: LGU-MABINAY-F-QA-19 Effective Date: 09/12/20218</span> <span>Page {{ $pageNumber }} of {{ count($chunkedEvents) }}</span>
     </div>
 
     <!-- Force page break after every set of 20 rows -->

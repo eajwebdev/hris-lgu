@@ -245,16 +245,16 @@ class ApplicationController extends Controller
                         ($sex === 'female' || $sex === 'f' ? 'Dear Ms.' : 'Dear');
             }
 
-            $subject = 'CPSU Application Update – Under Review';
+            $subject = 'LGU Mabinay Application Update – Under Review';
             $color = '#0ea5e9'; // Blue for "Reviewing"
             $position = e($app->position ?? 'the advertised position');
 
             $message = "
                 <p>{$salute} <strong>{$lastName}</strong>,</p>
-                <p>We have received your application for the position of <strong>{$position}</strong> at <strong>Central Philippines State University (CPSU)</strong>.</p>
+                <p>We have received your application for the position of <strong>{$position}</strong> at <strong>LGU Mabinay</strong>.</p>
                 <p>Your application is now <strong>under review</strong> by our HR Department.</p>
                 <p>We will contact you once there is an update regarding the next steps of the hiring process.</p>
-                <p>Thank you for your interest in joining CPSU.</p>
+                <p>Thank you for your interest in joining LGU Mabinay.</p>
             ";
 
             $body = '
@@ -266,10 +266,10 @@ class ApplicationController extends Controller
                     </div>
                     <div style="padding:20px;color:#333;">
                         ' . $message . '
-                        <p style="margin-top:20px;">Best regards,<br><strong>CPSU HR Department</strong></p>
+                        <p style="margin-top:20px;">Best regards,<br><strong>LGU Mabinay HR Department</strong></p>
                     </div>
                     <div style="background:#f1f1f1;text-align:center;padding:10px;font-size:12px;color:#555;">
-                        © ' . date('Y') . ' Central Philippines State University | HR Department
+                        © ' . date('Y') . ' LGU Mabinay | HR Department
                     </div>
                 </div>
             </div>';
@@ -404,24 +404,24 @@ class ApplicationController extends Controller
                     : 'To be announced';
                 $venue = e($app->venue ?? 'To be announced');
 
-                $subject = 'CPSU Interview Invitation';
+                $subject = 'LGU Mabinay Interview Invitation';
                 $message = "
                     <p>{$salute} <strong>{$lastName}</strong>,</p>
                     <p>Good day.</p>
                     <p>We are pleased to inform you that you have been shortlisted for the position of 
-                    <strong>" . e($app->position) . "</strong> at <strong>Central Philippines State University (CPSU)</strong>.</p>
+                    <strong>" . e($app->position) . "</strong> at <strong>LGU Mabinay</strong>.</p>
                     <p>Your interview is scheduled on <strong>{$formattedDate}</strong> at <strong>{$venue}</strong>.</p>
                     <p>Please acknowledge receipt of this message and confirm your availability for the interview.</p>
-                    <p>Thank you for your continued interest in joining CPSU.</p>
+                    <p>Thank you for your continued interest in joining LGU Mabinay.</p>
                 ";
                 break;
 
             case 3: // Disqualified
                 $reason = nl2br(e($app->dq_reason ?? 'Not specified.'));
-                $subject = 'CPSU Application Update – Disqualified';
+                $subject = 'LGU Mabinay Application Update – Disqualified';
                 $message = "
                     <p>{$salute} <strong>{$lastName}</strong>,</p>
-                    <p>Thank you for your interest in employment at <strong>Central Philippines State University (CPSU)</strong>.</p>
+                    <p>Thank you for your interest in employment at <strong>LGU Mabinay</strong>.</p>
                     <p>After careful review, we regret to inform you that your application was not able to proceed due to the following reason:</p>
                     <div style='background:#fee2e2;border-left:4px solid {$color};padding:10px 16px;margin:10px 0;color:#b91c1c;'>
                         {$reason}
@@ -431,53 +431,53 @@ class ApplicationController extends Controller
                 break;
 
             case 4: // Qualified but Not Selected
-                $subject = 'CPSU Application Result – Not Selected';
+                $subject = 'LGU Mabinay Application Result – Not Selected';
                 $message = "
                     <p>{$salute} <strong>{$lastName}</strong>,</p>
                     <p>We wish to extend our gratitude for your participation in the interview process for the 
-                    position of <strong>" . e($app->position) . "</strong> at <strong>Central Philippines State University (CPSU)</strong>.</p>
-                    <p>Following a thorough evaluation, another applicant was selected whose qualifications more closely meet the current needs of the University.</p>
-                    <p>We appreciate your time and encourage you to apply for future opportunities with CPSU.</p>
+                    position of <strong>" . e($app->position) . "</strong> at <strong>LGU Mabinay</strong>.</p>
+                    <p>Following a thorough evaluation, another applicant was selected whose qualifications more closely meet the current needs of the Municipality.</p>
+                    <p>We appreciate your time and encourage you to apply for future opportunities with LGU Mabinay.</p>
                 ";
                 break;
 
             case 5: // For Psychological / Pre-Employment Test
-                $subject = 'CPSU Application Update – Next Stage';
+                $subject = 'LGU Mabinay Application Update – Next Stage';
                 $message = "
                     <p>{$salute} <strong>{$lastName}</strong>,</p>
                     <p>We are pleased to inform you that you have been endorsed to advance to the next stage of the recruitment process 
-                    for the position of <strong>" . e($app->position) . "</strong> at <strong>Central Philippines State University (CPSU)</strong>.</p>
+                    for the position of <strong>" . e($app->position) . "</strong> at <strong>LGU Mabinay</strong>.</p>
                     <p>This stage will consist of a <strong>Psychological / Pre-Employment Test</strong>. Details regarding your schedule and venue 
                     will be sent to you shortly.</p>
-                    <p>Please check your email regularly for further instructions from the CPSU Career Portal.</p>
+                    <p>Please check your email regularly for further instructions from the LGU Mabinay Career Portal.</p>
                 ";
                 break;
 
             case 6: // Not Hired
-                $subject = 'CPSU Application Result – Not Hired';
+                $subject = 'LGU Mabinay Application Result – Not Hired';
                 $message = "
                     <p>{$salute} <strong>{$lastName}</strong>,</p>
                     <p>We sincerely appreciate the time and effort you devoted to the selection process for the 
-                    position of <strong>" . e($app->position) . "</strong> at <strong>Central Philippines State University (CPSU)</strong>.</p>
+                    position of <strong>" . e($app->position) . "</strong> at <strong>LGU Mabinay</strong>.</p>
                     <p>After careful consideration, we regret to inform you that you have not been selected for this position.</p>
                     <p>We wish you continued success in your professional journey.</p>
                 ";
                 break;
 
             case 7: // Hired
-                $subject = 'CPSU Application Update – Congratulations!';
+                $subject = 'LGU Mabinay Application Update – Congratulations!';
                 $message = "
                     <p>{$salute} <strong>{$lastName}</strong>,</p>
                     <p>Congratulations!</p>
                     <p>We are delighted to inform you that you have been selected for the position of 
-                    <strong>" . e($app->position) . "</strong> at <strong>Central Philippines State University (CPSU)</strong>.</p>
-                    <p>The CPSU Career Portal will contact you soon regarding onboarding procedures and employment documentation.</p>
-                    <p>Welcome to the CPSU community!</p>
+                    <strong>" . e($app->position) . "</strong> at <strong>LGU Mabinay</strong>.</p>
+                    <p>The LGU Mabinay Career Portal will contact you soon regarding onboarding procedures and employment documentation.</p>
+                    <p>Welcome to the LGU Mabinay community!</p>
                 ";
                 break;
 
             default:
-                $subject = 'CPSU Application Status Update';
+                $subject = 'LGU Mabinay Application Status Update';
                 $message = "
                     <p>{$salute} <strong>{$lastName}</strong>,</p>
                     <p>Your application status has been updated. Please log in to your applicant portal for further details.</p>
@@ -496,10 +496,10 @@ class ApplicationController extends Controller
                     </div>
                     <div style="padding:20px;color:#333;">
                         ' . $message . '
-                        <p style="margin-top:20px;">Best regards,<br><strong>CPSU Career Portal</strong></p>
+                        <p style="margin-top:20px;">Best regards,<br><strong>LGU Mabinay Career Portal</strong></p>
                     </div>
                     <div style="background:#f1f1f1;text-align:center;padding:10px;font-size:12px;color:#555;">
-                        © ' . date('Y') . ' Central Philippines State University | Human Resources Department
+                        © ' . date('Y') . ' LGU Mabinay | Human Resources Department
                     </div>
                 </div>
             </div>';
@@ -547,7 +547,7 @@ class ApplicationController extends Controller
         $guard = $this->getGuard();
         $user = auth()->guard($guard)->user();
 
-        // Previously gated on a hardcoded list of CPSU staff email addresses.
+        // Previously gated on a hardcoded list of LGU Mabinay staff email addresses.
         // HR and system administrators handle applications for the LGU.
         if (in_array($user->role, ['Administrator', 'HR Administrator'], true)) {
             $applications = Application::join('job_hirings', 'applications.jid', '=', 'job_hirings.id')

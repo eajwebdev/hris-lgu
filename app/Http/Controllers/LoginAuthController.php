@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Auth;
 
 class LoginAuthController extends Controller
 {
-
     public function getLoginAdmin()
     {
         if (Auth::guard('web')->check()) {

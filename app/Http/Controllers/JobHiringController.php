@@ -32,19 +32,41 @@ class JobHiringController extends Controller
         return view('career.portal', compact('jobs'));
     }
 
+    /**
+     * Nature of appointment, as an LGU uses it. The list previously offered
+     * "Teaching / Non-Teaching", which is a university distinction and meant
+     * nothing here.
+     */
+    public const APPOINTMENT_TYPES = [
+        'Permanent'            => 'Permanent',
+        'Casual'               => 'Casual',
+        'Contractual'          => 'Contractual',
+        'Co-terminous'         => 'Co-terminous',
+        'Temporary'            => 'Temporary',
+        'Job Order'            => 'Job Order',
+        'Contract of Service'  => 'Contract of Service',
+    ];
+
+    /**
+     * The separate "Job Openings" screen is retired.
+     *
+     * A vacancy is now published from the position it belongs to — the DBM
+     * Position Description — because all but four of this table's fields simply
+     * repeated that form. Old links and bookmarks land on the positions list.
+     */
     public function jlist()
     {
-        $guard = $this->getGuaard();
-        $jobs = JobHiring::all();
-
-        return view("career.list", compact('jobs', 'guard'));
+        return redirect()->route('positionDescriptionList');
     }
 
     public function jCreate(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'type'             => 'required',
+            'type'              => 'required',
             'title'             => 'required',
+            // The standing DBM-CSC Form No. 1 for this plantilla item. Optional,
+            // so a vacancy can still be posted before its description is written.
+            'position_description_id' => 'nullable|exists:position_descriptions,id',
             'plantilla_item_no' => 'required|unique:job_hirings',
             'salary'            => 'required|numeric',
             'assignment'        => 'nullable',
@@ -70,21 +92,31 @@ class JobHiringController extends Controller
     public function jEdit($id)
     {
         $guard = $this->getGuaard();
-        $jobs = JobHiring::all();
+        $jobs = JobHiring::with(['positionDescription', 'comparativeAssessment'])
+            ->withCount('applications')
+            ->orderByDesc('id')
+            ->get();
         $jEdit = JobHiring::find($id);
 
         if (!$jEdit) {
             return redirect()->back()->with('error', 'Job not found.');
         }
 
-        return view("career.list", compact('jobs', 'jEdit', 'guard'));
+        return view("career.list", compact('jobs', 'jEdit', 'guard') + [
+            'descriptions' => \App\Models\PositionDescription::where('status', 'active')
+                ->orderBy('position_title')->get(),
+            'types'        => self::APPOINTMENT_TYPES,
+        ]);
     }
 
     public function jUpdate(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'type'             => 'required',
+            'type'              => 'required',
             'title'             => 'required',
+            // The standing DBM-CSC Form No. 1 for this plantilla item. Optional,
+            // so a vacancy can still be posted before its description is written.
+            'position_description_id' => 'nullable|exists:position_descriptions,id',
             'plantilla_item_no' => 'required',
             'salary'            => 'required|numeric',
             'assignment'        => 'nullable',

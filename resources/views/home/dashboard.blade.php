@@ -89,6 +89,27 @@
         background: #fff4d3;
         color: #8b6b00;
     }
+    /* The trailing tick/cross is a status glyph, not a second action icon —
+       none of the tile styling above applies to it. */
+    .quick-action .quick-action-status {
+        width: auto;
+        height: auto;
+        margin-left: auto;
+        background: none;
+        border-radius: 0;
+        font-size: 1.05rem;
+    }
+    .face-prompt-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #eaf7f0;
+        color: #187744;
+        font-size: 28px;
+    }
     .dashboard-table td {
         vertical-align: middle;
     }
@@ -210,7 +231,7 @@
 
     <section class="content">
         <div class="row">
-            @if($isRegularEmployee)
+            @if($canFileLeave)
             <div class="col-lg-3 col-md-6 mb-3">
                 <div class="metric-card p-3">
                     <div class="d-flex justify-content-between">
@@ -328,7 +349,17 @@
                         <i class="fas fa-clipboard"></i>
                         <span>Open PDS</span>
                     </a>
-                    @if($isRegularEmployee)
+                    {{-- Face enrolment lives here rather than in the PDS submenu:
+                         the PDS is the HR-facing record, and this is the page an
+                         employee actually opens. The tick or cross is the whole
+                         point — "am I set up for the attendance kiosk" should be
+                         answerable at a glance. --}}
+                    <a class="quick-action mb-2" href="{{ route('faceRecognition') }}">
+                        <i class="fas fa-user-shield"></i>
+                        <span>Face Registration</span>
+                        <i class="quick-action-status fas {{ $faceRegistered ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }}"></i>
+                    </a>
+                    @if($canFileLeave)
                         <a class="quick-action mb-2" href="{{ route('leavesReadEmp') }}">
                             <i class="fas fa-calendar-plus"></i>
                             <span>File or Check Leave</span>
@@ -622,6 +653,59 @@
         history.go(1);
     };
 </script>
+{{-- Shown to any employee with no face on file, every time the dashboard
+     loads, until they enrol. See MasterController::dashboard for why this is no
+     longer once-per-sign-in: an employee with no biometric cannot use the
+     attendance kiosk at all, so a prompt they can lose track of is worse than
+     one that keeps asking.
+
+     Still escapable ("I'll do this later") rather than a hard gate: enrolment
+     needs a camera and reasonable light, and somebody checking their payslip
+     from a phone on the road should be reminded, not locked out of the
+     dashboard. The backdrop is static so it has to be answered deliberately
+     instead of dismissed by a stray tap. --}}
+@if($guard == 'employee' && ($promptFaceRegistration ?? false))
+<div class="modal fade" id="facePromptModal" tabindex="-1" role="dialog"
+     aria-labelledby="facePromptLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content" style="border-radius: 12px; border: none;">
+            <div class="modal-body text-center p-4">
+                <div class="face-prompt-icon mb-3">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <h5 class="font-weight-bold mb-2" id="facePromptLabel">Register your face</h5>
+                <p class="text-muted mb-4">
+                    You have no face registered yet. Registering lets you clock in and
+                    out at the attendance kiosk without typing anything. It takes about
+                    a minute and needs a camera with decent light.
+                </p>
+                <a href="{{ route('faceRecognition') }}" class="btn btn-block text-white font-weight-bold"
+                   style="background: #187744; border-radius: 8px;">
+                    Register now
+                </a>
+                <button type="button" class="btn btn-link btn-block text-muted" data-dismiss="modal">
+                    I'll do this later
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // AdminLTE ships jQuery + Bootstrap 4; if either is missing the prompt
+        // simply does not appear rather than throwing on every dashboard load.
+        if (window.jQuery && jQuery.fn.modal) {
+            jQuery('#facePromptModal').modal({
+                // Answered deliberately, not dismissed by a stray tap outside
+                // it or a reflexive Escape.
+                backdrop: 'static',
+                keyboard: false,
+                show: true,
+            });
+        }
+    });
+</script>
+@endif
 @if($guard == 'employee')
 <script>
     document.addEventListener('DOMContentLoaded', function () {

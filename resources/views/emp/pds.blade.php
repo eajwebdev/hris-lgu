@@ -104,7 +104,8 @@
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Sex</label><br>
+                                    {{-- Item 5 is "SEX AT BIRTH" on the 2026 PDS. --}}
+                                    <label class="badge badge-secondary lbel">Sex at Birth</label><br>
                                     <select class="form-control form-control-sm update-field" name="sex" required>
                                         <option disabled selected> Select </option>
                                         <option value="Male" data-column-id="{{ $empid }}" data-column-name="sex" @if($employee->sex == "Male") selected @endif>Male</option>
@@ -120,6 +121,10 @@
                                         <option value="Married" data-column-id="{{ $empid }}" data-column-name="civil_status" @if($employee->civil_status == "Married") selected @endif>Married</option>
                                         <option value="Separated" data-column-id="{{ $empid }}" data-column-name="civil_status" @if($employee->civil_status == "Separated") selected @endif>Separated</option>
                                         <option value="Widowed" data-column-id="{{ $empid }}" data-column-name="civil_status" @if($employee->civil_status == "Widowed") selected @endif>Widowed</option>
+                                        {{-- Listed on the 2026 PDS (item 6). The printed form already
+                                             ticks a Solo Parent box for this exact value, but there was
+                                             no way to choose it here, so that box could never be set. --}}
+                                        <option value="Solo Parent" data-column-id="{{ $empid }}" data-column-name="civil_status" @if($employee->civil_status == "Solo Parent") selected @endif>Solo Parent</option>
                                         <option value="Other" data-column-id="{{ $empid }}" data-column-name="civil_status" @if($employee->civil_status == "Other") selected @endif>Other/s</option>
                                     </select>
                                 </div>
@@ -264,9 +269,24 @@
                                     <input type="text" name="philhealth" id="philhealth" value="{{ $employee->philhealth }}" data-column-id="{{ $empid }}" data-column-name="philhealth" class="form-control form-control-sm update-field" placeholder="N/A">
                                 </div>
 
+                                {{-- This box was labelled "UMID ID NO." while writing to the
+                                     SSS column, so both numbers competed for one field. They
+                                     are separate now. Anything already typed here still prints
+                                     at item 10 of the PDS, because that row falls back to the
+                                     SSS number whenever no UMID has been recorded. --}}
+                                <div class="col-md-3">
+                                    <label class="badge badge-secondary lbel">SSS NO.</label><br>
+                                    <input type="text" name="sss" id="sss" value="{{ $employee->sss }}" data-column-id="{{ $empid }}" data-column-name="sss" class="form-control form-control-sm update-field" placeholder="N/A">
+                                </div>
+
                                 <div class="col-md-3">
                                     <label class="badge badge-secondary lbel">UMID ID NO.</label><br>
-                                    <input type="text" name="sss" id="sss" value="{{ $employee->sss }}" data-column-id="{{ $empid }}" data-column-name="sss" class="form-control form-control-sm update-field" placeholder="N/A">
+                                    <input type="text" name="umid" id="umid" value="{{ $employee->umid }}" data-column-id="{{ $empid }}" data-column-name="umid" class="form-control form-control-sm update-field" placeholder="N/A">
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="badge badge-secondary lbel">PhilSys No. (PSN)</label><br>
+                                    <input type="text" name="philsys" id="philsys" value="{{ $employee->philsys }}" data-column-id="{{ $empid }}" data-column-name="philsys" class="form-control form-control-sm update-field" placeholder="N/A">
                                 </div>
 
                                 <div class="col-md-3">

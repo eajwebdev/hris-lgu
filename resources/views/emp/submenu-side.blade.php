@@ -281,11 +281,17 @@
                         <span class="{{ request()->is('pds/signature') || request()->is('pds/signature/*') ? 'text-dark' : 'text-muted' }} text-bold">E-Signature</span>
                     </a>
                 </li>
-                {{-- Admin/HR see it on anyone's PDS; an employee sees it on their
-                     own, where they can register their own face. The middleware on
-                     the route is the real boundary; hiding the link just keeps it
-                     out of everyone else's way. --}}
-                @if(\App\Http\Middleware\EnsureFaceSelfOrRegistrar::allowsFor($employee))
+                {{-- Registrars only. The PDS is the HR-facing record — Admin and
+                     HR work through it on anyone's file, so enrolling a face from
+                     here belongs to them. An employee reaches their OWN enrolment
+                     from the dashboard instead (home/dashboard.blade.php), which
+                     is where they actually look, and is prompted for it at login
+                     when they have none.
+
+                     This only hides the link. The route still runs on 'face.self',
+                     so an employee opening their own page directly is allowed and
+                     one naming somebody else's id still gets a 403. --}}
+                @if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
                 @php
                     $onFacePage = request()->is('pds/face-recognition') || request()->is('pds/face-recognition/*');
                     $faceRegistered = $employee->faceSummary()['registered'];

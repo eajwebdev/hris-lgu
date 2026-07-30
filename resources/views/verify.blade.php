@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="{{ asset('css/verify.css') }}">
 
     <!-- Favicon -->
-    <link rel="shortcut icon" href="{{ asset('template/img/CPSU_L.png') }}">
+    <link rel="shortcut icon" href="{{ asset('Uploads/logo.png') }}">
 
     <style>
         body {
@@ -66,7 +66,7 @@
 
                 <div class="login-logo mt-4 text-center">
                     <a href="./">
-                        <img src="{{ asset('template/img/CPSU_L.png') }}" class="img-fluid" width="120">
+                        <img src="{{ asset('Uploads/logo.png') }}" class="img-fluid" width="120">
                     </a>
                 </div>
 

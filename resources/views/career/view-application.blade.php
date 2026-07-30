@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>CPSU | Job Application Review</title>
+    <title>LGU Mabinay | Job Application Review</title>
     <!-- Bootstrap 5 CSS + Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -264,14 +264,14 @@
             <i class="bi bi-bell-fill"></i> New Application
         </div>
         <h1 class="text-white app-title">Job Application Received</h1>
-        <p class="text-white-50 mb-0 small">CPSU Career Portal · ready for review</p>
+        <p class="text-white-50 mb-0 small">LGU Mabinay Career Portal · ready for review</p>
     </div>
 
     <div class="card-body-custom">
         <div class="alert-modern">
             <i class="bi bi-envelope-paper-fill me-2" style="color:#146b3a;"></i>
             <strong>Dear Records Office Team,</strong><br>
-            A new application has been submitted via the CPSU portal. Please verify the candidate details below.
+            A new application has been submitted via the LGU Mabinay portal. Please verify the candidate details below.
         </div>
 
         <div class="section-badge-light">
@@ -320,7 +320,7 @@
             <div class="col-12">
                 <div class="info-tile">
                     <div class="info-label-sm"><i class="bi bi-geo-alt"></i> Address</div>
-                    <div class="info-value-md">{{ $applications->address ?? 'Kabankalan City, Negros Occidental' }}</div>
+                    <div class="info-value-md">{{ $applications->address ?? 'Mabinay, Negros Oriental' }}</div>
                 </div>
             </div>
             <div class="col-12">
@@ -371,12 +371,12 @@
 
         <div class="signature-line">
             <span>Best regards,</span><br>
-            <strong class="text-dark">CPSU Online Career Portal</strong> <i class="bi bi-check2-circle text-success small"></i>
+            <strong class="text-dark">LGU Mabinay Online Career Portal</strong> <i class="bi bi-check2-circle text-success small"></i>
         </div>
     </div>
 
     <div class="footer-card">
-        <i class="bi bi-c-circle"></i> 2026 Central Philippines State University | Human Resource Information System
+        <i class="bi bi-c-circle"></i> 2026 LGU Mabinay | Human Resource Information System
     </div>
 </div>
 

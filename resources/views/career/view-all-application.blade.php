@@ -52,10 +52,9 @@
                                         {{ $application->title }}
                                         <br>
                                         <small class="text-muted">
-                                            @if($application->job_type == 1)
-                                                <span class="badge bg-success">Non-Teaching</span>
-                                            @elseif($application->job_type == 2)
-                                                <span class="badge bg-primary">Teaching</span>
+                                            @if($application->job_type)
+                                                {{-- Nature of appointment, as stored on the posting. --}}
+                                                <span class="badge badge-info">{{ $application->job_type }}</span>
                                             @endif
                                         </small>
                                     </td>

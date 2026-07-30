@@ -36,6 +36,11 @@ class LivenessVerifier
      * the attacker happens to hold a photo of. Demanding a sequence they cannot
      * predict means a printed photo or a phone screen is useless no matter how
      * many times they ask.
+     *
+     * pose_count = 0 turns the gesture stage OFF, exactly as flash_count = 0
+     * turns the illumination stage off. That is the configuration this kiosk
+     * ships with: the punch is QR + look-at-the-camera, and liveness is carried
+     * by the server-measured flash response instead.
      */
     public function issue(string $ip): array
     {
@@ -46,7 +51,20 @@ class LivenessVerifier
 
         shuffle($pool);
 
-        $poses = array_slice($pool, 0, max(1, $count));
+        // max(0, ...), NOT max(1, ...).
+        //
+        // The floor here used to be 1, which quietly made pose_count = 0 mean
+        // "one gesture" instead of "no gestures": array_slice($pool, 0, 1) still
+        // named a pose, the client still demanded it on screen, and checkPoses()
+        // still enforced it. Setting the config to 0 therefore appeared to
+        // change nothing and employees were still being told to turn their head.
+        //
+        // The floor presumably existed to stop a misconfigured 0 from silently
+        // disabling liveness. It cannot serve that purpose now — 0 is the
+        // documented off switch, and overriding it made the switch a lie. If the
+        // gesture stage must never be off, enforce that where it is read, not by
+        // rewriting the operator's setting behind their back.
+        $poses = $count > 0 ? array_slice($pool, 0, max(0, $count)) : [];
         $flash = $this->issueFlash();
 
         $ttl = (int) config('face.liveness.challenge_ttl', 90);

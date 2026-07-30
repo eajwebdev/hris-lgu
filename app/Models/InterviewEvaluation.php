@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 class InterviewEvaluation extends Model
 {
     protected $fillable = [
-        'ete_id',
         'jid',
         'interview_date',
         'active_application_id',
@@ -17,10 +16,6 @@ class InterviewEvaluation extends Model
         'interview_date' => 'datetime',
     ];
 
-    public function eteEvaluation()
-    {
-        return $this->belongsTo(EteEvaluation::class, 'ete_id');
-    }
 
     public function job()
     {

@@ -4,8 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Application;
 use App\Models\Employee;
-use App\Models\EteApplicantRating;
-use App\Models\EteEvaluation;
+use App\Models\JobHiring;
 use App\Models\InterviewApplicant;
 use App\Models\InterviewEvaluation;
 use App\Models\InterviewPanel;
@@ -16,9 +15,17 @@ use Illuminate\Support\Facades\DB;
 
 class InterviewEvaluationController extends Controller
 {
+    /**
+     * The seven traits on the PSB Interview Form.
+     *
+     * Each is rated 1-10 by each panel member, then weighted by the percentage
+     * printed on the form. The weights live in App\Services\PsbScoring so the
+     * rating screen, the ranking and the printed form cannot drift apart; they
+     * are mirrored into 'weight' below only for display.
+     */
     private array $interviewCriteria = [
-        'voice_speech' => [
-            'label' => 'Voice and speech',
+        'communication_skill' => [
+            'label' => 'Communication skill',
             'prompt' => 'Is his/her voice inviting or pleasant? Can you easily hear what he/she says? Is his/her speech clear and distinct? Is his/her voice resonant and well-modulated?',
             'levels' => [
                 '1 - 2' => 'Irritating or indistinct',
@@ -347,7 +354,7 @@ class InterviewEvaluationController extends Controller
 
     private function activeInterviewsForPanel(int $employeeId)
     {
-        return InterviewEvaluation::with(['job', 'eteEvaluation.office', 'activeApplication'])
+        return InterviewEvaluation::with(['job', 'activeApplication'])
             ->whereNotNull('active_application_id')
             ->whereHas('applicants', function ($query) {
                 $query->where('is_cast', true)
@@ -478,9 +485,20 @@ class InterviewEvaluationController extends Controller
         });
     }
 
+    /**
+     * The Interview Form totals 100 by weight, not by raw points: the seven
+     * traits are worth 10/10/20/20/10/15/15, so a raw sum out of 70 is not the
+     * score. interview_total therefore holds the weighted figure.
+     */
     private function maxInterviewScore(): int
     {
-        return count($this->interviewCriteria) * 10;
+        return 100;
+    }
+
+    /** The weight printed beside each trait on the form. */
+    private function interviewWeight(string $key): int
+    {
+        return \App\Services\PsbScoring::INTERVIEW_WEIGHTS[$key] ?? 0;
     }
 
     private function maxPotentialScore(): int
@@ -526,17 +544,22 @@ class InterviewEvaluationController extends Controller
         return ($score / $maxScore) * $weight;
     }
 
+    /**
+     * The shortlist this screen shows.
+     *
+     * Interview 50 / potential 50, both already on 100-point scales — this is a
+     * working view of how the panel scored the room. The board's official
+     * ranking is the Comparative Assessment, where the interview feeds the
+     * 10-point Potential column and education, training and experience are
+     * scored on the sheet itself.
+     */
     private function rankingRows(InterviewEvaluation $interview)
     {
         $ratingsByApplication = $interview->ratings->groupBy('application_id');
-        $eteRatings = EteApplicantRating::where('ete_id', $interview->ete_id)
-            ->whereIn('application_id', $interview->applicants->pluck('application_id'))
-            ->get()
-            ->keyBy('application_id');
 
         return $interview->applicants
             ->filter(fn ($row) => $row->application)
-            ->map(function ($row) use ($interview, $ratingsByApplication, $eteRatings) {
+            ->map(function ($row) use ($interview, $ratingsByApplication) {
                 $ratings = $ratingsByApplication->get($row->application_id, collect());
                 $panelCount = max(1, $this->assignedPanelIdsForApplication($interview, (int) $row->application_id)->count());
                 $startedRatings = $ratings->filter(function ($rating) {
@@ -551,11 +574,11 @@ class InterviewEvaluationController extends Controller
                 $interviewTotal = $submittedCount ? (float) $submittedRatings->avg('interview_total') : 0;
                 $potentialTotal = $submittedCount ? (float) $submittedRatings->avg('potential_total') : 0;
                 $totalScore = $submittedCount ? (float) $submittedRatings->avg('total_score') : 0;
-                $eteTotal = (float) optional($eteRatings->get($row->application_id))->total_score;
-                $qualificationScore = $eteTotal * 0.5;
-                $interviewScore = $this->weightedScore($interviewTotal, $this->maxInterviewScore(), 25);
-                $potentialScore = $this->weightedScore($potentialTotal, $this->maxPotentialScore(), 25);
-                $finalScore = $qualificationScore + $potentialScore + $interviewScore;
+                // Both halves are already out of 100, so each contributes 50.
+                $qualificationScore = 0.0;
+                $interviewScore = $this->weightedScore($interviewTotal, $this->maxInterviewScore(), 50);
+                $potentialScore = $this->weightedScore($potentialTotal, $this->maxPotentialScore(), 50);
+                $finalScore = $interviewScore + $potentialScore;
 
                 return [
                     'application_id' => $row->application_id,
@@ -598,7 +621,6 @@ class InterviewEvaluationController extends Controller
         $this->authorizeAdmin();
 
         $interviews = InterviewEvaluation::with([
-            'eteEvaluation.job',
             'job',
             'panels.employee',
             'activeApplication',
@@ -606,10 +628,13 @@ class InterviewEvaluationController extends Controller
             'ratings',
         ])->latest()->get();
 
-        $etes = EteEvaluation::with(['job', 'office'])->latest()->get();
+        // Positions that have someone ready to interview.
+        $jobs = JobHiring::whereHas('applications', fn ($q) => $q->where('status', 2))
+            ->orderByDesc('id')
+            ->get();
         $employees = Employee::orderBy('lname')->orderBy('fname')->get();
 
-        return view('interview.index', compact('interviews', 'etes', 'employees'));
+        return view('interview.index', compact('interviews', 'jobs', 'employees'));
     }
 
     public function assignments()
@@ -627,12 +652,12 @@ class InterviewEvaluationController extends Controller
                 'interview_id' => $interview->id,
                 'application_id' => $interview->active_application_id,
                 'panel_employee_id' => $employeeId,
-            ])->load(['interview.job', 'interview.eteEvaluation.office', 'application']);
+            ])->load(['interview.job', 'application']);
         });
 
         if ($ratings->isNotEmpty()) {
             $rating = $ratings->first();
-            $interview = $rating->interview->load(['job', 'eteEvaluation.office', 'panels.employee', 'activeApplication']);
+            $interview = $rating->interview->load(['job', 'panels.employee', 'activeApplication']);
             $application = $rating->application;
             $panelEmployee = Employee::findOrFail($employeeId);
             $relatedPositions = $this->relatedQualifiedPositions($application, (int) $employeeId);
@@ -744,26 +769,28 @@ class InterviewEvaluationController extends Controller
     {
         $this->authorizeAdmin();
 
+        // An interview belongs to the vacancy, not to a separate evaluation
+        // sheet. The board interviews applicants for a posted position and
+        // records the result on the PSB Interview Form.
         $request->validate([
-            'ete_id' => 'required|exists:ete_evaluations,id',
+            'jid' => 'required|exists:job_hirings,id',
             'interview_date' => 'nullable|date',
             'panels' => 'required|array|min:1',
             'panels.*' => 'exists:employees,id',
         ]);
 
         DB::transaction(function () use ($request) {
-            $ete = EteEvaluation::findOrFail($request->ete_id);
-            $qualifiedApplicants = Application::where('jid', $ete->jid)->where('status', 2)->count();
+            $job = JobHiring::findOrFail($request->jid);
+            $qualifiedApplicants = Application::where('jid', $job->id)->where('status', 2)->count();
 
             if ($qualifiedApplicants === 0) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'ete_id' => 'Cannot create interview assessment. No applicants are currently Qualified / Ready for Interview for this ETE position.',
+                    'jid' => 'Cannot create interview assessment. No applicants are currently Qualified / Ready for Interview for this position.',
                 ]);
             }
 
             $interview = InterviewEvaluation::create([
-                'ete_id' => $ete->id,
-                'jid' => $ete->jid,
+                'jid' => $job->id,
                 'interview_date' => $request->interview_date ? Carbon::parse($request->interview_date) : now(),
             ]);
 
@@ -782,7 +809,7 @@ class InterviewEvaluationController extends Controller
     {
         $this->authorizeAdmin();
 
-        $interview = InterviewEvaluation::with(['eteEvaluation.office', 'job', 'panels.employee', 'activeApplication'])->findOrFail($id);
+        $interview = InterviewEvaluation::with(['job', 'panels.employee', 'activeApplication'])->findOrFail($id);
         $this->syncApplicantRows($interview);
         $eligibleApplicants = $this->eligibleApplicants($interview);
         $eligibleApplicants->each(fn ($applicant) => $this->ensureDefaultApplicantPanels($interview, (int) $applicant->id));
@@ -933,7 +960,7 @@ class InterviewEvaluationController extends Controller
         $guard = $this->guard();
         abort_unless($guard, 403);
 
-        $interview = InterviewEvaluation::with(['job', 'eteEvaluation.office', 'panels.employee', 'activeApplication'])->findOrFail($id);
+        $interview = InterviewEvaluation::with(['job', 'panels.employee', 'activeApplication'])->findOrFail($id);
         $applicationId = $applicationId ?: $interview->active_application_id;
         abort_unless($applicationId, 404, 'No cast candidate is active for this interview.');
 
@@ -1074,9 +1101,10 @@ class InterviewEvaluationController extends Controller
             );
             $isComplete = collect($interviewKeys)->every(fn ($key) => isset($interviewScores[$key]) && $interviewScores[$key] !== '')
                 && collect($potentialKeys)->every(fn ($key) => isset($potentialScores[$key]) && $potentialScores[$key] !== '');
-            $interviewTotal = $isComplete
-                ? $this->sumScores($interviewScores, $interviewKeys, 1, 10)
-                : $this->sumProvidedScores($interviewScores, $interviewKeys, 1, 10);
+            // Weighted to 100 by the percentages on the PSB Interview Form. A
+            // part-finished sheet scores what has been rated so far; the
+            // unrated traits simply contribute nothing.
+            $interviewTotal = (new \App\Services\PsbScoring())->interviewTotal($interviewScores);
             $potentialTotal = $isComplete
                 ? $this->sumScores($potentialScores, $potentialKeys, 1, 5)
                 : $this->sumProvidedScores($potentialScores, $potentialKeys, 1, 5);
@@ -1197,7 +1225,7 @@ class InterviewEvaluationController extends Controller
     public function consolidatedScreen($id)
     {
         $this->authorizeRankingAdmin();
-        $interview = InterviewEvaluation::with(['job', 'eteEvaluation.office'])->findOrFail($id);
+        $interview = InterviewEvaluation::with(['job'])->findOrFail($id);
         $this->syncApplicantRows($interview);
 
         return view('interview.consolidated-screen', compact('interview'));
@@ -1220,14 +1248,64 @@ class InterviewEvaluationController extends Controller
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
+    /**
+     * The PSB INTERVIEW FORM, ready to print.
+     *
+     * One row per candidate. Each trait shows the panel's mean rating and the
+     * TOTAL column the panel's mean weighted score, because the board records a
+     * single figure per candidate, not one sheet per panellist.
+     */
+    public function psbInterviewForm($id)
+    {
+        $this->authorizeRankingAdmin();
+
+        $interview = InterviewEvaluation::with(['job', 'applicants.application', 'ratings'])->findOrFail($id);
+        $this->syncApplicantRows($interview);
+        $interview->load(['applicants.application', 'ratings']);
+
+        $psb = new \App\Services\PsbScoring();
+        $traitKeys = array_keys(\App\Services\PsbScoring::INTERVIEW_WEIGHTS);
+        $byApplication = $interview->ratings->groupBy('application_id');
+
+        $candidates = $interview->applicants
+            ->filter(fn ($row) => $row->application)
+            ->map(function ($row) use ($byApplication, $psb, $traitKeys) {
+                $ratings = $byApplication->get($row->application_id, collect())
+                    ->filter(fn ($r) => $this->ratingComplete($r));
+
+                // Mean raw rating per trait across the panel.
+                $scores = [];
+                foreach ($traitKeys as $key) {
+                    $values = $ratings->map(fn ($r) => ($r->interview_scores[$key] ?? null))
+                        ->filter(fn ($v) => $v !== null && $v !== '');
+                    $scores[$key] = $values->isEmpty() ? null : round($values->avg(), 2);
+                }
+
+                return [
+                    'name'   => $this->applicantName($row->application),
+                    'scores' => $scores,
+                    'total'  => $ratings->isEmpty()
+                        ? null
+                        : $psb->panelAverage($ratings->pluck('interview_total')->all()),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return view('interview.psb-interview-form', [
+            'position'   => optional($interview->job)->title ?? '',
+            'candidates' => $candidates,
+            'backUrl'    => route('interviewEvaluationShow', $interview->id),
+        ]);
+    }
+
     public function summaryRatingPdf($id)
     {
         $this->authorizeRankingAdmin();
 
         $interview = InterviewEvaluation::with([
             'job',
-            'eteEvaluation.office',
-            'panels.employee',
+                        'panels.employee',
             'applicants.application',
             'ratings.application',
         ])->findOrFail($id);

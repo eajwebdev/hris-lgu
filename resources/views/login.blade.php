@@ -10,8 +10,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-    <!-- Toastr -->
-    <link rel="stylesheet" href="{{ asset('template/plugins/toastr/toastr.min.css') }}">
     <!-- Auth theme (cache-busted so browsers never serve a stale copy) -->
     <link rel="stylesheet" href="{{ asset('css/auth.css') }}?v={{ filemtime(public_path('css/auth.css')) }}">
     <!-- Favicon -->
@@ -152,7 +150,6 @@
     </main>
 
     <script src="{{ asset('template/plugins/jquery/jquery.min.js') }}"></script>
-    <script src="{{ asset('template/plugins/toastr/toastr.min.js') }}"></script>
 
     <script>
         // Rising sparks for the animated background
@@ -199,16 +196,7 @@
         });
     </script>
 
-    @if(session('error'))
-        <script>
-            toastr.options = {
-                closeButton: true,
-                progressBar: true,
-                positionClass: 'toast-bottom-center',
-                timeOut: 4000
-            };
-            toastr.error(@json(session('error')));
-        </script>
-    @endif
+    {{-- Sign-in errors are shown by the .auth-alert above the username field.
+         A toastr copy repeated the same sentence at the bottom of the screen. --}}
 </body>
 </html>

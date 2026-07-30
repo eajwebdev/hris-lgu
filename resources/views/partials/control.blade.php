@@ -77,7 +77,12 @@
                     <p>Leave</p>
                 </a>
             </li>
-        @elseif(auth()->guard($guard)->user()->emp_status == 1)
+        {{-- Casual employees file leave too, so this is no longer
+             `emp_status == 1`. The eligible statuses live in config/leave.php;
+             isLeaveEligible() is the same check the dashboard panel and HR's
+             employee pickers use, so the nav link can never again disagree with
+             what the rest of the app will let the person do. --}}
+        @elseif(auth()->guard($guard)->user()->isLeaveEligible())
             <li class="nav-item">
                 <a href="{{ route('leavesReadEmp') }}" title="Leave"
                    class="nav-link {{ request()->is('leave') || request()->is('leave/*') ? 'active' : '' }}">
@@ -141,10 +146,12 @@
                     </p>
                 </a>
                 <ul class="nav nav-treeview">
+                    {{-- One entry, not two. A vacancy is published from the position
+                         it belongs to, so "Job Openings" no longer exists separately. --}}
                     <li class="nav-item">
-                        <a href="{{ route('jlist') }}" class="nav-link {{ request()->is('career') ? 'active' : '' }}">
+                        <a href="{{ route('positionDescriptionList') }}" class="nav-link {{ request()->is('position-descriptions*') || request()->is('career') ? 'active' : '' }}">
                             <i class="far fa-circle nav-icon"></i>
-                            <p>Job Openings</p>
+                            <p>Positions &amp; Vacancies</p>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -154,15 +161,15 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="{{ route('eteEvaluationList') }}" class="nav-link {{ request()->is('ete*') ? 'active' : '' }}">
-                            <i class="far fa-circle nav-icon"></i>
-                            <p>ETE Evaluation</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a href="{{ route('interviewEvaluationList') }}" class="nav-link {{ request()->is('interview*') ? 'active' : '' }}">
                             <i class="far fa-circle nav-icon"></i>
                             <p>Interview Assessment</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('psbMembers') }}" class="nav-link {{ request()->is('psb*') ? 'active' : '' }}">
+                            <i class="far fa-circle nav-icon"></i>
+                            <p>Selection Board</p>
                         </a>
                     </li>
                 </ul>

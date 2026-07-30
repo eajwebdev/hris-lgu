@@ -36,6 +36,29 @@
 
                 <div class="card-body bg-form">
 
+                    {{-- One form for the whole page. It is declared empty here and the
+                         controls point at it by id, because the Attendance Stations
+                         section further down has forms of its own and a <form> cannot
+                         be nested inside another one. --}}
+                    <form method="POST" action="{{ route('settingsUpdate') }}" id="system-settings-form">@csrf</form>
+
+                    @if(session('success'))
+                        <div class="alert alert-success">
+                            <i class="fas fa-check"></i> {{ session('success') }}
+                        </div>
+                    @endif
+
+                    @if($errors->any())
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle"></i> Nothing was saved:
+                            <ul class="mb-0 mt-1">
+                                @foreach($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
                     <!-- Group 1: Executive / Leadership Positions -->
                     <div class="settings-group">
                         <div class="group-header">Executive / Leadership Positions</div>
@@ -43,9 +66,10 @@
                             <div class="col-4">
                                 <div class="mb-3">
                                     <label class="d-block font-weight-bold">Mayor</label>
-                                    <select id="mayor" name="mayor" class="form-control form-select select2">
+                                    <select form="system-settings-form" id="mayor" name="mayor" class="form-control form-select select2">
+                                        <option value="">&mdash; Not assigned &mdash;</option>
                                         @foreach($employees as $emp)
-                                            <option value="{{ $emp->id }}" {{ optional($setting ?? null)->mayor == $emp->id ? 'selected' : '' }}>{{ ucfirst($emp->fname) }} {{ ucfirst($emp->lname) }}</option>
+                                            <option value="{{ $emp->id }}" {{ $settings->mayor == $emp->id ? 'selected' : '' }}>{{ ucfirst($emp->lname) }}, {{ ucfirst($emp->fname) }}</option>
                                         @endforeach
                                     </select>
                                     <small class="text-muted">Approves leave applications.</small>
@@ -55,9 +79,10 @@
                             <div class="col-4">
                                 <div class="mb-3">
                                     <label class="d-block font-weight-bold">Vice Mayor</label>
-                                    <select id="viceMayor" name="vice_mayor" class="form-control form-select select2">
+                                    <select form="system-settings-form" id="viceMayor" name="vice_mayor" class="form-control form-select select2">
+                                        <option value="">&mdash; Not assigned &mdash;</option>
                                         @foreach($employees as $emp)
-                                            <option value="{{ $emp->id }}" {{ optional($setting ?? null)->vice_mayor == $emp->id ? 'selected' : '' }}>{{ ucfirst($emp->fname) }} {{ ucfirst($emp->lname) }}</option>
+                                            <option value="{{ $emp->id }}" {{ $settings->vice_mayor == $emp->id ? 'selected' : '' }}>{{ ucfirst($emp->lname) }}, {{ ucfirst($emp->fname) }}</option>
                                         @endforeach
                                     </select>
                                     <small class="text-muted">May approve leave when the Mayor is unavailable.</small>
@@ -67,11 +92,13 @@
                             <div class="col-4">
                                 <div class="mb-3">
                                     <label class="d-block font-weight-bold">HR Head</label>
-                                    <select id="hrHead" name="hr" class="form-control form-select select2">
+                                    <select form="system-settings-form" id="hrHead" name="hr" class="form-control form-select select2">
+                                        <option value="">&mdash; Not assigned &mdash;</option>
                                         @foreach($employees as $emp)
-                                            <option value="{{ $emp->id }}" {{ optional($setting ?? null)->hr == $emp->id ? 'selected' : '' }}>{{ ucfirst($emp->fname) }} {{ ucfirst($emp->lname) }}</option>
+                                            <option value="{{ $emp->id }}" {{ $settings->hr == $emp->id ? 'selected' : '' }}>{{ ucfirst($emp->lname) }}, {{ ucfirst($emp->fname) }}</option>
                                         @endforeach
                                     </select>
+                                    <small class="text-muted">Signs the leave form for the HR office.</small>
                                 </div>
                             </div>
                         </div>
@@ -84,10 +111,10 @@
                             <div class="col-12">
                                 <div class="mb-3">
                                     <label class="d-block font-weight-bold">Time Entry Restriction</label>
-                                    <select id="timerestriction" class="form-control form-select select2">
-                                        <option value="0">None</option>
-                                        <option value="1">Partial Restriction</option>
-                                        <option value="2">Full Restriction</option>
+                                    <select form="system-settings-form" id="timerestriction" name="te_rstrct_lvl" class="form-control form-select select2">
+                                        <option value="0" {{ (string) $settings->te_rstrct_lvl === '0' ? 'selected' : '' }}>None</option>
+                                        <option value="1" {{ (string) $settings->te_rstrct_lvl === '1' ? 'selected' : '' }}>Partial Restriction</option>
+                                        <option value="2" {{ (string) $settings->te_rstrct_lvl === '2' ? 'selected' : '' }}>Full Restriction</option>
                                     </select>
                                 </div>
                             </div>
@@ -95,11 +122,11 @@
                             <div class="col-12">
                                 <div class="mb-3">
                                     <label class="d-block font-weight-bold">HR Kiosk Access</label>
-                                    <select id="hrKioskAccess" class="form-control form-select select2" multiple>
+                                    <select form="system-settings-form" id="hrKioskAccess" name="hr_kiosk[]" class="form-control form-select select2" multiple>
                                         @foreach($employees as $emp)
                                             <option value="{{ $emp->emp_ID }}"
-                                                {{ in_array($emp->emp_ID, $kioskAccess ?? []) ? 'selected' : '' }}>
-                                                {{ ucfirst($emp->fname) }} {{ ucfirst($emp->lname) }}
+                                                {{ in_array((string) $emp->emp_ID, $kioskAccess ?? [], true) ? 'selected' : '' }}>
+                                                {{ ucfirst($emp->lname) }}, {{ ucfirst($emp->fname) }}
                                             </option>
                                         @endforeach
                                     </select>
@@ -109,14 +136,20 @@
                             <div class="col-12">
                                 <div class="mb-3">
                                     <label class="d-block font-weight-bold">DTR Full Access</label>
-                                    <select id="dtrFullAccess" class="form-control form-select select2" multiple>
+                                    <select form="system-settings-form" id="dtrFullAccess" name="dtr_acct[]" class="form-control form-select select2" multiple>
                                         @foreach($employees as $emp)
                                             <option value="{{ $emp->id }}"
-                                                {{ in_array($emp->id, $dtrFullAccess ?? []) ? 'selected' : '' }}>
-                                                {{ ucfirst($emp->fname) }} {{ ucfirst($emp->lname) }}
+                                                {{ in_array((string) $emp->id, $dtrFullAccess ?? [], true) ? 'selected' : '' }}>
+                                                {{ ucfirst($emp->lname) }}, {{ ucfirst($emp->fname) }}
                                             </option>
                                         @endforeach
                                     </select>
+                                    <small class="text-muted">
+                                        Gives these employees the HR view of the DTR &mdash; but only for
+                                        their <b>own office</b>. They can read and print the daily time
+                                        record of anyone sharing their office and no one outside it.
+                                        An employee with no office set keeps seeing only their own.
+                                    </small>
                                 </div>
                             </div>
                         </div>
@@ -238,24 +271,24 @@
                     <div class="settings-group">
                         <div class="group-header">Email & Notification Settings</div>
                         <div class="row">
-                            <div class="col-4">
-                                <div class="mb-3">
-                                    <label class="d-block font-weight-bold">HR Head Email</label>
-                                    <input type="email" id="hr-head-email" class="form-control form-control-sm" placeholder="Enter email">
-                                </div>
-                            </div>
-
-                            <div class="col-4">
+                            {{-- "HR Head Email" used to sit here with nowhere to save to —
+                                 settings has no such column. The HR head's address comes
+                                 from the employee chosen as HR Head above. --}}
+                            <div class="col-6">
                                 <div class="mb-3">
                                     <label class="d-block font-weight-bold">Records Office Email</label>
-                                    <input type="email" id="records-office-email" class="form-control form-control-sm" placeholder="Enter email">
+                                    <input form="system-settings-form" type="email" name="records_office_email" id="records-office-email"
+                                           class="form-control form-control-sm" placeholder="Enter email"
+                                           value="{{ $settings->records_office_email }}">
                                 </div>
                             </div>
 
-                            <div class="col-4">
+                            <div class="col-6">
                                 <div class="mb-3">
                                     <label class="d-block font-weight-bold">Job Portal Email</label>
-                                    <input type="email" id="job-portal-email" class="form-control form-control-sm" placeholder="Enter email">
+                                    <input form="system-settings-form" type="email" name="job_portal_email" id="job-portal-email"
+                                           class="form-control form-control-sm" placeholder="Enter email"
+                                           value="{{ $settings->job_portal_email }}">
                                 </div>
                             </div>
                         </div>
@@ -268,19 +301,29 @@
                             <div class="col-6 col-md-4">
                                 <div class="mb-3">
                                     <label class="d-block font-weight-bold mb-2">System Maintenance Mode</label>
-                                    <input type="checkbox" id="maintenanceSwitch" data-bootstrap-switch
-                                           data-off-color="danger" data-on-color="success">
+                                    <input form="system-settings-form" type="checkbox" name="maintenance" value="1"
+                                           id="maintenanceSwitch" data-bootstrap-switch
+                                           data-off-color="danger" data-on-color="success"
+                                           {{ $settings->maintenance ? 'checked' : '' }}>
                                 </div>
                             </div>
 
                             <div class="col-6 col-md-4">
                                 <div class="mb-3">
                                     <label class="d-block font-weight-bold mb-2">HR Kiosk Backtrack Sync</label>
-                                    <input type="checkbox" id="kioskBacktrackSync" data-bootstrap-switch
-                                           data-off-color="danger" data-on-color="success">
+                                    <input form="system-settings-form" type="checkbox" name="sync_backups" value="1"
+                                           id="kioskBacktrackSync" data-bootstrap-switch
+                                           data-off-color="danger" data-on-color="success"
+                                           {{ $settings->sync_backups ? 'checked' : '' }}>
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="text-right mb-2">
+                        <button form="system-settings-form" type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> Save settings
+                        </button>
                     </div>
 
                 </div>

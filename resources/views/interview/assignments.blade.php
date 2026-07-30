@@ -31,7 +31,7 @@
                             @if($rating->interview->job && $rating->interview->job->plantilla_item_no)
                                 <div class="text-muted small">{{ $rating->interview->job->plantilla_item_no }}</div>
                             @endif
-                            <div class="text-muted small">{{ $rating->interview->eteEvaluation->office->office_name ?? '' }}</div>
+                            <div class="text-muted small">{{ optional(optional($rating->interview)->job)->assignment ?? '' }}</div>
                         </div>
                     </div>
                     <div class="text-right">

@@ -29,12 +29,12 @@
     <div class="card mb-3">
         <div class="interview-manage-head">
             <div>
-                <small class="text-muted">Interview Assessment from ETE #{{ $interview->ete_id }}</small>
+                <small class="text-muted">Personnel Selection Board &middot; Interview Assessment</small>
                 <h4>{{ $interview->job->title ?? 'Position' }}</h4>
                 @if($interview->job && $interview->job->plantilla_item_no)
                     <div class="text-muted small">{{ $interview->job->plantilla_item_no }}</div>
                 @endif
-                <div class="text-muted small"><i class="fas fa-building mr-1"></i>{{ $interview->eteEvaluation->office->office_name ?? 'Office not set' }}</div>
+                <div class="text-muted small"><i class="fas fa-building mr-1"></i>{{ optional(optional($interview->job)->positionDescription)->bureau_office ?? $interview->job->assignment ?? 'Office not set' }}</div>
             </div>
             <div class="d-flex flex-wrap align-items-center" style="gap:8px;">
                 @if(auth()->guard('web')->check() && in_array(auth()->guard('web')->user()->role, ['Administrator', 'HR Administrator'], true))
@@ -44,6 +44,15 @@
                     <a href="{{ route('interviewSummaryRatingPdf', $interview->id) }}" target="_blank" class="btn btn-danger">
                         <i class="fas fa-file-pdf"></i> Summary Rating
                     </a>
+                    <a href="{{ route('psbInterviewForm', $interview->id) }}" target="_blank" class="btn btn-success"
+                       title="Personnel Selection Board interview form, ready to sign">
+                        <i class="fas fa-print"></i> PSB Interview Form
+                    </a>
+                    @if($interview->jid)
+                        <a href="{{ route('psbAssessment', $interview->jid) }}" class="btn btn-outline-success">
+                            <i class="fas fa-scale-balanced"></i> Comparative Assessment
+                        </a>
+                    @endif
                     <button type="button" class="btn btn-info" data-toggle="modal" data-target="#panelMembersModal">
                         <i class="fas fa-users"></i> Panel
                     </button>

@@ -202,6 +202,7 @@
         looping:     false,
         stepIndex:   0,
         captures:    {},   // type -> embedding array
+        reals:       {},   // type -> anti-spoof "live" probability for that capture
         lastCheck:   null, // the most recent validation result
         // Movement step: reset each time that step is entered.
         movement: { baseline: null, moved: false },
@@ -496,9 +497,34 @@
                 return;
             }
 
+            // Anti-spoof BEFORE the embedding is kept. A template enrolled from
+            // a photograph is worse than a bad punch: it is on file for as long
+            // as the employee is, and every later match is measured against it.
+            // Registration used to skip this entirely unless the Python sidecar
+            // was running, which left self-enrolment — now the default route in
+            // from the dashboard prompt — with no liveness check at all.
+            //
+            // Rejected here AND re-checked on the server, which is what
+            // actually enforces it; this copy only gives the employee an
+            // immediate, specific reason instead of a refusal at the end.
+            var real = await FaceEngine.antispoof(el.video, result);
+
+            if (CONFIG.antispoof && CONFIG.antispoof.enabled) {
+                if (typeof real !== 'number') {
+                    setFeedback('The face security check could not load. Please reload the page.', false);
+                    return;
+                }
+
+                if (real < CONFIG.antispoof.minReal) {
+                    setFeedback('Please use your real face — a photo or screen was detected.', false);
+                    return;
+                }
+            }
+
             // The ArcFace pass is the expensive one, so it runs here — four
             // times per registration — rather than on every preview frame.
             state.captures[step] = Array.from(await FaceEngine.embed(el.video, result));
+            state.reals[step]    = real;
 
             markStepDone(step);
 
@@ -710,7 +736,14 @@
         el.finishBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
 
         var payload = ORDER.map(function (type) {
-            return { type: type, embedding: state.captures[type] };
+            return {
+                type:      type,
+                embedding: state.captures[type],
+                // The server enforces its own floor on this and refuses a
+                // capture that arrives without one, so omitting it is not a way
+                // around the check.
+                real:      state.reals[type],
+            };
         });
 
         try {

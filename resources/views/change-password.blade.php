@@ -32,7 +32,10 @@
         <div class="auth-blob auth-blob--3"></div>
     </div>
 
-    <main class="auth-shell">
+    {{-- --solo centres the card. The base .auth-shell is the sign-in layout's
+         two-column grid (hero + card); without a hero this page was leaving the
+         first column empty and sitting off to the right. --}}
+    <main class="auth-shell auth-shell--solo">
         <section class="auth-card">
             <img src="{{ asset('Uploads/logo.png') }}" alt="Mabinay Seal" class="auth-card__logo">
 
@@ -64,27 +67,18 @@
             <form action="{{ route('password.change.update') }}" method="post" id="changePassword">
                 @csrf
 
-                <div class="auth-field">
-                    <label for="current_password">Current password</label>
-                    <div class="auth-input-wrap">
-                        <svg class="ico"><use href="#i-lock"></use></svg>
-                        <input type="password" class="auth-input" id="current_password" name="current_password"
-                               placeholder="••••••••" autocomplete="current-password" autofocus required>
-                        <button type="button" class="auth-toggle" data-toggle-for="current_password" aria-label="Show password">
-                            <svg class="ico"><use href="#i-eye"></use></svg>
-                        </button>
-                    </div>
-                    @error('current_password')
-                        <small class="auth-error">{{ $message }}</small>
-                    @enderror
-                </div>
-
+                {{-- No "current password" field. The account reaching this
+                     screen is almost always still on the password HR issued —
+                     which every new account receives, so asking them to retype
+                     a shared secret proved nothing and was one more thing to
+                     mistype on a phone. The server no longer asks for it
+                     either; see PasswordController::update. --}}
                 <div class="auth-field">
                     <label for="password">New password</label>
                     <div class="auth-input-wrap">
                         <svg class="ico"><use href="#i-lock"></use></svg>
                         <input type="password" class="auth-input" id="password" name="password"
-                               placeholder="At least 8 characters" autocomplete="new-password" required>
+                               placeholder="At least 8 characters" autocomplete="new-password" autofocus required>
                         <button type="button" class="auth-toggle" data-toggle-for="password" aria-label="Show password">
                             <svg class="ico"><use href="#i-eye"></use></svg>
                         </button>

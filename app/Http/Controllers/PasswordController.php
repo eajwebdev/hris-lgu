@@ -34,18 +34,29 @@ class PasswordController extends Controller
             return redirect()->route('getLogin')->with('error', 'Please sign in first.');
         }
 
+        // The current password is no longer asked for.
+        //
+        // For the case this screen exists to serve it proved nothing: an
+        // account held here by EnsurePasswordChanged is still on the password
+        // HR issued, and every account is issued the SAME one, so retyping it
+        // demonstrated no knowledge an attacker lacked.
+        //
+        // WHAT IT DID STILL COVER, so this is a deliberate trade and not an
+        // oversight: a voluntary change made from an already-authenticated
+        // session. Someone at an unattended signed-in machine can now set a new
+        // password without knowing the old one and lock the owner out. The
+        // session is what guards this now — session()->regenerate() below, the
+        // auth middleware, and whoever walks away from a logged-in terminal.
+        //
+        // To restore that protection for voluntary changes only, require the
+        // field when the forced hold is NOT in play:
+        //
+        //     if (! session(EnsurePasswordChanged::SESSION_KEY)) { ...check... }
         $validated = $request->validate([
-            'current_password' => ['required', 'string'],
-            'password'         => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
         ], [
             'password.confirmed' => 'The two new passwords do not match.',
         ]);
-
-        if (! Hash::check($validated['current_password'], $account->password)) {
-            throw ValidationException::withMessages([
-                'current_password' => 'That is not your current password.',
-            ]);
-        }
 
         // Refusing the issued password here is the whole point — without this
         // the screen could be satisfied by typing it straight back in.

@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Listeners\FlagMissingFaceRegistration;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
@@ -17,6 +19,13 @@ class EventServiceProvider extends ServiceProvider
     protected $listen = [
         Registered::class => [
             SendEmailVerificationNotification::class,
+        ],
+
+        // Every way into the application, not just the password form: the
+        // Google controller keeps its own afterLogin(), so anything hung off
+        // one of those is invisible to the other.
+        Login::class => [
+            FlagMissingFaceRegistration::class,
         ],
     ];
 

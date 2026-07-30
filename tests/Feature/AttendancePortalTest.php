@@ -43,6 +43,23 @@ class AttendancePortalTest extends TestCase
         // Challenges, the vector index and the rate limiter all live in the cache.
         Cache::flush();
 
+        // Most of this class exercises the 1:N face path — identify(), the
+        // ratio test, "not recognised" — which the kiosk no longer offers by
+        // default now that face.require_qr makes the badge mandatory. The code
+        // is still live and still reachable with the flag off, so the coverage
+        // is kept by pinning the flag here rather than deleting the tests.
+        // test_face_only_is_refused_when_the_badge_is_required() covers the
+        // default the kiosk actually ships with.
+        //
+        // require_images is pinned off for the same reason: these fixtures post
+        // modelled face/bg luma to exercise the CHALLENGE and THRESHOLD logic,
+        // while PunchFlashImagesTest drives the same endpoint with real JPEGs
+        // and is where the server-measures-it-itself guarantee is proven.
+        config([
+            'face.require_qr' => false,
+            'face.liveness_flash_frames.require_images' => false,
+        ]);
+
         $this->faces = app(FaceEmbeddingService::class);
 
         [$this->alice, $this->bob] = Employee::orderBy('id')->take(2)->get()->all();
@@ -474,6 +491,170 @@ class AttendancePortalTest extends TestCase
         $this->assertNull($this->todayFor($this->alice));
     }
 
+    /**
+     * pose_count = 0 means NO gestures, which is what this kiosk ships with:
+     * the punch is QR + look at the camera, and nobody is told to turn their
+     * head.
+     *
+     * This is a regression test for a real one. issue() floored the count at
+     * max(1, $count), so setting the config to 0 still named one pose, the
+     * kiosk still demanded it on screen and the server still enforced it — the
+     * off switch silently did nothing and employees kept being asked to turn.
+     */
+    public function test_the_gesture_challenge_is_off_at_pose_count_zero(): void
+    {
+        config(['face.liveness.pose_count' => 0]);
+
+        $this->assertSame([], $this->challenge()['poses']);
+    }
+
+    /** ...and a nonzero count still issues exactly that many distinct gestures. */
+    public function test_a_nonzero_pose_count_still_issues_gestures(): void
+    {
+        config(['face.liveness.pose_count' => 2]);
+
+        $poses = $this->challenge()['poses'];
+
+        $this->assertCount(2, $poses);
+        $this->assertSame($poses, array_unique($poses), 'the gestures must be distinct');
+    }
+
+    /**
+     * The whole point of turning them off: a punch with no gesture frames at
+     * all is accepted, and liveness is carried by the flash instead.
+     */
+    public function test_a_punch_with_no_gesture_frames_is_accepted(): void
+    {
+        config(['face.liveness.pose_count' => 0]);
+
+        $this->enrol($this->alice, 126);
+
+        $challenge = $this->challenge();
+
+        $this->assertSame([], $challenge['poses']);
+
+        $payload = $this->livePayload(126, $challenge, 'in');
+
+        $this->assertSame(
+            [],
+            array_values(array_filter($payload['frames'], fn ($f) => $f['stage'] === 'pose')),
+            'the fixture should carry no pose frames when none were demanded'
+        );
+
+        $this->punch($payload)->assertOk()->assertJsonPath('recorded', true);
+    }
+
+    /**
+     * A photograph is still refused with the gesture challenge switched OFF.
+     *
+     * This is the test the existing photo cases were not making. Both of those
+     * post frames and nothing else, so with a flash sequence outstanding they
+     * are refused for having sent no illumination samples at all — true, but it
+     * proves nothing about detecting a photo. And before pose_count = 0 genuinely
+     * took effect they were refused earlier still, for not performing a gesture.
+     *
+     * Here the payload is complete and otherwise perfect: a full flash response
+     * modelled on a real face, and anti-spoof scores claiming a live one. The
+     * ONLY thing wrong with it is that the identity frames barely differ, the
+     * way a still photograph's do. min_variation is what has to catch that now
+     * that no gesture will.
+     */
+    public function test_a_photo_is_refused_with_the_gesture_challenge_off(): void
+    {
+        config(['face.liveness.pose_count' => 0]);
+
+        $this->enrol($this->alice, 127);
+
+        $challenge = $this->challenge();
+
+        $this->assertSame([], $challenge['poses'], 'this must be testing the no-gesture path');
+
+        $res = $this->punch([
+            'mode'           => 'face',
+            'action'         => 'in',
+            'nonce'          => $challenge['nonce'],
+            'frames'         => $this->photoFrames(127),
+            // Everything a real punch would carry, so nothing else can be what
+            // does the refusing.
+            'flash'          => $this->flashPayload(127, $challenge),
+            'liveness_score' => 0.97,
+            'liveness_min'   => 0.90,
+        ])->assertStatus(403);
+
+        // Pinned to the reason, not just the status: a 403 for some unrelated
+        // reason would leave this test passing while the photo defence rotted.
+        $this->assertStringContainsString(
+            'not a photo',
+            strtolower($res->json('message') ?? ''),
+            'the frame-variation check should be what refuses this'
+        );
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /**
+     * A VIDEO CALL of the real employee, held up to the kiosk, with gestures off.
+     *
+     * The hardest of the spoofs and the one the gesture challenge was worst
+     * against: a person on a live call can be coached to turn their head, so
+     * removing the gestures cost nothing here. What a call cannot do is beat
+     * the physics the flash reads.
+     *
+     * Everything an attacker controls is set to whatever helps them most:
+     *
+     *   - the frames VARY naturally, because it is a live human being — so
+     *     min_variation, which is what catches a still photograph, is no help
+     *     at all here and this must be refused by something else;
+     *   - the identity is genuinely the enrolled employee, because it is
+     *     really them on the call;
+     *   - the anti-spoof scores claim a live face, as a patched client would.
+     *
+     * The only tells are the two the server measures from the light:
+     *
+     *   - the background tracks the face, because the phone's display IS the
+     *     whole frame and lights both regions equally; and
+     *   - the face never takes the segment's colour, because the recording was
+     *     made before the server chose the sequence.
+     */
+    public function test_a_video_call_on_a_screen_is_refused_with_gestures_off(): void
+    {
+        config(['face.liveness.pose_count' => 0]);
+
+        $this->enrol($this->alice, 128);
+
+        $challenge = $this->challenge();
+
+        $this->assertSame([], $challenge['poses'], 'this must be testing the no-gesture path');
+
+        // A phone screen: face and background carry the same emitted light, and
+        // the colour balance is whatever was recorded rather than what was asked
+        // for a moment ago.
+        $face = [];
+        $bg   = [];
+
+        foreach (['white', 'dark', 'red', 'green', 'blue'] as $seg) {
+            $emitted    = [150.0, 150.0, 150.0];
+            $face[$seg] = $emitted;
+            $bg[$seg]   = $emitted;
+        }
+
+        $res = $this->punch($this->livePayload(128, $challenge, 'in', [
+            'flash' => $this->flashPayload(128, $challenge, ['face' => $face, 'bg' => $bg]),
+            // The client insisting it saw a live person.
+            'liveness_score' => 0.99,
+            'liveness_min'   => 0.98,
+        ]))->assertStatus(403);
+
+        // Refused on the light, not on some incidental malformity.
+        $this->assertStringContainsString(
+            'photo or screen',
+            strtolower($res->json('message') ?? ''),
+            'the illumination checks should be what refuses a replay device'
+        );
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
     /** flash_count = 0 turns the whole check off, poses and all else unchanged. */
     public function test_the_illumination_check_can_be_disabled(): void
     {
@@ -633,6 +814,71 @@ class AttendancePortalTest extends TestCase
         $this->assertEmpty($row->time_in);
     }
 
+    public function test_a_live_face_records_overtime(): void
+    {
+        $this->enrol($this->alice, 215);
+
+        $this->livePunch(215, 'ot')
+            ->assertOk()
+            ->assertJsonPath('action', 'OVERTIME');
+
+        $row = $this->todayFor($this->alice);
+
+        // Its own column, and it must not leak into the ordinary day's times.
+        $this->assertNotEmpty($row->time_over);
+        $this->assertEmpty($row->time_in);
+        $this->assertEmpty($row->time_out);
+    }
+
+    /**
+     * Overtime is ONE column: the start and the end of the stretch both append
+     * to time_over and are told apart by order, so a second OT punch extends
+     * the list rather than writing anywhere else.
+     */
+    public function test_a_second_overtime_punch_appends_to_the_same_column(): void
+    {
+        config(['attendance.cooldown_seconds' => 0]);
+
+        $this->enrol($this->alice, 216);
+
+        $this->livePunch(216, 'ot')->assertOk()->assertJsonPath('recorded', true);
+
+        // Times are stored to the second, and the service drops an exact
+        // duplicate. Without this the two punches land in the same second and
+        // the second one is correctly discarded — which made this test pass or
+        // fail depending on where the wall clock happened to be.
+        $this->travel(2)->seconds();
+
+        $this->livePunch(216, 'ot')->assertOk()->assertJsonPath('recorded', true);
+
+        $row = $this->todayFor($this->alice);
+
+        $this->assertCount(2, explode(',', $row->time_over));
+        $this->assertEmpty($row->time_in);
+        $this->assertEmpty($row->time_out);
+    }
+
+    /**
+     * Overtime is a punch like any other — the new button is not a new door.
+     * A still photograph fails the same frontal-variation check it fails on a
+     * clock-in.
+     */
+    public function test_overtime_still_requires_a_live_face(): void
+    {
+        $this->enrol($this->alice, 217);
+
+        $challenge = $this->challenge();
+
+        $this->punch([
+            'mode'   => 'face',
+            'action' => 'ot',
+            'nonce'  => $challenge['nonce'],
+            'frames' => $this->photoFrames(217),
+        ])->assertStatus(403);
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
     public function test_clocking_out_right_after_clocking_in_is_allowed(): void
     {
         $this->enrol($this->alice, 220);
@@ -704,6 +950,44 @@ class AttendancePortalTest extends TestCase
     public function test_a_garbage_qr_is_refused(): void
     {
         $this->postJson(route('attendanceQrCheck'), ['qr' => 'not-a-real-token'])->assertStatus(404);
+    }
+
+    /**
+     * The badge requirement is POLICY, enforced by the endpoint.
+     *
+     * setUp() pins face.require_qr off so this class can keep exercising the
+     * 1:N code; this test restores the shipped default and proves a badge-less
+     * punch is refused even with a perfect live face. Hiding the "use face
+     * only" button in the kiosk script is presentation — the script is editable
+     * by whoever holds the device, so the rule has to live here.
+     */
+    public function test_face_only_is_refused_when_the_badge_is_required(): void
+    {
+        config(['face.require_qr' => true]);
+
+        $this->enrol($this->alice, 305);
+
+        $this->livePunch(305, 'in')->assertStatus(422);
+
+        $this->assertNull(
+            $this->todayFor($this->alice),
+            'a badge-less punch must not record attendance'
+        );
+    }
+
+    /** With the badge, the same live face goes through. */
+    public function test_the_badge_path_still_works_when_it_is_required(): void
+    {
+        config(['face.require_qr' => true]);
+
+        $this->enrol($this->alice, 306);
+
+        $this->livePunch(306, 'in', [
+            'mode' => 'qr',
+            'qr'   => shortEncrypt($this->alice->emp_ID),
+        ])->assertOk()->assertJsonPath('recorded', true);
+
+        $this->assertNotNull($this->todayFor($this->alice));
     }
 
     public function test_qr_plus_a_live_matching_face_clocks_in(): void

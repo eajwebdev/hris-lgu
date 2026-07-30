@@ -57,8 +57,22 @@
         el.actions.forEach(function (btn) { btn.disabled = disabled; });
     }
 
+    /**
+     * Badge-first kiosk. When set, the punch is always QR -> look at the
+     * camera: the badge names the employee and the face proves it is them,
+     * which is a 1:1 verify rather than a 1:N search across the whole roster.
+     *
+     * This constant only decides what the kiosk OFFERS. The punch endpoint
+     * refuses mode=face on its own authority, so editing this in the browser
+     * buys nothing.
+     */
+    var REQUIRE_QR = CONFIG.requireQr !== false;
+
+    /** Where a fresh attempt begins, and where reset() returns to. */
+    var HOME_MODE = REQUIRE_QR ? 'qr' : 'face';
+
     var state = {
-        mode:    'face',   // face | qr | qrface | result
+        mode:    HOME_MODE,   // face | qr | qrface | result
         action:  'in',
         stream:  null,
         looping: false,
@@ -70,6 +84,30 @@
 
     var scratch    = document.createElement('canvas');
     var scratchCtx = scratch.getContext('2d', { willReadFrequently: true });
+
+    // Size and quality of the frame posted with each flash sample. The server
+    // averages colour over regions rather than recognising anything, so 320px is
+    // ample; a full-resolution frame would multiply the payload for no gain.
+    // Measured at ~3 KB per frame, so a four-segment burst adds ~12 KB.
+    var FLASH_SNAP_W = 320;
+    var FLASH_SNAP_Q = 0.72;
+
+    // Size and quality of the frame posted with each IDENTITY capture, when
+    // server-side punch scoring is on. Larger than the flash snapshots because
+    // the server is recognising a face in these, not averaging colour over a
+    // region: the face has to survive as enough pixels for ArcFace, and
+    // face.scoring.enrolment.min_face_px alone wants 90. At 640 wide a face
+    // filling a fifth of the frame still lands near 130px.
+    //
+    // ~25 KB per frame, so the default five neutral frames plus two gestures
+    // add roughly 175 KB to a punch.
+    var RECOG_SNAP_W = 640;
+    var RECOG_SNAP_Q = 0.82;
+
+    // Whether to attach those frames at all. Off and the server has only the
+    // browser's word for who this is; the flag is server-rendered so the two
+    // sides cannot disagree about it.
+    var SEND_FRAMES = {{ config('face.scoring.enabled') && config('face.scoring.punch.enabled') ? 'true' : 'false' }};
 
     var luma = document.createElement('canvas');
     luma.width = luma.height = 32;
@@ -372,7 +410,7 @@
         drawBox(gate.detection, gate.ok);
         el.guide.classList.toggle('guide--ok', gate.ok);
 
-        setHint(gate.ok ? 'Ready — tap CLOCK IN or CLOCK OUT' : gate.message, gate.ok ? 'ok' : 'bad');
+        setHint(gate.ok ? 'Ready — tap CLOCK IN, CLOCK OUT or OVERTIME' : gate.message, gate.ok ? 'ok' : 'bad');
     }
 
     async function idleQr() {
@@ -461,6 +499,7 @@
                 pose: null,
                 t: Math.round(performance.now() - t0),
                 descriptor: Array.from(frame.descriptor),
+                image: frame.snapshot,
             });
 
             if (typeof frame.real === 'number') reals.push(frame.real);
@@ -490,6 +529,7 @@
                 pose: pose,
                 t: Math.round(performance.now() - t0),
                 descriptor: Array.from(posed.descriptor),
+                image: posed.snapshot,
             });
 
             if (typeof posed.real === 'number') reals.push(posed.real);
@@ -560,11 +600,18 @@
                 showFlash(seg);
                 await sleep(settle);
 
+                // The readings below are a courtesy to older servers and to the
+                // on-screen hints; the snapshot is what the server actually
+                // judges, because it can re-measure it for itself.
+                var snap = snapshotFor(box);
+
                 samples.push({
-                    seg:  seg,
-                    t:    Math.round(performance.now() - t0),
-                    face: sampleRegion(box),
-                    bg:   sampleBackground(box),
+                    seg:   seg,
+                    t:     Math.round(performance.now() - t0),
+                    face:  sampleRegion(box),
+                    bg:    sampleBackground(box),
+                    image: snap ? snap.image : null,
+                    box:   snap ? snap.box : null,
                 });
 
                 // Mid-burst, while a colour is still up: proves the face the
@@ -631,6 +678,12 @@
             var full = (await detectFull())[0];
 
             if (full && poseHolds(full.landmarks, pose, baselinePitch)) {
+                // Taken FIRST, before the two inference passes below, so the
+                // pixels the server judges are the pixels the pose was just
+                // confirmed on. The embed and anti-spoof calls cost tens of
+                // milliseconds each and the head keeps moving through them.
+                full.snapshot = recogSnapshot();
+
                 full.descriptor = await FaceEngine.embed(el.video, full);
                 // Same frame, judged by the anti-spoof model. null when the model
                 // is not loaded, in which case the check simply does not apply.
@@ -689,6 +742,72 @@
      * because a 16x16 average is all the precision this needs and it costs
      * almost nothing to take.
      */
+    /**
+     * The current video frame as a small JPEG, plus the face box translated into
+     * that JPEG's pixel space.
+     *
+     * Sent alongside each flash sample so the SERVER can measure the light
+     * response itself rather than trusting sampleRegion()/sampleBackground()
+     * below — those run here, in a browser an attacker controls, and a tampered
+     * client can simply report whatever readings would pass.
+     *
+     * Downscaled to FLASH_SNAP_W because the server is measuring average colour
+     * over regions, not recognising anything: a 320px frame answers that just as
+     * well as a 1080p one and keeps the payload small enough to post several of.
+     *
+     * The box MUST be scaled by the same factor. Sending video-space coordinates
+     * with a downscaled image would have the server measuring the wrong region —
+     * which fails the face-vs-background test rather than passing it, but fails
+     * it for the wrong reason and for every honest employee too.
+     */
+    function snapshotFor(box) {
+        var v = el.video;
+
+        if (!v.videoWidth || !v.videoHeight) return null;
+
+        var scale = Math.min(1, FLASH_SNAP_W / v.videoWidth);
+        var w = Math.max(1, Math.round(v.videoWidth * scale));
+        var h = Math.max(1, Math.round(v.videoHeight * scale));
+
+        scratch.width = w;
+        scratch.height = h;
+        scratchCtx.drawImage(v, 0, 0, w, h);
+
+        return {
+            image: scratch.toDataURL('image/jpeg', FLASH_SNAP_Q).split(',')[1],
+            box: [
+                Math.max(0, box.x * scale),
+                Math.max(0, box.y * scale),
+                Math.min(w, (box.x + box.width) * scale),
+                Math.min(h, (box.y + box.height) * scale)
+            ]
+        };
+    }
+
+    /**
+     * The current video frame as a JPEG, for the server to recognise from.
+     *
+     * No box travels with it: the server runs its own detector, which is the
+     * point — a box supplied by the client would be one more number to trust.
+     * Returns null when frames are not being sent, so the caller can attach the
+     * result unconditionally.
+     */
+    function recogSnapshot() {
+        var v = el.video;
+
+        if (!SEND_FRAMES || !v.videoWidth || !v.videoHeight) return null;
+
+        var scale = Math.min(1, RECOG_SNAP_W / v.videoWidth);
+        var w = Math.max(1, Math.round(v.videoWidth * scale));
+        var h = Math.max(1, Math.round(v.videoHeight * scale));
+
+        scratch.width = w;
+        scratch.height = h;
+        scratchCtx.drawImage(v, 0, 0, w, h);
+
+        return scratch.toDataURL('image/jpeg', RECOG_SNAP_Q).split(',')[1];
+    }
+
     function sampleRegion(rect) {
         var v = el.video;
         var sx = Math.max(0, Math.round(rect.x));
@@ -909,13 +1028,21 @@
         stopCamera();
         hideCue();
 
+        // Three outcomes now, not two. Overtime gets its own mark and colour so
+        // an employee glancing at the kiosk can tell at once that they recorded
+        // OT rather than an ordinary clock-in — the two are easy to confuse
+        // when the buttons sit next to each other and the punch is this quick.
         var out = body.action === 'CLOCK OUT';
+        var ot  = body.action === 'OVERTIME';
 
         el.result.classList.toggle('result--out', out);
+        el.result.classList.toggle('result--ot', ot);
 
-        document.getElementById('result-mark').innerHTML = out
-            ? '<i class="fas fa-right-from-bracket"></i>'
-            : '<i class="fas fa-check"></i>';
+        document.getElementById('result-mark').innerHTML = ot
+            ? '<i class="fas fa-moon"></i>'
+            : out
+                ? '<i class="fas fa-right-from-bracket"></i>'
+                : '<i class="fas fa-check"></i>';
 
         document.getElementById('result-action').textContent = body.action;
         document.getElementById('result-name').textContent   = body.employee.name;
@@ -938,7 +1065,7 @@
         state.qrToken = null;
         state.busy    = false;
 
-        setMode('face');
+        setMode(HOME_MODE);
     }
 
     // ---------------------------------------------------------------- modes
@@ -960,6 +1087,11 @@
         el.guideBox.classList.toggle('d-none', !qr);
 
         // Icon-only switch pinned over the camera: show what tapping it goes TO.
+        // Hidden outright when the badge is mandatory — there is no face-only
+        // path to offer, and a button that refuses to do anything is worse than
+        // no button.
+        el.modeBtn.classList.toggle('d-none', REQUIRE_QR);
+
         var toQr = !(qr || mode === 'qrface');
         el.modeIcon.className = toQr ? 'fas fa-qrcode' : 'fas fa-user';
         el.modeBtn.title = toQr ? 'Scan QR instead' : 'Use face only instead';
@@ -1132,6 +1264,10 @@
     el.modeBtn.addEventListener('click', function () {
         if (state.busy) return;
 
+        // Nothing to switch to when the badge is mandatory — the button is
+        // hidden in setMode(), and this is the belt to that braces.
+        if (REQUIRE_QR) return;
+
         setMode(state.mode === 'face' ? 'qr' : 'face');
     });
 
@@ -1142,7 +1278,11 @@
             state.looping = false;
             stopCamera();
         } else if (el.result.classList.contains('d-none')) {
-            setMode(state.mode === 'qrface' ? 'face' : state.mode);
+            // A half-finished badge scan does not survive the kiosk being
+            // backgrounded: setMode() drops the token for any mode but
+            // 'qrface', so coming back sends the employee to rescan rather
+            // than punching against a token from who-knows-when.
+            setMode(state.mode === 'qrface' ? HOME_MODE : state.mode);
         }
     });
 
@@ -1823,7 +1963,7 @@
         });
 
         try {
-            await setMode('face');
+            await setMode(HOME_MODE);
         } catch (e) {
             console.error(e);
         }

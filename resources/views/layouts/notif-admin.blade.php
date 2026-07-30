@@ -1,5 +1,8 @@
 <!-- Job Application Notifications -->
-@if(auth()->user()->username === 'hrisadmin@cpsu.edu.ph') 
+{{-- Was pinned to a single carried-over username that does not exist here, so
+     no administrator ever saw these. Any Administrator / HR Administrator —
+     the same people the recruitment routes admit — sees them now. --}}
+@if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
 <li class="nav-item dropdown">
     <a class="nav-link" href="#" data-toggle="dropdown" title="Job Applications">
         <i class="fas fa-envelope text-success1"></i>

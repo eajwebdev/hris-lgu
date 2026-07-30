@@ -1,5 +1,18 @@
 <!-- Job Application Notifications -->
-@if(in_array(auth()->guard('employee')->user()->org_email, ['cbaligyan@cpsu.edu.ph','janetoledo@cpsu.edu.ph','wbantigue@cpsu.edu.ph']))
+{{-- Who sees job-application alerts.
+
+     This was a hardcoded list of three personal addresses carried over from the
+     previous deployment; none of them exist here, so the bell never appeared
+     for anyone. It now asks a question the data can answer: the HR head named
+     in Settings, and anyone sitting on the Personnel Selection Board. --}}
+@php
+    $notifEmployeeId = auth()->guard('employee')->id();
+    $seesApplications = $notifEmployeeId && (
+        (int) optional(\App\Models\Setting::first())->hr === (int) $notifEmployeeId
+        || \App\Models\PsbMember::active()->where('employee_id', $notifEmployeeId)->exists()
+    );
+@endphp
+@if($seesApplications)
 <li class="nav-item dropdown">
     <a class="nav-link" href="#" data-toggle="dropdown" title="Job Applications">
         <i class="fas fa-envelope text-success1"></i>

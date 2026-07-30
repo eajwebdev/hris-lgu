@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>CPSU | HRIS</title>
+        <title>LGU Mabinay | HRIS</title>
         <!-- Google Font: Source Sans Pro -->
         <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
         <!-- Font Awesome -->
@@ -15,7 +15,7 @@
         <!-- Theme style -->
         <link rel="stylesheet" href="{{ asset('template/dist/css/adminlte.css') }}">
         <!-- Logo  -->
-        <link rel="shortcut icon" type="" href="{{ asset('template/img/CPSU_L.png') }}">
+        <link rel="shortcut icon" type="" href="{{ asset('Uploads/logo.png') }}">
 
         <style>
             body {
@@ -110,7 +110,7 @@
                     </a>                    
                 </div>
                 <div class="col-md-4 col-sm-6 mb-4" id="payroll">
-                    <a href="http://localhost/cpsupms/public/">
+                    <a href="#">
                         <div class="position-relative" style="min-height: 180px;">
                             <img src="{{ asset('template/img/payroll.jpg') }}" alt="Payroll" class="img-fluid" style="border-radius: 10px;">
                             <div class="ribbon-wrapper ribbon-xl">

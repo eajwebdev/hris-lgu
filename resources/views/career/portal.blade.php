@@ -176,6 +176,23 @@
             font: 500 .88rem 'Inter', sans-serif; padding: 10px 12px; outline: none; background: #fff;
         }
         .f input:focus, .f select:focus, .f textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(24,119,68,.13); }
+        /* Internal / external applicant choice */
+        .radio-row { display: flex; flex-wrap: wrap; gap: 10px; }
+        .radio-opt {
+            display: flex; align-items: center; gap: 8px;
+            flex: 1 1 260px; min-width: 0; margin: 0;
+            padding: 11px 13px; cursor: pointer;
+            border: 1px solid #d9dfe4; border-radius: 10px; background: #fff;
+            font-weight: 500; transition: border-color .15s, background .15s, box-shadow .15s;
+        }
+        .radio-opt:hover { border-color: var(--green); background: #f6fbf8; }
+        .radio-opt input { accent-color: var(--green); width: 16px; height: 16px; flex: 0 0 auto; }
+        .radio-opt:has(input:checked) {
+            border-color: var(--green); background: #f0f8f3;
+            box-shadow: 0 0 0 3px rgba(30,122,69,.12);
+        }
+        .hint { display: block; margin-top: 5px; font-size: .76rem; color: #6b7a86; line-height: 1.45; }
+
         .f-section { margin: 22px 0 10px; display: flex; align-items: center; gap: 10px; }
         .f-section h4 { font-size: .82rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--green); }
         .f-section::after { content: ''; flex: 1; height: 1px; background: var(--line); }
@@ -367,6 +384,41 @@
 
                 <form id="applyForm" novalidate>
                     <input type="hidden" name="jid" id="ap-jid">
+
+                    {{-- Employment status with the LGU.
+
+                         The Comparative Assessment the selection board signs asks for each
+                         candidate's present position, salary grade and status, and gives a
+                         performance rating 35 of its 100 points. Those apply only to someone
+                         already in the service. Rather than ask an applicant to type facts
+                         about their own appointment, an internal applicant gives their
+                         Employee ID and HR reads the rest from the 201 file. --}}
+                    <div class="f-section"><h4>Employment status</h4></div>
+                    <div class="f-grid">
+                        <div class="f" style="grid-column:1/-1;">
+                            <label>Are you currently employed at LGU Mabinay? *</label>
+                            <div class="radio-row">
+                                <label class="radio-opt">
+                                    <input type="radio" name="is_internal" value="0" checked
+                                           onchange="document.getElementById('internal-fields').hidden = true">
+                                    <span>No &mdash; I am applying from outside the LGU</span>
+                                </label>
+                                <label class="radio-opt">
+                                    <input type="radio" name="is_internal" value="1"
+                                           onchange="document.getElementById('internal-fields').hidden = false">
+                                    <span>Yes &mdash; I am a current employee</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="f-grid" id="internal-fields" hidden>
+                        <div class="f">
+                            <label>Employee ID number *</label>
+                            <input name="emp_ID" placeholder="e.g. 1051-02" autocomplete="off">
+                            <small class="hint">As printed on your employee card. Your present position,
+                                salary grade and appointment status are taken from your 201 file.</small>
+                        </div>
+                    </div>
 
                     <div class="f-section"><h4>Personal information</h4></div>
                     <div class="f-grid">

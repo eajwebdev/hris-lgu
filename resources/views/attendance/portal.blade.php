@@ -50,7 +50,11 @@
         html, body {
             margin: 0;
             padding: 0;
-            height: 100%;
+            /* min-height, not height: the column is normally exactly one screen
+               tall, but on a short handset the stage's floor can push it past
+               that and a fixed height would clip the action buttons off the
+               bottom rather than letting the page scroll to them. */
+            min-height: 100%;
             background: var(--ink);
             color: var(--text);
             font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -62,8 +66,8 @@
         .portal {
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            height: 100dvh; /* newer engines; the vh line above is the fallback */
+            min-height: 100vh;
+            min-height: 100dvh; /* newer engines; the vh line above is the fallback */
             max-width: 560px;
             margin: 0 auto;
             position: relative;
@@ -94,7 +98,12 @@
             border-radius: 22px;
             overflow: hidden;
             background: #000;
-            min-height: 0; /* lets the flex child actually shrink on short screens */
+            /* A floor, not 0. The readout below used to be painted ON the video
+               and so cost it nothing; now that it takes its own space the stage
+               is the flex child that pays, and on a short screen it would
+               otherwise shrink until the employee cannot see their own framing.
+               Below this the column scrolls instead — see .portal. */
+            min-height: 240px;
         }
         .stage video {
             width: 100%;
@@ -195,7 +204,11 @@
             position: absolute;
             top: 14px;
             left: 14px;
-            right: 14px;
+            /* Stops short of the top-right corner so it never runs underneath
+               the round icon button parked there — whichever one that is: the
+               camera switch normally, or the map button when the switch is
+               hidden because the badge is mandatory. */
+            right: 68px;
             z-index: 4;
             display: flex;
             align-items: center;
@@ -267,9 +280,13 @@
             padding: 12px 16px calc(env(safe-area-inset-bottom) + 14px);
         }
 
-        /* Two big action buttons. Each tap captures the face and writes the punch
-           directly — there is no separate "confirm" step. In is green, out amber,
-           so the choice reads at a glance across a room. */
+        /* The action buttons. Each tap captures the face and writes the punch
+           directly — there is no separate "confirm" step. In is green, out amber
+           and overtime purple, so the choice reads at a glance across a room.
+           IN and OUT share the full-size top row; OVERTIME spans both columns
+           beneath them, which keeps the two daily actions large and lets the
+           occasional one stay legible instead of squeezing all three into
+           thirds of a phone-width screen. */
         .actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -295,6 +312,20 @@
         .action i { font-size: 20px; }
         .action--in  { background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%); }
         .action--out { background: linear-gradient(135deg, #F59E0B 0%, #B45309 100%); color: #1a1200; }
+        /* Overtime spans both columns on its own row — the two daily actions
+           keep the full-size top row, and OT reads as the secondary choice
+           without being hidden. Purple matches the 'OT' punch pill on the
+           employee dashboard, so the same action is the same colour in both
+           places. */
+        .action--ot  {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #7C5CD6 0%, #4C3193 100%);
+            flex-direction: row;
+            gap: 10px;
+            padding: 14px 12px;
+            font-size: 14px;
+        }
+        .action--ot i { font-size: 17px; }
         .action:active:not(:disabled) { transform: scale(.97); }
         .action:disabled { opacity: .40; cursor: not-allowed; }
 
@@ -323,6 +354,12 @@
         /* Nearest-station map — a second round icon button tucked directly under
            the camera switch. Opens the animated station map so the employee can
            see which site is closest and which way to walk to be in range. */
+        /* Sits under the camera switch — unless that switch is hidden (badge
+           mandatory, so there is no face-only mode to offer), in which case it
+           takes the vacated top slot instead of floating below an empty gap.
+           A sibling rule rather than a JS class: .camswap is rendered with
+           d-none server-side and toggled by setMode(), and this follows either
+           way without the two having to be kept in step. */
         .mapbtn {
             position: absolute;
             top: 68px;   /* camswap top (14) + its height (44) + a 10px gap */
@@ -354,6 +391,7 @@
             100% { transform: scale(1.35); opacity: 0; }
         }
         .mapbtn:active:not(:disabled) { transform: scale(.94); }
+        .camswap.d-none ~ .mapbtn { top: 14px; }
 
         /* When the capture cue banner is up it owns the top strip; the switches
            step aside rather than sitting on the text. */
@@ -517,21 +555,14 @@
            nearest station, and the raw fix. Courtesy display only — the server
            re-derives all of it at punch time from the same station table. */
         .geohud {
-            position: absolute;
-            left: 12px;
-            right: 12px;
-            bottom: 12px;
-            z-index: 3;
             display: flex;
             flex-direction: column;
-            gap: 5px;
-            padding: 9px 12px;
+            gap: 3px;
+            padding: 8px 12px;
             border-radius: 12px;
-            background: rgba(11, 18, 32, .72);
+            background: var(--ink-soft);
             border: 1px solid var(--line);
-            backdrop-filter: blur(8px);
             font-size: 12px;
-            pointer-events: none;
         }
         .geohud__row {
             display: flex;
@@ -545,40 +576,46 @@
             color: #FDE68A;
             display: none;
         }
+        /* Diagnostic, not information the employee acts on — it exists so HR has
+           the raw fix when a punch is disputed. Demoted accordingly: it used to
+           be set at the same weight as the employee's own name. */
         .geohud__coords {
-            font-size: 10px;
+            font-size: 9.5px;
             color: var(--muted);
             font-variant-numeric: tabular-nums;
-            letter-spacing: .03em;
+            letter-spacing: .02em;
+            opacity: .75;
         }
         .geohud--ok  .geohud__row { color: #86EFAC; }
         .geohud--far .geohud__row { color: #FCD34D; }
         .geohud--far .geohud__note { display: block; }
 
-        /* The QR name card and the HUD share the bottom edge; when the card is
-           visible the HUD steps up so both stay readable. */
-        .named:not(.d-none) ~ .geohud { bottom: 84px; }
-
         /* ---------------------------------------------------------------- name card */
 
+        /* Name card + location, in normal flow UNDER the camera.
+           Previously absolutely positioned inside the stage, where on a phone
+           they covered the subject's own face. flex:0 0 auto so they take only
+           what they need and the video keeps the rest. */
+        .readout {
+            flex: 0 0 auto;
+            margin: 10px 16px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         .named {
-            position: absolute;
-            left: 16px;
-            right: 16px;
-            bottom: 16px;
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 12px 14px;
-            border-radius: 16px;
-            background: rgba(11, 18, 32, .88);
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: var(--ink-soft);
             border: 1px solid var(--line);
-            backdrop-filter: blur(8px);
-            z-index: 4;
         }
         .avatar {
-            width: 42px;
-            height: 42px;
+            width: 38px;
+            height: 38px;
             flex: 0 0 auto;
             border-radius: 12px;
             display: grid;
@@ -617,12 +654,14 @@
             animation: pop .35s cubic-bezier(.2, 1.4, .4, 1);
         }
         .result--out .result__mark { background: rgba(239, 144, 23, .14); color: var(--amber); }
+        .result--ot  .result__mark { background: rgba(124, 92, 214, .16); color: #A78BFA; }
         @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
         .result__name   { font-size: 21px; font-weight: 800; }
         .result__pos    { font-size: 12.5px; color: var(--muted); margin-top: -8px; }
         .result__action { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: var(--ok); }
         .result--out .result__action { color: var(--amber); }
+        .result--ot  .result__action { color: #A78BFA; }
         .result__time   { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
         .result__date   { font-size: 12px; color: var(--muted); margin-top: -10px; }
         .result__note   { font-size: 12px; color: var(--muted); margin-top: 6px; }
@@ -682,6 +721,14 @@
 </head>
 <body>
 
+@php
+    // Badge-first kiosk. Read once here so the markup below can render the
+    // face-only switch already hidden rather than letting setMode() blink it
+    // away on first paint. The punch endpoint enforces the same rule itself —
+    // this only decides what the kiosk shows.
+    $requireQr = (bool) config('face.require_qr', true);
+@endphp
+
 <div class="portal">
 
     <header class="top">
@@ -717,8 +764,59 @@
             </div>
         </div>
 
-        {{-- Shown after a QR scan resolves, so the person sees their name before
-             the face step rather than after it. --}}
+        {{-- The capture prompt. Guidance only — the server decides what actually
+             happened, by measuring the submitted frames itself. --}}
+        <div class="cue d-none" id="cue">
+            <i class="fas fa-user" id="cue-icon"></i>
+            <span id="cue-text">Look straight at the camera</span>
+        </div>
+
+        {{-- Face/QR switch (also flips to the rear camera for QR). Pinned over
+             the live view's top-right corner rather than in the control bar.
+             HIDDEN when face.require_qr is on — there is no face-only mode to
+             switch to. Rendered hidden server-side rather than only by setMode()
+             so it never flashes into view on the first paint, and .mapbtn slides
+             up into the vacated slot (see the .camswap.d-none rule in the CSS). --}}
+        <button type="button" class="camswap{{ $requireQr ? ' d-none' : '' }}" id="mode-toggle" title="Scan QR instead" aria-label="Switch camera mode">
+            <i class="fas fa-qrcode" id="mode-toggle-icon"></i>
+        </button>
+
+        {{-- Nearest-station map. Sits under the camera switch, or in its place
+             when the switch is hidden; opens the animated map so the employee
+             can see the closest site and how far they are. --}}
+        <button type="button" class="mapbtn" id="map-toggle" title="Nearest station map" aria-label="Show nearest station map">
+            <i class="fas fa-map-location-dot"></i>
+        </button>
+
+        {{-- Everything that lives along the bottom of the live view, in ONE
+             stack rather than several things each absolutely positioned to the
+             same corner. The name card and the location HUD were both pinned to
+             the bottom and overlapped whenever a badge had been scanned — which,
+             now that the badge is mandatory, is every single punch. A flex
+             column keeps them clear of each other without anyone having to know
+             how tall the other one is, and collapses cleanly when the name card
+             is hidden. --}}
+        <div class="veil" id="veil">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <div id="veil-text">Starting camera…</div>
+        </div>
+    </main>
+
+    {{-- The name card and the location readout, BELOW the camera rather than
+         floating on top of it.
+
+         They used to be absolutely positioned inside the stage, which meant
+         that on a phone — where the video is portrait and the face fills it —
+         they sat squarely over the subject's mouth and chin. An employee could
+         not see whether they were framed properly because the thing telling
+         them who they were was in the way. Nothing overlaps the video now
+         except the fixed aiming oval and the map button in the corner.
+
+         Cost is vertical space, paid for by letting the stage shrink (it is the
+         flex:1 child, so it gives up exactly this much and no more). --}}
+    <div class="readout">
+        {{-- Shown after a QR scan resolves, so the person sees their name
+             before the face step rather than after it. --}}
         <div class="named d-none" id="named">
             <div class="avatar" id="named-initials">--</div>
             <div>
@@ -727,29 +825,12 @@
             </div>
         </div>
 
-        {{-- The head-turn prompt. Guidance only — the server decides whether the
-             turn actually happened, by comparing the frame against the employee's
-             enrolled left/right captures. --}}
-        <div class="cue d-none" id="cue">
-            <i class="fas fa-user" id="cue-icon"></i>
-            <span id="cue-text">Look straight at the camera</span>
-        </div>
-
-        {{-- Face/QR switch (also flips to the rear camera for QR). Pinned over
-             the live view's top-right corner rather than in the control bar. --}}
-        <button type="button" class="camswap" id="mode-toggle" title="Scan QR instead" aria-label="Switch camera mode">
-            <i class="fas fa-qrcode" id="mode-toggle-icon"></i>
-        </button>
-
-        {{-- Nearest-station map. Sits under the camera switch; opens the animated
-             map so the employee can see the closest site and how far they are. --}}
-        <button type="button" class="mapbtn" id="map-toggle" title="Nearest station map" aria-label="Show nearest station map">
-            <i class="fas fa-map-location-dot"></i>
-        </button>
-
-        {{-- Live location: distance to the nearest station + the raw fix. The
-             note line is written by updateGeoHud(), which knows whether the
-             perimeter is being enforced — do not hardcode a policy here. --}}
+        {{-- Live location. The note line is written by updateGeoHud(), which
+             knows whether the perimeter is being enforced — do not hardcode a
+             policy here. The raw fix is kept (it is what HR is given when a
+             punch is disputed) but demoted to the smallest thing on screen:
+             it is diagnostic, and it was previously as prominent as the
+             employee's own name. --}}
         <div class="geohud" id="geohud">
             <div class="geohud__row">
                 <i class="fas fa-location-dot"></i>
@@ -758,12 +839,7 @@
             <div class="geohud__note" id="geo-note"></div>
             <div class="geohud__coords" id="geo-coords">Lat —, Lng —</div>
         </div>
-
-        <div class="veil" id="veil">
-            <i class="fas fa-spinner fa-spin fa-2x"></i>
-            <div id="veil-text">Starting camera…</div>
-        </div>
-    </main>
+    </div>
 
     {{-- Nearest-station map. A self-contained animated canvas (no tiles, no CDN —
          it must work on the LGU LAN with no internet): stations are blinking
@@ -821,6 +897,16 @@
                 <i class="fas fa-right-from-bracket"></i>
                 <span>CLOCK OUT</span>
             </button>
+            {{-- Overtime is one column in the DTR: both the start and the end of
+                 an OT stretch append to time_over and are told apart by order,
+                 so there is one button here rather than an OT IN / OT OUT pair.
+                 Full width on its own row because it is the occasional action —
+                 three equal columns would shrink the two daily ones and cramp
+                 their labels on a phone-sized kiosk. --}}
+            <button type="button" class="action action--ot" data-action="ot">
+                <i class="fas fa-moon"></i>
+                <span>OVERTIME</span>
+            </button>
         </div>
     </div>
 
@@ -856,6 +942,10 @@
         ],
         'resetAfter' => (int) config('attendance.portal.reset_after', 5),
         'thresholds' => config('face.client'),
+        // Badge-first. Drives the kiosk's starting mode and hides the "use face
+        // only" switch; the punch endpoint enforces the same rule again, which
+        // is the half that actually counts.
+        'requireQr'  => (bool) config('face.require_qr', true),
         // For the live distance HUD only — the authoritative distance/range
         // judgement is re-derived server-side at punch time.
         'stations'   => $stations,
