@@ -295,16 +295,24 @@ class MasterController extends Controller
                 ->get();
 
             $recentDtrs = $filteredDtrs;
-            $isRegularEmployee = (int) $employee->emp_status === 1;
+            // Casual employees file leave too — see config/leave.php.
+            //
+            // Renamed from $isRegularEmployee, which was a bare
+            // `emp_status === 1`. The old name is why this was wrong: it asked
+            // "is this person permanent" when the thing being decided was "may
+            // this person file leave", and those are not the same question. A
+            // casual employee got no leave count, no recent applications and a
+            // dead Quick Action tile.
+            $canFileLeave = $employee->isLeaveEligible();
 
-            $leaveApplications = $isRegularEmployee
+            $leaveApplications = $canFileLeave
                 ? LeaveApplication::where('empid', $employee->emp_ID)
                     ->orderBy('created_at', 'desc')
                     ->take(5)
                     ->get()
                 : collect();
 
-            $leaveCount = $isRegularEmployee
+            $leaveCount = $canFileLeave
                 ? LeaveApplication::where('empid', $employee->emp_ID)->count()
                 : 0;
             $serviceYears = $employee->date_hired
@@ -391,7 +399,7 @@ class MasterController extends Controller
                 'leaveApplications',
                 'leaveCount',
                 'serviceYears',
-                'isRegularEmployee'
+                'canFileLeave'
             ));
         }
     }

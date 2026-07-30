@@ -131,7 +131,6 @@ class ForcePasswordChangeTest extends TestCase
         $this->signIn($this->default);
 
         $this->post(route('password.change.update'), [
-            'current_password'      => $this->default,
             'password'              => 'BrandNewPass1',
             'password_confirmation' => 'BrandNewPass1',
         ])->assertRedirect(route('dashboard'));
@@ -153,7 +152,6 @@ class ForcePasswordChangeTest extends TestCase
         $this->signIn($this->default);
 
         $this->post(route('password.change.update'), [
-            'current_password'      => $this->default,
             'password'              => $this->default,
             'password_confirmation' => $this->default,
         ])->assertSessionHasErrors('password');
@@ -162,7 +160,35 @@ class ForcePasswordChangeTest extends TestCase
         $this->assertTrue(Hash::check($this->default, $this->employee->password));
     }
 
-    public function test_the_current_password_must_be_right(): void
+    /**
+     * The current password is no longer asked for, and sending one anyway must
+     * not change the outcome.
+     *
+     * This asserted the opposite until the field was dropped from the screen.
+     * For the case this flow exists to serve it proved nothing: the account is
+     * still on the password HR issued, and every account is issued the same
+     * one. Retyping a shared secret demonstrated no knowledge an attacker
+     * lacked, while costing every employee a field to mistype on a phone.
+     *
+     * A stray value is simply ignored rather than rejected, so a cached form or
+     * a password manager filling the old field cannot lock anyone out.
+     */
+    public function test_the_current_password_is_no_longer_required(): void
+    {
+        $this->setPassword($this->default);
+        $this->signIn($this->default);
+
+        // Omitted entirely.
+        $this->post(route('password.change.update'), [
+            'password'              => 'BrandNewPass1',
+            'password_confirmation' => 'BrandNewPass1',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->employee->refresh();
+        $this->assertTrue(Hash::check('BrandNewPass1', $this->employee->password));
+    }
+
+    public function test_a_stray_current_password_value_is_ignored(): void
     {
         $this->setPassword($this->default);
         $this->signIn($this->default);
@@ -171,10 +197,10 @@ class ForcePasswordChangeTest extends TestCase
             'current_password'      => 'not-my-password',
             'password'              => 'BrandNewPass1',
             'password_confirmation' => 'BrandNewPass1',
-        ])->assertSessionHasErrors('current_password');
+        ])->assertRedirect(route('dashboard'));
 
         $this->employee->refresh();
-        $this->assertTrue(Hash::check($this->default, $this->employee->password));
+        $this->assertTrue(Hash::check('BrandNewPass1', $this->employee->password));
     }
 
     public function test_the_two_new_passwords_must_match(): void
@@ -183,7 +209,6 @@ class ForcePasswordChangeTest extends TestCase
         $this->signIn($this->default);
 
         $this->post(route('password.change.update'), [
-            'current_password'      => $this->default,
             'password'              => 'BrandNewPass1',
             'password_confirmation' => 'DifferentPass1',
         ])->assertSessionHasErrors('password');
@@ -195,7 +220,6 @@ class ForcePasswordChangeTest extends TestCase
         $this->signIn($this->default);
 
         $this->post(route('password.change.update'), [
-            'current_password'      => $this->default,
             'password'              => 'ab1',
             'password_confirmation' => 'ab1',
         ])->assertSessionHasErrors('password');

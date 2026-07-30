@@ -77,7 +77,12 @@
                     <p>Leave</p>
                 </a>
             </li>
-        @elseif(auth()->guard($guard)->user()->emp_status == 1)
+        {{-- Casual employees file leave too, so this is no longer
+             `emp_status == 1`. The eligible statuses live in config/leave.php;
+             isLeaveEligible() is the same check the dashboard panel and HR's
+             employee pickers use, so the nav link can never again disagree with
+             what the rest of the app will let the person do. --}}
+        @elseif(auth()->guard($guard)->user()->isLeaveEligible())
             <li class="nav-item">
                 <a href="{{ route('leavesReadEmp') }}" title="Leave"
                    class="nav-link {{ request()->is('leave') || request()->is('leave/*') ? 'active' : '' }}">

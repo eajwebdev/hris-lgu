@@ -231,7 +231,7 @@
 
     <section class="content">
         <div class="row">
-            @if($isRegularEmployee)
+            @if($canFileLeave)
             <div class="col-lg-3 col-md-6 mb-3">
                 <div class="metric-card p-3">
                     <div class="d-flex justify-content-between">
@@ -359,7 +359,7 @@
                         <span>Face Registration</span>
                         <i class="quick-action-status fas {{ $faceRegistered ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }}"></i>
                     </a>
-                    @if($isRegularEmployee)
+                    @if($canFileLeave)
                         <a class="quick-action mb-2" href="{{ route('leavesReadEmp') }}">
                             <i class="fas fa-calendar-plus"></i>
                             <span>File or Check Leave</span>

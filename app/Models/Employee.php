@@ -66,6 +66,36 @@ class Employee extends Authenticatable
     }
 
     /**
+     * May this employee file leave?
+     *
+     * Permanent and Casual today; see config/leave.php for which employment
+     * statuses qualify and why Job Order is not among them.
+     */
+    public function isLeaveEligible(): bool
+    {
+        return in_array(
+            (int) $this->emp_status,
+            array_map('intval', (array) config('leave.eligible_statuses', [1])),
+            true
+        );
+    }
+
+    /**
+     * Restrict a query to employees who may file leave.
+     *
+     * Used for HR's employee pickers on the leave pages — a Casual employee was
+     * previously absent from those lists entirely, so HR could not open their
+     * leave record even to look at it.
+     */
+    public function scopeLeaveEligible($query)
+    {
+        return $query->whereIn(
+            'emp_status',
+            array_map('intval', (array) config('leave.eligible_statuses', [1]))
+        );
+    }
+
+    /**
      * Registration metadata for the profile panel — never the vectors themselves.
      */
     public function faceSummary(): array

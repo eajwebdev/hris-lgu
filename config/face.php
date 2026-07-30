@@ -330,13 +330,18 @@ return [
         // raises anything lower so the seeded white/dark/colour trio still
         // fits), so all three properties are still tested every attempt — this
         // only drops the one extra random segment and the ~600ms it cost.
-        // Back to 4. It was cut to 3 to save ~600ms when the employee also had
-        // two gestures to perform; with the gestures gone the whole punch is
-        // shorter than it has ever been, and the extra segment is the cheapest
-        // anti-spoof available — one more colour the recording has to have
-        // predicted. All three properties are tested at 3; the 4th widens the
-        // chroma sample.
-        'flash_count' => 4,
+        // 3, which is the floor for a nonzero count — issueFlash() seeds
+        // white + dark + one colour and raises anything lower, so all three
+        // flash properties (brightness, face-vs-background, chroma) are still
+        // tested on every attempt. The 4th segment only widened the chroma
+        // sample.
+        //
+        // Traded away to pay for the flash_settle_ms safety correction below.
+        // 320ms per segment sat inside the photosensitive-epilepsy risk band,
+        // so segments had to get LONGER; dropping one keeps the burst from
+        // getting slower in the process. 3 x 400 = 1200ms against the previous
+        // 4 x 320 = 1280ms — safe and marginally quicker.
+        'flash_count' => 3,
 
         // Segments the sequence is drawn from. 'white'/'dark' carry the
         // brightness and differential checks; the colours carry the chroma
@@ -403,11 +408,26 @@ return [
         //
         // ALSO A SAFETY FLOOR, not only a timing one. Full-screen flashing
         // between roughly 3 Hz and 30 Hz can provoke seizures in people with
-        // photosensitive epilepsy. At 320ms per segment the screen changes at
-        // about 2.5 Hz — deliberately under that band. Do not lower this below
-        // ~340ms without re-checking that arithmetic; the security value of a
-        // faster sequence is not worth the risk.
-        'flash_settle_ms' => 320,
+        // photosensitive epilepsy.
+        //
+        // CORRECTED 320 -> 400. The note here used to claim 320ms was "about
+        // 2.5 Hz — deliberately under that band". It is not: 1 / 0.320 =
+        // 3.125 Hz, which is INSIDE the band, and the same note went on to say
+        // never to go below ~340ms while the value itself sat at 320. The
+        // 2.5 Hz figure describes 400ms, so the comment appears to have been
+        // written for 400 and the value drifted below it later.
+        //
+        // The arithmetic, so the next person can check it in one line:
+        //
+        //     320ms -> 3.13 Hz   inside the 3-30 Hz risk band   UNSAFE
+        //     340ms -> 2.94 Hz   just outside, no margin
+        //     400ms -> 2.50 Hz   outside with margin            <- here
+        //
+        // Do not lower this below 400ms. The cost of the correction was paid
+        // for by dropping flash_count from 4 back to 3 (see above), so the
+        // burst is fractionally SHORTER than it was while now being safe:
+        // 3 x 400 = 1200ms against the old 4 x 320 = 1280ms.
+        'flash_settle_ms' => 400,
     ],
 
     /*

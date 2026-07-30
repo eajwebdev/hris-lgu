@@ -115,9 +115,45 @@
                             </div>
                         </div>
 
+                        {{-- Password. There was no field here at all, which is why
+                             a user created on this page could never sign in: the
+                             controller hashed request('password') and then left it
+                             out of the insert, so the account was stored with none.
+
+                             On EDIT it is optional — leaving it blank keeps the
+                             existing password, so an admin fixing a typo in
+                             somebody's surname does not have to reissue their
+                             credentials to do it. --}}
+                        <div class="form-group">
+                            <div class="form-row">
+                                <div class="col-md-12">
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">
+                                                <i class="fas fa-lock"></i>
+                                            </span>
+                                        </div>
+                                        <input type="password" name="password" id="userPassword"
+                                               placeholder="{{ $current_route == 'uEdit' ? 'Leave blank to keep current password' : 'Enter Password (min 8 characters)' }}"
+                                               class="form-control form-control-sm" autocomplete="new-password"
+                                               {{ $current_route == 'uEdit' ? '' : 'required' }}>
+                                        <div class="input-group-append">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleUserPassword"
+                                                    tabindex="-1" aria-label="Show password">
+                                                <i class="fas fa-eye" id="toggleUserPasswordIcon"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    @error('password')
+                                        <span style="color: #FF0000; font-size: 10pt;" class="form-text text-left">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                            </div>
+                        </div>
+
                         @php
                             $accessArray = isset($uEdit) ? explode(',', $uEdit->access) : [];
-                        @endphp    
+                        @endphp
 
                         <div class="form-group">
                             <div class="form-row">
@@ -248,4 +284,31 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Reveal toggle for the password field. An admin typing a password FOR
+    // someone else cannot rely on muscle memory to catch a typo, and the person
+    // it is issued to has no way to discover the mistake except by failing to
+    // sign in — so being able to read it back before saving matters more here
+    // than on a normal login form.
+    (function () {
+        var field = document.getElementById('userPassword');
+        var btn   = document.getElementById('toggleUserPassword');
+        var icon  = document.getElementById('toggleUserPasswordIcon');
+
+        if (!field || !btn) return;
+
+        btn.addEventListener('click', function () {
+            var shown = field.type === 'text';
+
+            field.type = shown ? 'password' : 'text';
+            btn.setAttribute('aria-label', shown ? 'Show password' : 'Hide password');
+
+            if (icon) {
+                icon.classList.toggle('fa-eye', shown);
+                icon.classList.toggle('fa-eye-slash', !shown);
+            }
+        });
+    })();
+</script>
 @endsection

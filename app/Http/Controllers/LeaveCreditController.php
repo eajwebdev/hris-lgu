@@ -20,7 +20,7 @@ class LeaveCreditController extends Controller
     }  
 
     public function leavesRead($id = null){
-        $emplalls = Employee::where('emp_status', 1)->get();
+        $emplalls = Employee::leaveEligible()->get();
         $guard = $this->getGuard();
         $empid = ($id) ? $id : auth()->guard($guard)->user()->id;
 

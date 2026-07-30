@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use App\Models\User;
 
 class UserController extends Controller
@@ -34,18 +35,24 @@ class UserController extends Controller
             'fname' => 'required',
             'mname' => 'required',
             'username' => 'required|unique:users',
+            // Was not validated at all, and — worse — was hashed into a local
+            // variable that never reached the insert below. A user created here
+            // was stored with no password and could not sign in.
+            // No 'confirmed' rule and no second field: an administrator is
+            // typing this FOR somebody else, so retyping it proves nothing they
+            // could not check by tapping the reveal button next to it, and a
+            // confirm box would only double the typing on every account.
+            'password' => ['required', Password::min(8)->letters()->numbers()],
             'role' => 'required',
             'gender' => 'required',
             'access' => 'array',
             'access.*' => 'in:0,1',
         ]);
-    
+
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
-    
-        $password = Hash::make($request->input('password'));
-    
+
         $userData = [
             'fname' => $request->input('fname'),
             'mname' => $request->input('mname'),
@@ -53,6 +60,10 @@ class UserController extends Controller
             'username' => $request->input('username'),
             'role' => $request->input('role'),
             'gender' => $request->input('gender'),
+            // Hashed explicitly: unlike Employee, the User model has no
+            // 'creating' hook and no 'hashed' cast, so a plain string assigned
+            // here would be written to the column verbatim.
+            'password' => Hash::make($request->input('password')),
         ];
     
         $accessPermissions = array_fill(0, 8, '0');
@@ -93,23 +104,26 @@ class UserController extends Controller
             'fname' => 'required',
             'mname' => 'required',
             'username' => 'required',
-            'password' => 'nullable',
+            // Optional on edit — blank means "leave the password alone" — but
+            // anything actually typed has to clear the same bar as a new
+            // account's. 'nullable' alone accepted a one-character password.
+            'password' => ['nullable', Password::min(8)->letters()->numbers()],
             'role' => 'required',
             'gender' => 'required',
             'access' => 'array',
             'access.*' => 'in:0,1',
         ]);
-    
+
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
-    
+
         $user = User::find($request->input('uid'));
-    
+
         if (!$user) {
             return redirect()->back()->withErrors(['error' => 'User not found']);
         }
-    
+
         $userData = [
             'fname' => $request->input('fname'),
             'mname' => $request->input('mname'),
@@ -118,6 +132,13 @@ class UserController extends Controller
             'role' => $request->input('role'),
             'gender' => $request->input('gender'),
         ];
+
+        // Only when one was typed. The field was validated here before but
+        // never written, so the form silently discarded every password change
+        // an administrator made on this page.
+        if (filled($request->input('password'))) {
+            $userData['password'] = Hash::make($request->input('password'));
+        }
     
         $accessPermissions = array_fill(0, 9, '0');
     

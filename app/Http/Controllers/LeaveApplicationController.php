@@ -228,7 +228,7 @@ class LeaveApplicationController extends Controller
             $leavesapphead = [];
         }
         
-        $emplalls = Employee::where('emp_status', 1)->get();
+        $emplalls = Employee::leaveEligible()->get();
 
         return view("leaves.status", compact('guard', 'setting', 'employee', 'leavesapp', 'isOfficeHead', 'leavesapphead', 'oic', 'emplalls', 'empid'));
     }
@@ -1150,7 +1150,7 @@ class LeaveApplicationController extends Controller
         if (!$employee) {
             return redirect()->route('dashboard')->with('error', 'Employee record not found.');
         }
-        $emplalls = Employee::where('emp_status', 1)->get();
+        $emplalls = Employee::leaveEligible()->get();
         
         $settings = Setting::join('employees as hr', 'hr.id', '=', 'settings.hr')
         ->join('employees as mayor', 'mayor.id', '=', 'settings.mayor')
