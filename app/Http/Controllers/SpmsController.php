@@ -252,7 +252,7 @@ class SpmsController extends Controller
     {
         $request->validate([
             'opcr_item_id' => 'required|exists:spms_opcr_items,id',
-            'employee_ids' => 'required|array',
+            'employee_ids' => 'nullable|array',
             'employee_ids.*' => 'exists:employees,id',
         ]);
 
@@ -262,10 +262,27 @@ class SpmsController extends Controller
         $user = auth()->guard($guard)->user();
         $assignerId = $user ? $user->id : null;
 
+        $selectedEmployeeIds = $request->input('employee_ids', []);
+
+        // 1. Remove cascaded IPCR items for employees that are NO LONGER in the selected list
+        $removedItems = SpmsIpcrItem::with('employee')
+            ->where('opcr_item_id', $opcrItem->id)
+            ->whereNotIn('employee_id', $selectedEmployeeIds)
+            ->get();
+
+        $unassignedNames = [];
+        foreach ($removedItems as $removed) {
+            if ($removed->employee) {
+                $unassignedNames[] = "{$removed->employee->fname} {$removed->employee->lname}";
+            }
+            $removed->delete();
+        }
+
+        // 2. Add / Assign cascaded IPCR items for newly selected employees
         $assignedNames = [];
         $failedNames = [];
 
-        foreach ($request->employee_ids as $empId) {
+        foreach ($selectedEmployeeIds as $empId) {
             $employee = Employee::find($empId);
 
             if (!$employee) {
@@ -300,7 +317,6 @@ class SpmsController extends Controller
                 ->exists();
 
             if ($alreadyAssigned) {
-                $failedNames[] = "{$employee->fname} {$employee->lname} (Already Assigned)";
                 continue;
             }
 
@@ -336,10 +352,16 @@ class SpmsController extends Controller
 
         $msg = "";
         if (count($assignedNames) > 0) {
-            $msg .= "Successfully cascaded row target to: " . implode(', ', $assignedNames) . ". ";
+            $msg .= "Successfully assigned target to: " . implode(', ', $assignedNames) . ". ";
+        }
+        if (count($unassignedNames) > 0) {
+            $msg .= "Removed assignment from: " . implode(', ', $unassignedNames) . ". ";
         }
         if (count($failedNames) > 0) {
             $msg .= "Skipped: " . implode(', ', $failedNames) . ".";
+        }
+        if (empty($msg)) {
+            $msg = "Target assignments updated successfully.";
         }
 
         return back()->with('success', $msg);
@@ -966,8 +988,9 @@ class SpmsController extends Controller
         $ipcr = SpmsIpcr::findOrFail($request->ipcr_id);
         $guard = $this->getGuard();
         $user = auth()->guard($guard)->user();
+        $isHead = $this->isOfficeHead($guard, $user);
 
-        if ($guard === 'employee' && $ipcr->employee_id != $user->id) {
+        if ($guard === 'employee' && $ipcr->employee_id != $user->id && !$isHead) {
             return back()->with('error', 'Unauthorized access to this IPCR matrix.');
         }
 
@@ -1090,14 +1113,15 @@ class SpmsController extends Controller
     {
         $request->validate([
             'ipcr_id' => 'required|exists:spms_ipcrs,id',
-            'template_type' => 'nullable|string|in:general_services,admin_support,custom',
+            'template_type' => 'nullable|string|in:general_services,admin_support,custom,official_regular',
         ]);
 
         $ipcr = SpmsIpcr::findOrFail($request->ipcr_id);
         $guard = $this->getGuard();
         $user = auth()->guard($guard)->user();
+        $isHead = $this->isOfficeHead($guard, $user);
 
-        if ($guard === 'employee' && $ipcr->employee_id != $user->id) {
+        if ($guard === 'employee' && $ipcr->employee_id != $user->id && !$isHead) {
             return back()->with('error', 'Unauthorized access to this IPCR matrix.');
         }
 

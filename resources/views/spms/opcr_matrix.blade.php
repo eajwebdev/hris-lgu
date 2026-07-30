@@ -614,7 +614,7 @@
                                                                 <i class="fas fa-users fa-xs mr-1"></i> Select All Members
                                                             </button>
                                                         </div>
-                                                        <select name="employee_ids[]" id="employeeSelect{{ $item->id }}" class="form-control select2" multiple required style="width: 100%;">
+                                                        <select name="employee_ids[]" id="employeeSelect{{ $item->id }}" class="form-control select2" multiple style="width: 100%;">
                                                             @foreach($officeEmployees as $emp)
                                                                 <option value="{{ $emp->id }}" {{ $item->assignedEmployees->contains($emp->id) ? 'selected' : '' }}>
                                                                     {{ $emp->fname }} {{ $emp->lname }} ({{ $emp->position ?? 'Personnel' }})
