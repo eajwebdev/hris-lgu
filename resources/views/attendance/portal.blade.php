@@ -856,6 +856,10 @@
         ],
         'resetAfter' => (int) config('attendance.portal.reset_after', 5),
         'thresholds' => config('face.client'),
+        // Badge-first. Drives the kiosk's starting mode and hides the "use face
+        // only" switch; the punch endpoint enforces the same rule again, which
+        // is the half that actually counts.
+        'requireQr'  => (bool) config('face.require_qr', true),
         // For the live distance HUD only — the authoritative distance/range
         // judgement is re-derived server-side at punch time.
         'stations'   => $stations,

@@ -59,14 +59,21 @@ class FaceRegistrationTest extends TestCase
         return $vector;
     }
 
-    /** Four poses of the same person. */
-    private function captures(int $seed): array
+    /**
+     * Four poses of the same person.
+     *
+     * 'real' is the browser's anti-spoof probability for the capture. Enrolment
+     * fails closed on a missing one (face.antispoof.enrolment_require_score),
+     * so a live-looking value belongs in the happy path here; the tests that
+     * exercise the floor itself override it.
+     */
+    private function captures(int $seed, float $real = 0.97): array
     {
         return [
-            ['type' => 'front',    'embedding' => $this->face($seed, 0.02)],
-            ['type' => 'left',     'embedding' => $this->face($seed, 0.05)],
-            ['type' => 'right',    'embedding' => $this->face($seed, 0.05)],
-            ['type' => 'movement', 'embedding' => $this->face($seed, 0.03)],
+            ['type' => 'front',    'embedding' => $this->face($seed, 0.02), 'real' => $real],
+            ['type' => 'left',     'embedding' => $this->face($seed, 0.05), 'real' => $real],
+            ['type' => 'right',    'embedding' => $this->face($seed, 0.05), 'real' => $real],
+            ['type' => 'movement', 'embedding' => $this->face($seed, 0.03), 'real' => $real],
         ];
     }
 
@@ -217,6 +224,58 @@ class FaceRegistrationTest extends TestCase
         $this->actingAs($this->admin(), 'web')
             ->postJson(route('faceRegister', $this->employee->id), ['captures' => $captures])
             ->assertStatus(422);
+    }
+
+    // ------------------------------------------------------- enrolment spoof
+
+    /**
+     * A photograph must not become a permanent template.
+     *
+     * Registration used to run no anti-spoof check at all unless the Python
+     * sidecar was enabled, which meant self-enrolment — the route the dashboard
+     * prompt sends every unregistered employee down — had none.
+     */
+    public function test_it_refuses_an_enrolment_capture_the_model_calls_a_spoof(): void
+    {
+        $floor = (float) config('face.antispoof.enrolment_min_real', 0.60);
+
+        $captures = $this->captures(91);
+        $captures[2]['real'] = $floor - 0.05;
+
+        $this->actingAs($this->admin(), 'web')
+            ->postJson(route('faceRegister', $this->employee->id), ['captures' => $captures])
+            ->assertStatus(422);
+
+        $this->assertFalse(
+            $this->employee->fresh()->faceSummary()['registered'],
+            'a rejected enrolment must leave no template behind'
+        );
+    }
+
+    /** Fail closed: omitting the score is not a way around the check. */
+    public function test_it_refuses_an_enrolment_capture_with_no_spoof_score(): void
+    {
+        $captures = $this->captures(92);
+        unset($captures[0]['real']);
+
+        $this->actingAs($this->admin(), 'web')
+            ->postJson(route('faceRegister', $this->employee->id), ['captures' => $captures])
+            ->assertStatus(422);
+
+        $this->assertFalse(
+            $this->employee->fresh()->faceSummary()['registered'],
+            'a scoreless enrolment must leave no template behind'
+        );
+    }
+
+    /** A confidently-live set of captures still enrols normally. */
+    public function test_a_live_enrolment_is_accepted(): void
+    {
+        $this->actingAs($this->admin(), 'web')
+            ->postJson(route('faceRegister', $this->employee->id), ['captures' => $this->captures(93)])
+            ->assertOk();
+
+        $this->assertTrue($this->employee->fresh()->faceSummary()['registered']);
     }
 
     // ---------------------------------------------------------------- remove

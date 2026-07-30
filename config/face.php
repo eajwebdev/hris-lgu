@@ -36,6 +36,44 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Require the QR badge at the kiosk
+    |--------------------------------------------------------------------------
+    |
+    | When true the punch endpoint accepts mode=qr ONLY: the employee scans
+    | their badge, which names them, and then simply looks at the camera to
+    | prove they are that person and alive. The face-only path — a 1:N search
+    | across every enrolled face — is refused.
+    |
+    | This is a security improvement, not just a workflow one, and it is what
+    | lets the capture be as gentle as it now is:
+    |
+    |   * 1:1 beats 1:N. Face-only had to pick one employee out of everybody,
+    |     so it needed the ratio test to refuse a stranger who sat at a mediocre
+    |     distance from the whole roster. With the badge naming the employee
+    |     first, the only question left is "is this that person", which is a far
+    |     easier question to answer correctly and fails honest employees much
+    |     less often.
+    |
+    |   * The error rate of a 1:N search grows with headcount; a 1:1 verify does
+    |     not. This LGU's roster will only get bigger.
+    |
+    |   * Two factors instead of one: something you carry and something you are.
+    |     A stolen badge alone is useless without the face, and a photograph of
+    |     the face is useless without the badge.
+    |
+    | Enforced SERVER-SIDE in AttendancePortalController::punch(), because the
+    | kiosk JavaScript can be edited by whoever is holding the device — hiding
+    | the "use face only" button is presentation, not policy.
+    |
+    | Set false to allow badge-less face punching again (the old 1:N behaviour),
+    | and expect to re-tighten face.match.ratio if you do.
+    |
+    */
+
+    'require_qr' => env('FACE_REQUIRE_QR', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Duplicate rejection threshold
     |--------------------------------------------------------------------------
     |
@@ -103,9 +141,21 @@ return [
     | why float32 in pass 1 costs nothing in accuracy.
     */
 
+    /*
+    | RELAXED after employees were unable to punch at all. 1.10/0.78 is the
+    | textbook ArcFace operating point, measured on frontal studio captures; a
+    | kiosk camera in a corridor is not that, and the gap between "enrolled in
+    | good light" and "punching under a ceiling fluorescent" was landing real
+    | employees past 1.10. 1.24 is cosine ≈ 0.23 — still far outside the
+    | different-people band this model produces, and the ratio test below is
+    | what actually stops a stranger being handed someone's identity.
+    |
+    | If a wrong employee is ever matched, tighten 'ratio' first (down toward
+    | 0.78), not 'distance' — ratio is the discriminating check.
+    */
     'match' => [
-        'distance'  => 1.10,
-        'ratio'     => 0.78,
+        'distance'  => 1.24,
+        'ratio'     => 0.88,
         'shortlist' => 24,
     ],
 
@@ -156,19 +206,57 @@ return [
         // Straight-ahead frames the client gathers before the gestures. More
         // frames give the variation test below more to read and average the
         // identity match over a steadier signal.
-        'min_neutral_frames' => 5,
+        // RELAXED 5 -> 3. Every one of these frames has to clear the framing
+        // gate AND hold |yaw| under front_yaw_max, each with its own 10s
+        // deadline in captureAt() — so five of them was up to 50 seconds of
+        // standing still before the gestures even started, and one bad frame
+        // restarted the lot. Three still gives min_variation something to read.
+        // 3 -> 4. With the gesture stage retired these are the ONLY identity
+        // frames in a punch, and they are also what the anti-spoof average is
+        // taken over, so one extra is worth having. Still far quicker than the
+        // old five-plus-two-gestures sequence.
+        'min_neutral_frames' => 4,
 
         // Gestures the challenge can demand, and how many are drawn per attempt
         // (distinct, shuffled). left/right are yaw turns; up/down are pitch
         // tilts measured against the employee's own frontal baseline.
+        //
+        // 0 = OFF, and that is deliberate policy here, not a tuning slip.
+        //
+        // The punch is now QR + look-at-the-camera: the employee scans their
+        // code and simply looks, with no gesture to perform. Everything the
+        // gestures used to prove is now proven by the ACTIVE ILLUMINATION
+        // challenge below, which is fully passive from the employee's side —
+        // the screen does the work while they stand still — and, with
+        // liveness_flash_frames.require_images on, is measured by the SERVER
+        // from the submitted pixels rather than asserted by the browser.
+        //
+        // That is a straight upgrade against the two attacks that matter here.
+        // A gesture challenge is beaten by a coached live video replay (the
+        // person on the call can be told to turn their head). The flash
+        // challenge is not: a video call cannot make its face brighten more
+        // than the wall behind it, and cannot take on a colour the server chose
+        // after the recording started.
+        //
+        // checkPoses() and the client's pose loop both no-op on an empty list,
+        // so this switches the whole stage off cleanly.
+        //
+        // NOTE: this does NOT affect registration, which still captures
+        // front/left/right/movement — see face.captures. A richer enrolment
+        // template is what makes the 1:1 verify below forgiving of head angle,
+        // and enrolment is supervised and one-off, so the cost is paid once.
         'pose_pool'  => ['left', 'right', 'up', 'down'],
-        'pose_count' => 2,
+        'pose_count' => 0,
 
         // Squared-free euclidean distance a challenged-pose frame must sit from
         // the straight-ahead master embedding. A genuine head turn moves the
         // embedding well past this; a flat image rotated in front of the lens
         // barely moves it. Kept modest so a subtle but real turn still passes.
-        'min_pose_shift' => 0.05,
+        // RELAXED 0.05 -> 0.035. With pose_count at 1 a single marginal-but-real
+        // turn now fails the whole punch rather than one of two, so the floor is
+        // eased to match. Still an order of magnitude above where a flat image
+        // swivelled on the spot lands.
+        'min_pose_shift' => 0.035,
 
         // Upper bound on the face captures in a payload, so the endpoint
         // cannot be used to ship megabytes of vectors. Must stay at least
@@ -180,7 +268,14 @@ return [
 
         // The frames must span at least this long — a human takes time to
         // perform two gestures; a payload assembled in one instant does not.
-        'min_duration_ms' => 1200,
+        // RELAXED 1200 -> 500. This spans the identity frames only (checkTiming
+        // reads 'frames', not the flash samples), and with the gestures gone
+        // those are four frames taken 180ms apart — roughly 750ms end to end,
+        // uncomfortably close to the old floor. A cooperative employee being
+        // refused for punching TOO FAST is the one failure this number must
+        // never produce. 500ms still catches a payload assembled in one instant,
+        // which is all it was ever for.
+        'min_duration_ms' => 500,
         'max_duration_ms' => 40000,
 
         // Seconds a challenge stays usable. Single-use regardless.
@@ -231,6 +326,16 @@ return [
         | checkPoses() no-ops on an empty pose list.
         */
 
+        // RELAXED 4 -> 3. Three is the floor for a nonzero count (issueFlash()
+        // raises anything lower so the seeded white/dark/colour trio still
+        // fits), so all three properties are still tested every attempt — this
+        // only drops the one extra random segment and the ~600ms it cost.
+        // Back to 4. It was cut to 3 to save ~600ms when the employee also had
+        // two gestures to perform; with the gestures gone the whole punch is
+        // shorter than it has ever been, and the extra segment is the cheapest
+        // anti-spoof available — one more colour the recording has to have
+        // predicted. All three properties are tested at 3; the 4th widens the
+        // chroma sample.
         'flash_count' => 4,
 
         // Segments the sequence is drawn from. 'white'/'dark' carry the
@@ -244,13 +349,36 @@ return [
         // 'min_brightness' below. Kept low: in a bright hall the screen adds
         // little next to daylight, and this check is not carrying the weight
         // on its own.
-        'min_flash_delta' => 8,
+        // RELAXED 8 -> 4. This was already documented as the weakest of the
+        // three flash checks and the one daylight defeats: in a bright hall the
+        // kiosk screen adds almost nothing next to the windows, so a real
+        // employee fails it through no fault of their own. min_face_bg_delta
+        // below is the check actually carrying the replay-device defence.
+        //
+        // RAISED BACK 4 -> 7 now that the gestures are gone. These numbers were
+        // loosened while the pose challenge was still carrying liveness and
+        // this was a secondary check; it is not secondary any more. They are
+        // also now applied to SERVER-MEASURED luma rather than whatever the
+        // browser reported, so a threshold here finally means something.
+        'min_flash_delta' => 7,
 
         // How much more the FACE must respond than the background does, in the
         // same luma units. The one number worth tuning first if a real screen
         // spoof ever gets through — raise it. Lower it only if employees at a
         // kiosk mounted very close to a wall are being turned away, since a
         // wall right behind the head shrinks the natural gap.
+        // RAISED BACK 2 -> 4. THIS IS THE VIDEO-CALL DEFENCE and, with the
+        // gestures retired, the single most important number in this file.
+        //
+        // Light falls off with distance, so a kiosk screen inches from a real
+        // face and metres from the wall lights the two very differently. When
+        // the "employee" is a video call held up to the lens, the entire frame
+        // IS that phone's display: face region and background region carry the
+        // same emitted light and rise together, so this differential collapses
+        // toward zero no matter how convincing the person on the call is.
+        //
+        // Lower it ONLY for a kiosk mounted hard against a wall, and retest
+        // with an actual phone afterwards.
         'min_face_bg_delta' => 4,
 
         // Rise in a colour's share of the face's total RGB under that colour's
@@ -258,7 +386,16 @@ return [
         // Dimensionless (a ratio of ratios), so exposure and white balance
         // drift do not move it. 0.03 is roughly a 3-point shift on a channel
         // that normally sits near a third of the total.
-        'min_chroma_shift' => 0.03,
+        // RAISED BACK 0.018 -> 0.028, the second half of the video-call
+        // defence. The server picks the colour sequence AFTER the attempt
+        // starts, so a recording — however live the person in it looks — was
+        // made before the answer existed and keeps whatever colour balance it
+        // was recorded with. A real face reflects the screen's red under red.
+        //
+        // Held just under the original 0.03 because a dark-skinned or strongly
+        // side-lit face genuinely reflects proportionally less of the cast, and
+        // that must not read as a spoof.
+        'min_chroma_shift' => 0.028,
 
         // Milliseconds the screen holds each colour before the sample is taken:
         // enough for the panel to repaint and the camera's auto-exposure to
@@ -309,11 +446,67 @@ return [
     |
     */
 
+    /*
+    | RELAXED per the note above ("LOWER IT back toward 0.5 if real employees on
+    | a poor camera are being turned away") — which is exactly what happened.
+    | 0.55 is still above the model's own 0.5 decision point, so a frame this
+    | passes is one MiniFASNet calls live, not one it is merely unsure about.
+    |
+    | 'require_score' stays TRUE. That flag is not a strictness dial — turning it
+    | off would let any client skip anti-spoofing entirely by omitting a field,
+    | which is a hole rather than a relaxation.
+    |
+    | WHY THIS STAYS PERMISSIVE, now that the gestures are gone.
+    |
+    | It is tempting to raise this floor to compensate. Don't — it would buy
+    | almost no security and cost real employees their punch. Unless the sidecar
+    | is running, THIS SCORE IS COMPUTED IN THE BROWSER AND MERELY REPORTED: the
+    | pixels never reach the server, so an attacker who has patched the client
+    | posts 0.99 whatever the threshold is. Raising it filters honest employees
+    | on cheap cameras and nobody else.
+    |
+    | The check that actually stops a print or a video call is the active
+    | illumination sequence above, because with liveness_flash_frames
+    | .require_images on the server measures it from submitted pixels instead of
+    | believing a number. Treat MiniFASNet as a cheap first filter and put the
+    | tuning effort into min_face_bg_delta and min_chroma_shift.
+    */
     'antispoof' => [
         'enabled'        => true,
-        'min_real'       => 0.70,
-        'min_real_frame' => 0.35,
+        'min_real'       => 0.55,
+        'min_real_frame' => 0.20,
         'require_score'  => true,
+
+        /*
+        | ENROLMENT floor, deliberately HIGHER than the punch floor above.
+        |
+        | The asymmetry is on purpose. A punch is one moment and a rejected one
+        | costs an employee thirty seconds; a template is on file for years and
+        | every future match is measured against it, so a photograph enrolled
+        | once quietly degrades every punch that employee ever makes. Refusing a
+        | marginal capture here is cheap, and the employee is sitting in front
+        | of the camera able to retry immediately.
+        |
+        | This ran nowhere until now: registration only scored captures when the
+        | Python sidecar was enabled, so with FACE_SCORING_ENABLED off — the
+        | default — self-enrolment had NO liveness check whatsoever. That gap
+        | mattered more once the dashboard prompt made self-enrolment the normal
+        | way in.
+        |
+        | Same honest caveat as min_real: without the sidecar this score is
+        | computed in the browser and merely reported, so it stops a casual
+        | photo rather than a patched client. Enrolment is the place where
+        | turning the sidecar on pays for itself most — it is four frames, once
+        | per employee, not a per-punch cost.
+        */
+        'enrolment_min_real' => 0.60,
+
+        /*
+        | Fail closed at enrolment: a capture arriving with no anti-spoof score
+        | is refused rather than stored. Without this, omitting one field is all
+        | it takes to enrol a photograph.
+        */
+        'enrolment_require_score' => true,
     ],
 
     /*
@@ -330,14 +523,30 @@ return [
     'client' => [
         // SCRFD confidence below which we refuse to capture. SCRFD's usual
         // operating threshold is 0.5; confident real faces score well above it.
-        'min_detection_score' => 0.50,
+        //
+        // RELAXED 0.50 -> 0.45 to match detectFull()'s own scoreThreshold. At
+        // 0.50 a face scoring 0.45-0.50 was detected by the engine and then
+        // refused by this gate, so the portal sat on "Please position your face
+        // properly" with nothing the employee could do about it.
+        'min_detection_score' => 0.45,
 
         // Face box width as a fraction of the video width. Under this the face
         // is too far away for a usable embedding.
-        'min_face_ratio' => 0.20,
+        //
+        // RELAXED 0.20 -> 0.14. Kiosk and laptop webcams are wide-angle, so a
+        // face at normal standing distance covers well under a fifth of the
+        // frame and the portal just repeated "move closer" indefinitely.
+        'min_face_ratio' => 0.14,
 
         // Mean luma (0-255) inside the face box. Under this it is too dark.
-        'min_brightness' => 55,
+        //
+        // RELAXED 55 -> 38, and this is the single most likely cause of the
+        // portal hanging: an ordinary office under ceiling fluorescents puts a
+        // face in the 40s, so gateOf() returned "Lighting is insufficient" on
+        // every frame until the 10s deadline expired, on every retry. Brightness
+        // is a capture-quality floor, not a security check — a photograph is
+        // perfectly well lit.
+        'min_brightness' => 38,
 
         // Variance of a Laplacian filter over the face crop (64x64 grayscale).
         // Motion blur flattens edges and drags this toward zero; a blurred frame
@@ -346,7 +555,13 @@ return [
         // an obvious-blur catch, not a focus meter. Kept low so a cheap phone
         // camera is not made to re-capture "hold still" over and over — that
         // re-capture loop is dead time an employee reads as the portal hanging.
-        'min_sharpness' => 14,
+        // RELAXED 14 -> 7. This config already documents (under scoring.enrolment)
+        // that raw Laplacian variance scales with scene contrast, so a sharp
+        // capture of a dark face scores below a blurred capture of a bright one
+        // and no threshold on it cleanly separates the two. It is an
+        // obvious-blur catch only, and 14 was doing real work refusing honest
+        // frames on low-contrast cameras.
+        'min_sharpness' => 7,
 
         // Yaw is now the nose tip's offset from the eye midpoint in units of
         // interocular distance (SCRFD gives 5 landmarks, not 68). ~0 facing the
@@ -354,9 +569,19 @@ return [
         // jaw-based measure, hence the re-tuned values below.
 
         // |yaw| under this counts as looking straight at the camera.
-        'front_yaw_max' => 0.15,
+        //
+        // RELAXED 0.15 -> 0.18. Every straight-ahead frame must hold this, so a
+        // kiosk mounted slightly off to one side made all of them hard at once.
+        //
+        // MUST STAY BELOW turn_yaw_min. If these two overlap, a single head
+        // position counts as both "facing front" and "a deliberate turn", which
+        // would let one static pose satisfy the gesture challenge — the exact
+        // property the challenge exists to prove. The gap below is deliberate.
+        'front_yaw_max' => 0.18,
 
-        // |yaw| over this counts as a deliberate head turn.
+        // |yaw| over this counts as a deliberate head turn. Left alone: easing
+        // the front gate above already shortens the slow part of the capture,
+        // and lowering this would close the gap described above.
         'turn_yaw_min' => 0.22,
 
         // Pitch is the nose tip's vertical offset from the eye midpoint in
@@ -364,7 +589,11 @@ return [
         // judged as a CHANGE from the employee's own frontal baseline (captured
         // during the straight-ahead frames): a tilt counts once the pitch has
         // moved this far from that baseline.
-        'turn_pitch_min' => 0.12,
+        // RELAXED 0.12 -> 0.09. A nod is a much smaller landmark movement than a
+        // yaw turn, and it is measured against a baseline averaged over the
+        // straight-ahead frames — now three rather than five, so that baseline
+        // is slightly noisier and the margin above it should not be tight.
+        'turn_pitch_min' => 0.09,
 
         // Landmark travel, in fractions of face width, that counts as movement.
         // NOTE: blink detection is gone with the engine swap — 5 landmarks carry
@@ -531,7 +760,22 @@ return [
         // frames first — turning it on before that refuses every punch. Once the
         // client sends them, turn it on: until you do, liveness is still only as
         // trustworthy as the browser claiming it.
-        'require_images'    => env('FACE_FLASH_IMAGES_REQUIRED', false),
+        // NOW ON BY DEFAULT. The comment above used to say this was left off
+        // "because the portal script must be updated to send frames first" —
+        // that update has since landed (runFlash() attaches a JPEG and a face
+        // box to every sample), so the reason for the default no longer holds.
+        //
+        // Turning it on is what makes the flash challenge real. Until now the
+        // server was grading the browser's own homework: a patched client could
+        // report whatever face/bg luma numbers passed. With this on, the server
+        // decodes the submitted JPEGs with GD and measures the light response
+        // itself, then overwrites the client's claims before any threshold is
+        // applied.
+        //
+        // REQUIRES PHP'S GD EXTENSION. It is enabled in this deployment's
+        // php.ini; if you move to a host without it, FlashFrameVerifier cannot
+        // decode a frame and every punch fails closed.
+        'require_images'    => env('FACE_FLASH_IMAGES_REQUIRED', true),
 
         'min_delta'         => 6.0,
         'min_face_bg_delta' => 3.0,

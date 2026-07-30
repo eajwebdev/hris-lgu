@@ -14,6 +14,15 @@ use Tests\TestCase;
  */
 class PunchFlashImagesTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // These fixtures post mode=face and are about flash provenance, not
+        // badge policy. See AttendancePortalTest for the badge requirement.
+        config(['face.require_qr' => false]);
+    }
+
     private function challenge(): array
     {
         $res = $this->postJson(route('attendanceChallenge'));

@@ -40,6 +40,14 @@ class AttendanceGeoTest extends TestCase
 
         Cache::flush();
 
+        // Geofencing is orthogonal to badge policy and to flash provenance, and
+        // these fixtures post mode=face with modelled luma. See
+        // AttendancePortalTest and PunchFlashImagesTest for those two.
+        config([
+            'face.require_qr' => false,
+            'face.liveness_flash_frames.require_images' => false,
+        ]);
+
         $this->faces = app(FaceEmbeddingService::class);
         $this->alice = Employee::orderBy('id')->firstOrFail();
         $this->alice->forceFill(['stat_1' => 1])->save();

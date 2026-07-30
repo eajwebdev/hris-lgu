@@ -70,7 +70,8 @@ class FaceRegistrationPromptTest extends TestCase
             for ($i = 0; $i < (int) config('face.dimension'); $i++) {
                 $vector[] = (mt_rand() / mt_getrandmax()) - 0.5;
             }
-            $captures[] = ['type' => $type, 'embedding' => $vector];
+            // 'real' is the anti-spoof score; enrolment fails closed without it.
+            $captures[] = ['type' => $type, 'embedding' => $vector, 'real' => 0.97];
         }
 
         $this->actingAs($admin, 'web')
@@ -164,8 +165,17 @@ class FaceRegistrationPromptTest extends TestCase
             ->assertSee('Register your face');
     }
 
-    /** The whole point of the session flag: it fires once, not on every visit. */
-    public function test_the_prompt_does_not_reappear_on_the_next_visit(): void
+    /**
+     * The prompt KEEPS asking until there is a face on file.
+     *
+     * This asserted the opposite until enrolment turned out to be a
+     * prerequisite for using the attendance kiosk at all: an employee who
+     * dismissed the one-and-only prompt, or who navigated somewhere else before
+     * the dashboard rendered, was never asked again and only discovered the
+     * problem standing in front of a kiosk that would not recognise them.
+     * Being nagged is recoverable; that is not.
+     */
+    public function test_the_prompt_reappears_until_the_employee_enrols(): void
     {
         session([FlagMissingFaceRegistration::SESSION_KEY => true]);
 
@@ -173,8 +183,19 @@ class FaceRegistrationPromptTest extends TestCase
             ->get(route('dashboard'))
             ->assertSee('facePromptModal');
 
-        // Same session, second load — the flag was consumed by the first.
+        // Same session, second load — still no face on file, so still asked.
         $this->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('facePromptModal');
+
+        // ...and it stops the moment they enrol, rather than on a visit count.
+        // Re-authenticated against the refreshed model because enrolFace() signs
+        // in as the admin to post the captures, and actingAs() pins the exact
+        // instance it was handed — the stale one still reads as unenrolled.
+        $this->enrolFace();
+
+        $this->actingAs($this->employee, 'employee')
+            ->get(route('dashboard'))
             ->assertOk()
             ->assertDontSee('facePromptModal');
     }
@@ -207,13 +228,18 @@ class FaceRegistrationPromptTest extends TestCase
             ->assertDontSee('facePromptModal');
     }
 
-    /** No flag, no prompt — an ordinary navigation to the dashboard is quiet. */
-    public function test_no_prompt_without_the_login_flag(): void
+    /**
+     * The prompt no longer depends on the sign-in flag at all — it is driven by
+     * whether a face is on file. An employee who reaches the dashboard by any
+     * route with no biometric enrolled gets asked, which is the point: the
+     * flag-gated version had several ways to arrive here silently.
+     */
+    public function test_the_prompt_does_not_depend_on_the_login_flag(): void
     {
         $this->actingAs($this->employee, 'employee')
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('facePromptModal');
+            ->assertSee('facePromptModal');
     }
 
     /**

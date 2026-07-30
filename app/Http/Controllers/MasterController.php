@@ -349,19 +349,23 @@ class MasterController extends Controller
             // one-time prompt below.
             $faceRegistered = $employee->faceSummary()['registered'];
 
-            // Pulled, not read: the flag is set once at sign-in and consumed the
-            // first time the dashboard renders, so the modal appears once per
-            // login rather than on every visit. A prompt that reappears on every
-            // navigation is one people learn to dismiss without reading.
+            // Prompt on EVERY dashboard load while there is no face on file,
+            // not once per sign-in.
             //
-            // The registration check is re-applied here because the flag was set
-            // before the employee had a chance to act on it — somebody who
-            // enrolled and came back to the dashboard in the same session should
-            // not be asked again.
-            $promptFaceRegistration = session()->pull(
-                \App\Listeners\FlagMissingFaceRegistration::SESSION_KEY,
-                false
-            ) && ! $faceRegistered;
+            // It was previously gated on a session flag pulled at first render,
+            // so an employee who dismissed it — or who simply landed somewhere
+            // else first — never saw it again that session, and then could not
+            // punch at the kiosk. Enrolment is a prerequisite for using
+            // attendance at all, so "asked once and forgotten" was the wrong
+            // trade: being nagged is recoverable, silently having no biometric
+            // on file is what sends someone to stand at a kiosk that will never
+            // recognise them.
+            //
+            // The flag is still consumed here so it does not sit in the session
+            // forever after the employee enrols.
+            session()->forget(\App\Listeners\FlagMissingFaceRegistration::SESSION_KEY);
+
+            $promptFaceRegistration = ! $faceRegistered;
 
             return view("home.dashboard", compact(
                 'offCount',

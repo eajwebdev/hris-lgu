@@ -34,6 +34,12 @@ class PunchIdentityScoringTest extends TestCase
             'face.scoring.punch.enabled'  => true,
             'face.scoring.punch.required' => true,
             'face.scoring.url'            => 'http://127.0.0.1:8078',
+            // This class is about what the SIDECAR does to a payload, not about
+            // badge policy or flash provenance, and its fixtures post mode=face
+            // with modelled luma. See AttendancePortalTest for the badge
+            // requirement and PunchFlashImagesTest for the image path.
+            'face.require_qr'             => false,
+            'face.liveness_flash_frames.require_images' => false,
         ]);
     }
 

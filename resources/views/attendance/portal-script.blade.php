@@ -57,8 +57,22 @@
         el.actions.forEach(function (btn) { btn.disabled = disabled; });
     }
 
+    /**
+     * Badge-first kiosk. When set, the punch is always QR -> look at the
+     * camera: the badge names the employee and the face proves it is them,
+     * which is a 1:1 verify rather than a 1:N search across the whole roster.
+     *
+     * This constant only decides what the kiosk OFFERS. The punch endpoint
+     * refuses mode=face on its own authority, so editing this in the browser
+     * buys nothing.
+     */
+    var REQUIRE_QR = CONFIG.requireQr !== false;
+
+    /** Where a fresh attempt begins, and where reset() returns to. */
+    var HOME_MODE = REQUIRE_QR ? 'qr' : 'face';
+
     var state = {
-        mode:    'face',   // face | qr | qrface | result
+        mode:    HOME_MODE,   // face | qr | qrface | result
         action:  'in',
         stream:  null,
         looping: false,
@@ -1043,7 +1057,7 @@
         state.qrToken = null;
         state.busy    = false;
 
-        setMode('face');
+        setMode(HOME_MODE);
     }
 
     // ---------------------------------------------------------------- modes
@@ -1065,6 +1079,11 @@
         el.guideBox.classList.toggle('d-none', !qr);
 
         // Icon-only switch pinned over the camera: show what tapping it goes TO.
+        // Hidden outright when the badge is mandatory — there is no face-only
+        // path to offer, and a button that refuses to do anything is worse than
+        // no button.
+        el.modeBtn.classList.toggle('d-none', REQUIRE_QR);
+
         var toQr = !(qr || mode === 'qrface');
         el.modeIcon.className = toQr ? 'fas fa-qrcode' : 'fas fa-user';
         el.modeBtn.title = toQr ? 'Scan QR instead' : 'Use face only instead';
@@ -1237,6 +1256,10 @@
     el.modeBtn.addEventListener('click', function () {
         if (state.busy) return;
 
+        // Nothing to switch to when the badge is mandatory — the button is
+        // hidden in setMode(), and this is the belt to that braces.
+        if (REQUIRE_QR) return;
+
         setMode(state.mode === 'face' ? 'qr' : 'face');
     });
 
@@ -1247,7 +1270,11 @@
             state.looping = false;
             stopCamera();
         } else if (el.result.classList.contains('d-none')) {
-            setMode(state.mode === 'qrface' ? 'face' : state.mode);
+            // A half-finished badge scan does not survive the kiosk being
+            // backgrounded: setMode() drops the token for any mode but
+            // 'qrface', so coming back sends the employee to rescan rather
+            // than punching against a token from who-knows-when.
+            setMode(state.mode === 'qrface' ? HOME_MODE : state.mode);
         }
     });
 
@@ -1928,7 +1955,7 @@
         });
 
         try {
-            await setMode('face');
+            await setMode(HOME_MODE);
         } catch (e) {
             console.error(e);
         }

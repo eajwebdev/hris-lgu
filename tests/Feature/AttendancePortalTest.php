@@ -43,6 +43,23 @@ class AttendancePortalTest extends TestCase
         // Challenges, the vector index and the rate limiter all live in the cache.
         Cache::flush();
 
+        // Most of this class exercises the 1:N face path — identify(), the
+        // ratio test, "not recognised" — which the kiosk no longer offers by
+        // default now that face.require_qr makes the badge mandatory. The code
+        // is still live and still reachable with the flag off, so the coverage
+        // is kept by pinning the flag here rather than deleting the tests.
+        // test_face_only_is_refused_when_the_badge_is_required() covers the
+        // default the kiosk actually ships with.
+        //
+        // require_images is pinned off for the same reason: these fixtures post
+        // modelled face/bg luma to exercise the CHALLENGE and THRESHOLD logic,
+        // while PunchFlashImagesTest drives the same endpoint with real JPEGs
+        // and is where the server-measures-it-itself guarantee is proven.
+        config([
+            'face.require_qr' => false,
+            'face.liveness_flash_frames.require_images' => false,
+        ]);
+
         $this->faces = app(FaceEmbeddingService::class);
 
         [$this->alice, $this->bob] = Employee::orderBy('id')->take(2)->get()->all();
@@ -704,6 +721,44 @@ class AttendancePortalTest extends TestCase
     public function test_a_garbage_qr_is_refused(): void
     {
         $this->postJson(route('attendanceQrCheck'), ['qr' => 'not-a-real-token'])->assertStatus(404);
+    }
+
+    /**
+     * The badge requirement is POLICY, enforced by the endpoint.
+     *
+     * setUp() pins face.require_qr off so this class can keep exercising the
+     * 1:N code; this test restores the shipped default and proves a badge-less
+     * punch is refused even with a perfect live face. Hiding the "use face
+     * only" button in the kiosk script is presentation — the script is editable
+     * by whoever holds the device, so the rule has to live here.
+     */
+    public function test_face_only_is_refused_when_the_badge_is_required(): void
+    {
+        config(['face.require_qr' => true]);
+
+        $this->enrol($this->alice, 305);
+
+        $this->livePunch(305, 'in')->assertStatus(422);
+
+        $this->assertNull(
+            $this->todayFor($this->alice),
+            'a badge-less punch must not record attendance'
+        );
+    }
+
+    /** With the badge, the same live face goes through. */
+    public function test_the_badge_path_still_works_when_it_is_required(): void
+    {
+        config(['face.require_qr' => true]);
+
+        $this->enrol($this->alice, 306);
+
+        $this->livePunch(306, 'in', [
+            'mode' => 'qr',
+            'qr'   => shortEncrypt($this->alice->emp_ID),
+        ])->assertOk()->assertJsonPath('recorded', true);
+
+        $this->assertNotNull($this->todayFor($this->alice));
     }
 
     public function test_qr_plus_a_live_matching_face_clocks_in(): void

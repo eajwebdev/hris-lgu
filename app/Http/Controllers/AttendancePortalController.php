@@ -118,8 +118,15 @@ class AttendancePortalController extends Controller
         $dimension = (int) config('face.dimension', 128);
         $maxFrames = (int) config('face.liveness.max_frames', 12);
 
+        // The badge is mandatory unless face.require_qr is switched off. Applied
+        // as a validation rule so the refusal is uniform with every other
+        // malformed punch, and applied HERE rather than in the kiosk script
+        // because the script is editable by whoever holds the device — the
+        // hidden "use face only" button is presentation, the rule is policy.
+        $modes = config('face.require_qr', true) ? ['qr'] : ['face', 'qr'];
+
         $validated = $request->validate([
-            'mode'                 => ['required', Rule::in(['face', 'qr'])],
+            'mode'                 => ['required', Rule::in($modes)],
             'action'               => ['required', Rule::in(['in', 'out'])],
             'nonce'                => ['required', 'string', 'max:64'],
             'frames'               => ['required', 'array', 'min:3', 'max:' . $maxFrames],

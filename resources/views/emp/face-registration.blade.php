@@ -224,6 +224,14 @@
         ],
         'steps'      => $steps,
         'thresholds' => config('face.client'),
+        // Enrolment anti-spoof. The browser refuses an obvious photo or screen
+        // at the moment of capture so the employee gets a specific reason; the
+        // store endpoint enforces the same floor again and refuses a capture
+        // that arrives without a score at all.
+        'antispoof'  => [
+            'enabled' => (bool) config('face.antispoof.enabled', true),
+            'minReal' => (float) config('face.antispoof.enrolment_min_real', 0.60),
+        ],
     ];
 @endphp
 <script id="face-config" type="application/json">@json($faceConfig)</script>

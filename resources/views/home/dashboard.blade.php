@@ -653,14 +653,17 @@
         history.go(1);
     };
 </script>
-{{-- Shown once per sign-in, to an employee with no face on file.
+{{-- Shown to any employee with no face on file, every time the dashboard
+     loads, until they enrol. See MasterController::dashboard for why this is no
+     longer once-per-sign-in: an employee with no biometric cannot use the
+     attendance kiosk at all, so a prompt they can lose track of is worse than
+     one that keeps asking.
 
-     The flag is set in LoginAuthController::afterLogin and consumed by
-     MasterController::dashboard, so this markup is only rendered on the first
-     dashboard load after logging in — not on every visit. Dismissable on
-     purpose: enrolment needs a camera and reasonable light, and somebody
-     signing in from a phone on the road should be reminded, not trapped. The
-     Quick Actions tile keeps the cross showing until it is done. --}}
+     Still escapable ("I'll do this later") rather than a hard gate: enrolment
+     needs a camera and reasonable light, and somebody checking their payslip
+     from a phone on the road should be reminded, not locked out of the
+     dashboard. The backdrop is static so it has to be answered deliberately
+     instead of dismissed by a stray tap. --}}
 @if($guard == 'employee' && ($promptFaceRegistration ?? false))
 <div class="modal fade" id="facePromptModal" tabindex="-1" role="dialog"
      aria-labelledby="facePromptLabel" aria-hidden="true">
@@ -681,7 +684,7 @@
                     Register now
                 </a>
                 <button type="button" class="btn btn-link btn-block text-muted" data-dismiss="modal">
-                    Remind me next time
+                    I'll do this later
                 </button>
             </div>
         </div>
@@ -692,7 +695,13 @@
         // AdminLTE ships jQuery + Bootstrap 4; if either is missing the prompt
         // simply does not appear rather than throwing on every dashboard load.
         if (window.jQuery && jQuery.fn.modal) {
-            jQuery('#facePromptModal').modal('show');
+            jQuery('#facePromptModal').modal({
+                // Answered deliberately, not dismissed by a stray tap outside
+                // it or a reflexive Escape.
+                backdrop: 'static',
+                keyboard: false,
+                show: true,
+            });
         }
     });
 </script>

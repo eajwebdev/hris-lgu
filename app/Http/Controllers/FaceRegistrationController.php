@@ -94,11 +94,58 @@ class FaceRegistrationController extends Controller
             // the enrolment verifiable: without it the embedding below is just a
             // number the browser asserts.
             'captures.*.frame'     => [$scoring->enabled() ? 'required' : 'nullable', 'string'],
+            // The browser's anti-spoof probability for this capture. Shape is
+            // validated here; whether a MISSING one is acceptable is policy,
+            // decided just below so the refusal can say why.
+            'captures.*.real'      => ['nullable', 'numeric', 'between:0,1'],
         ], [
             'captures.size'   => 'All ' . count($required) . ' captures are required to complete registration.',
             'captures.*.embedding.size' => 'A face descriptor was malformed. Please redo the registration.',
             'captures.*.frame.required' => 'This capture did not include an image, so it cannot be verified. Please redo the registration.',
         ]);
+
+        // Anti-spoof, enforced on every capture before anything is stored.
+        //
+        // This runs whether or not the sidecar is available. When scoring IS
+        // enabled the block below re-derives the score from the pixels and this
+        // is merely a fast pre-filter; when it is not — the default — this is
+        // the only thing standing between a held-up photograph and a permanent
+        // face template. Previously there was nothing here at all.
+        if (config('face.antispoof.enabled', true)) {
+            // NOT named $required — that already holds the configured capture
+            // list and is needed intact further down.
+            $floor          = (float) config('face.antispoof.enrolment_min_real', 0.60);
+            $mustHaveScore  = (bool) config('face.antispoof.enrolment_require_score', true);
+
+            foreach ($validated['captures'] as $capture) {
+                $real = $capture['real'] ?? null;
+
+                if ($real === null) {
+                    if (! $mustHaveScore) {
+                        continue;
+                    }
+
+                    return $this->fail(
+                        ucfirst($capture['type']).' capture: the face security check did not run. '
+                        .'Please reload the page and register again.'
+                    );
+                }
+
+                if ((float) $real < $floor) {
+                    Log::info('Face enrolment capture refused by anti-spoof.', [
+                        'employee_id' => $employee->id,
+                        'capture'     => $capture['type'],
+                        'real'        => round((float) $real, 3),
+                        'floor'       => $floor,
+                    ]);
+
+                    return $this->fail(
+                        ucfirst($capture['type']).' capture: please use your real face, '
+                        .'not a photo or a screen.'
+                    );
+                }
+            }
+        }
 
         // Score every frame on the server before anything is stored.
         //
