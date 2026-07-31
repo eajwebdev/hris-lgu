@@ -438,6 +438,79 @@ class AttendancePortalTest extends TestCase
      * floor still cannot change its colour balance to match a hue it was never
      * showing.
      */
+    /**
+     * The two flash verifiers must not disagree.
+     *
+     * FlashFrameVerifier measures the light from the submitted pixels, then
+     * LivenessVerifier::checkFlash() judges the very same numbers again. When
+     * the second set of floors was the stricter one, a punch could clear the
+     * authoritative measurement and be refused a moment later by a duplicate of
+     * it — reported with a different message, which is what made one fault look
+     * like two.
+     *
+     * Config-level rather than behavioural on purpose: the failure was a pair of
+     * numbers drifting apart, and that is the thing to pin.
+     */
+    public function test_the_two_flash_floors_do_not_contradict_each_other(): void
+    {
+        $liveness = (array) config('face.liveness');
+        $frames   = (array) config('face.liveness_flash_frames');
+
+        $this->assertLessThanOrEqual(
+            (float) $frames['min_delta'],
+            (float) $liveness['min_flash_delta'],
+            'liveness.min_flash_delta must not exceed liveness_flash_frames.min_delta'
+        );
+
+        $this->assertLessThanOrEqual(
+            (float) $frames['min_face_bg_delta'],
+            (float) $liveness['min_face_bg_delta'],
+            'liveness.min_face_bg_delta must not exceed liveness_flash_frames.min_face_bg_delta'
+        );
+
+        $this->assertLessThanOrEqual(
+            (float) $frames['min_hue_shift'],
+            (float) $liveness['min_chroma_shift'],
+            'liveness.min_chroma_shift must not exceed liveness_flash_frames.min_hue_shift'
+        );
+    }
+
+    /**
+     * A real face on a phone: the screen is a weak source next to the room, so
+     * the colour it casts is a small shift on top of the employee's own skin
+     * tone. That must still pass.
+     *
+     * Regression for a live employee being told "use your real face, not a
+     * photo or screen" while facing the camera. checkFlashColour() averaged the
+     * coloured segment into its own baseline, eating about a third of the very
+     * shift it was measuring, and the floor above it was nearly twice the GD
+     * path's for the same quantity.
+     */
+    public function test_a_weak_but_real_colour_response_on_skin_is_accepted(): void
+    {
+        $this->enrol($this->alice, 129);
+
+        $challenge = $this->challenge();
+
+        // Red-dominant skin, lit mostly by the room. The coloured segment lifts
+        // its own channel by a few points and no more.
+        $skin = function (array $tint) {
+            return [120.0 * $tint[0], 88.0 * $tint[1], 76.0 * $tint[2]];
+        };
+
+        $face = [
+            'white' => $skin([1.00, 1.00, 1.00]),
+            'dark'  => $skin([0.82, 0.82, 0.82]),
+            'red'   => $skin([1.12, 0.97, 0.95]),
+            'green' => $skin([0.97, 1.12, 0.95]),
+            'blue'  => $skin([0.95, 0.97, 1.12]),
+        ];
+
+        $this->punch($this->livePayload(129, $challenge, 'in', [
+            'flash' => $this->flashPayload(129, $challenge, ['face' => $face]),
+        ]))->assertOk()->assertJsonPath('recorded', true);
+    }
+
     public function test_a_face_that_does_not_take_on_the_colour_is_rejected(): void
     {
         $this->enrol($this->alice, 122);

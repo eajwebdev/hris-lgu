@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Employee;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -426,23 +427,50 @@ class LivenessVerifier
             return null;
         }
 
-        $shares = [];
-
-        foreach ($samples as $sample) {
-            $shares[] = $this->channelShares($sample['face'] ?? []);
-        }
-
-        $baseline = [];
-
-        foreach ([0, 1, 2] as $i) {
-            $baseline[$i] = $this->mean(array_column($shares, $i));
-        }
-
         foreach ($coloured as $sample) {
             $i     = $channels[$sample['seg']];
             $share = $this->channelShares($sample['face'] ?? [])[$i];
 
-            if (($share - $baseline[$i]) < (float) ($config['min_chroma_shift'] ?? 0.03)) {
+            // The baseline EXCLUDES the segment being judged.
+            //
+            // It used to be the mean across every sample including that one,
+            // which quietly ate a large part of the very shift it was looking
+            // for: with a three-segment sequence the red frame contributed a
+            // third of its own baseline, so a genuine rise of 0.045 measured as
+            // 0.030, and a weak phone screen in a lit room fell under the floor
+            // and refused a live employee. The same correction was made in
+            // FlashFrameVerifier::baselineShare(), and the two must agree —
+            // they judge the same quantity on the same numbers.
+            $others = [];
+
+            foreach ($samples as $other) {
+                if (($other['seg'] ?? null) === $sample['seg']) {
+                    continue;
+                }
+
+                $shares = $this->channelShares($other['face'] ?? []);
+
+                if ($shares) {
+                    $others[] = $shares[$i];
+                }
+            }
+
+            // Nothing neutral to compare against; not a spoof, just untestable.
+            if (! $others) {
+                continue;
+            }
+
+            $baseline = $this->mean($others);
+
+            if (($share - $baseline) < (float) ($config['min_chroma_shift'] ?? 0.03)) {
+                Log::info('Flash colour response below floor.', [
+                    'segment'  => $sample['seg'],
+                    'share'    => round($share, 4),
+                    'baseline' => round($baseline, 4),
+                    'shift'    => round($share - $baseline, 4),
+                    'floor'    => (float) ($config['min_chroma_shift'] ?? 0.03),
+                ]);
+
                 return 'Please use your real face, not a photo or screen.';
             }
         }
