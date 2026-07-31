@@ -360,12 +360,18 @@ return [
         // employee fails it through no fault of their own. min_face_bg_delta
         // below is the check actually carrying the replay-device defence.
         //
-        // RAISED BACK 4 -> 7 now that the gestures are gone. These numbers were
-        // loosened while the pose challenge was still carrying liveness and
-        // this was a secondary check; it is not secondary any more. They are
-        // also now applied to SERVER-MEASURED luma rather than whatever the
-        // browser reported, so a threshold here finally means something.
-        'min_flash_delta' => 7,
+        // MUST NOT BE STRICTER THAN liveness_flash_frames.min_delta.
+        //
+        // Both numbers judge the same physical quantity on the same
+        // server-measured pixels: FlashFrameVerifier reads it first, then
+        // checkFlash() reads it again. Setting this to 7 while the GD floor sat
+        // at 6.0 meant a punch could clear the authoritative measurement and be
+        // refused a moment later by a stricter duplicate of it — with a
+        // different message, which is what made it look like a new fault rather
+        // than the same one.
+        //
+        // Kept equal to liveness_flash_frames.min_delta. Change them together.
+        'min_flash_delta' => 6,
 
         // How much more the FACE must respond than the background does, in the
         // same luma units. The one number worth tuning first if a real screen
@@ -384,23 +390,35 @@ return [
         //
         // Lower it ONLY for a kiosk mounted hard against a wall, and retest
         // with an actual phone afterwards.
-        'min_face_bg_delta' => 4,
+        //
+        // 4 -> 3, to match liveness_flash_frames.min_face_bg_delta. Same reason
+        // as min_flash_delta above: two floors on one measurement, and the
+        // second one was the stricter, so it refused punches the authoritative
+        // check had already passed. Change the pair together.
+        'min_face_bg_delta' => 3,
 
         // Rise in a colour's share of the face's total RGB under that colour's
         // segment, versus that share averaged across the whole sequence.
         // Dimensionless (a ratio of ratios), so exposure and white balance
         // drift do not move it. 0.03 is roughly a 3-point shift on a channel
         // that normally sits near a third of the total.
-        // RAISED BACK 0.018 -> 0.028, the second half of the video-call
-        // defence. The server picks the colour sequence AFTER the attempt
-        // starts, so a recording — however live the person in it looks — was
-        // made before the answer existed and keeps whatever colour balance it
-        // was recorded with. A real face reflects the screen's red under red.
+        // The second half of the video-call defence: the server picks the colour
+        // sequence AFTER the attempt starts, so a recording — however live the
+        // person in it looks — was made before the answer existed and keeps
+        // whatever colour balance it was recorded with.
         //
-        // Held just under the original 0.03 because a dark-skinned or strongly
-        // side-lit face genuinely reflects proportionally less of the cast, and
-        // that must not read as a spoof.
-        'min_chroma_shift' => 0.028,
+        // 0.028 -> 0.015, matching liveness_flash_frames.min_hue_shift. Two
+        // things made 0.028 unreachable for a real face on a phone:
+        // checkFlashColour() was averaging the coloured segment into its own
+        // baseline (now fixed, which recovers roughly a third of the shift),
+        // and this floor was nearly twice the GD path's for the same
+        // measurement. A dark-skinned or side-lit face reflects proportionally
+        // less of the cast, so the honest signal is genuinely small.
+        //
+        // Keep equal to liveness_flash_frames.min_hue_shift. Raise BOTH if a
+        // recording ever gets through; the logged shift/baseline on each
+        // refusal is what to tune against.
+        'min_chroma_shift' => 0.015,
 
         // Milliseconds the screen holds each colour before the sample is taken:
         // enough for the panel to repaint and the camera's auto-exposure to
