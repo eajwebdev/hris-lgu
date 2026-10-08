@@ -119,6 +119,8 @@
                 </button>
             </form>
 
+            @include('partials.demo-login')
+
             <div class="auth-divider">or</div>
 
             <a href="{{ route('google.login') }}" class="btn-google">

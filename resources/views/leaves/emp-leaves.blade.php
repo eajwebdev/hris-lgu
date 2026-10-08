@@ -1,303 +1,186 @@
-@extends('layouts.master')
+@extends('layouts.app')
+
+@php
+    // HR sees an employee's credit ledger here; an employee sees their own
+    // application form. The Status and History tabs are still on the old
+    // shell (leaves/status, leaves/history) with their own copies of the
+    // panel, menu and dialogs: leaves/side-menu, top-menu and modal.
+
+    // column => [label, id of the figure in the balances panel]
+    $otherBalances = [
+        'special_pl'     => ['Special Privilege Leave', 'special-pl'],
+        'solo_pl'        => ['Solo Parent Leave', 'solo-pl'],
+        'study_leave'    => ['Study Leave', 'study-leave'],
+        'vawc_leave'     => ['10-Day VAWC Leave', 'vawc-leave'],
+        'rehab_leave'    => ['Rehabilitation Privilege', 'rehab-leave'],
+        'benefits_leave' => ['Special Leave Benefits for Women', 'benefits-leave'],
+        'calamity_leave' => ['Special Emergency (Calamity) Leave', 'calamity-leave'],
+        'adopt_leave'    => ['Adoption Leave', 'adopt-leave'],
+        'servcred_leave' => ['Vacation Service Credit', 'servcred-leave'],
+        'well_leave'     => ['Wellness Leave', 'wellness-leave'],
+    ];
+
+    $field = 'mt-1 block w-full rounded-xl border border-line bg-paper px-3 text-ink outline-none transition-shadow placeholder:text-ink/40 focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15';
+    $label = 'block text-xs font-medium text-ink/60';
+    $rowAction = 'grid size-9 place-items-center rounded-lg text-ink/55 transition-colors focus-visible:outline-2 focus-visible:outline-sun-500';
+@endphp
+
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Leave</h1>
+            <p class="mt-1 text-cream/70">
+                @if($guard == 'web')
+                    Credits earned, deducted and remaining for {{ ucwords(strtolower($employee->fname)) }} {{ ucwords(strtolower($employee->lname)) }}.
+                @else
+                    Apply for leave, then follow it under Status.
+                @endif
+            </p>
+        </div>
+        @include('leaves.partials.tabs')
+    </div>
+@endsection
 
 @section('body')
-@include('leaves.style')
-<section class="content">
-<div class="container-fluid">
-    <div class="row">
-        @include("leaves.side-menu")
-        <div class="col-lg-9">
-            <div class="card card-info card-outline">
-                <div class="card-header">
-                    @include("leaves.top-menu")
-                </div>
-                <div class="card-body">
-                @if($guard == "web")
-                    @if(count($leaves) == 0)
-                    <div class="form-row lbel">
-                        <div class="col-md-12">
-                            <div class="row">
-                                <div class="col-12 ">
-                                    <div class="card  p-4">
-                                        <h2 class="font-weight-bold text-center" style="color: var(--brand-700);">Input Leave Credit Balance to Start</h2>
-                                        <p class="text-muted text-center">Please enter employee leave credit balance below to proceed.</p>
-                                        <form class="form-horizontal" action="{{ route('leavesCreate') }}" method="POST">
-                                            @csrf
-                                            <div class="row">
-                                                <div class="col-md-3 col-sm-4 mb-3"></div>
-                                        
-                                                <div class="col-md-3 col-sm-4 mb-3">
-                                                    <div class="form-check">
-                                                        <label class="badge badge-secondary">Sick Leave</label>
-                                                        <input type="hidden" name="empid" value="{{ $employee->id }}">
-                                                        <input class="form-control form-control-sm" type="number" name="sl" step="0.001" min="0" max="{{ (count($leaves) == 0) ? '' : 30 }}" placeholder="0.00" required>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="col-md-3 col-sm-4">
-                                                    <div class="form-check">
-                                                        <label class="badge badge-secondary">Vacation Leave</label>
-                                                        <input class="form-control form-control-sm" type="number" name="vl" step="0.001" min="0" required>
-                                                    </div>
-                                                </div>
-                                        
-                                                <div class="col-md-3 col-sm-4"></div>
-                                        
-                                                <div class="col-md-3"></div>
+<div class="grid gap-5 lg:grid-cols-[21rem_minmax(0,1fr)]">
+    @include('leaves.partials.balances')
 
-                                                <div class="col-md-6 col-sm-4 mb-3">
-                                                    <div class="form-check">
-                                                        <label class="badge badge-secondary">Remarks</label>
-                                                        <textarea class="form-control form-control-sm" type="text" name="remarks" step="0.001" rows="3"></textarea>
-                                                    </div>
-                                                </div>
+    <div class="min-w-0">
+        @if($guard == 'web')
+            @if(count($leaves) == 0)
+                {{-- Nothing recorded yet: the first entry is the balance the
+                     employee starts with. --}}
+                <section class="rounded-2xl border border-line bg-surface p-6 sm:p-8">
+                    <div class="mx-auto max-w-md">
+                        <h2 class="text-center font-display text-2xl font-semibold tracking-tight">Input leave credit balance to start</h2>
+                        <p class="mt-1 text-center text-ink/60">Please enter employee leave credit balance below to proceed.</p>
 
-                                                <div class="col-md-6"></div>
-                                                
-                                                <div class="col-md-3 text-right">
-                                                    <button type="submit" name="btn-submit" class="btn btn-success btn-sm">
-                                                        <i class="fas fa-save"></i> submit
-                                                    </button>
-                                                </div>
-                                        
-                                                <div class="col-md-3"></div>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>                                                             
-                                <div class="col-3">
-                       
+                        <form action="{{ route('leavesCreate') }}" method="POST" class="mt-6">
+                            @csrf
+                            <input type="hidden" name="empid" value="{{ $employee->id }}">
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label for="startSl" class="{{ $label }}">Sick Leave</label>
+                                    <input type="number" id="startSl" name="sl" step="0.001" min="0" placeholder="0.00" required class="{{ $field }} h-10">
+                                </div>
+                                <div>
+                                    <label for="startVl" class="{{ $label }}">Vacation Leave</label>
+                                    <input type="number" id="startVl" name="vl" step="0.001" min="0" placeholder="0.00" required class="{{ $field }} h-10">
                                 </div>
                             </div>
-                        </div>
-                    </div>    
-                    @else
-                    <button class="btn btn-sm btn-info float-right mb-2" data-toggle="modal" data-target="#leaveModal"><i class="fas fa-plus"></i></button>
-                    <button class="btn btn-sm btn-warning float-right mb-2 mr-1" data-toggle="modal" data-target="#leaveModalDeduct"><i class="fas fa-minus"></i></button>
-                    <div class="table-responsive ">
-                        <table class="table table-collapsed table-hover" id="example3">
-                            <thead>
+
+                            <div class="mt-4">
+                                <label for="startRemarks" class="{{ $label }}">Remarks</label>
+                                <textarea id="startRemarks" name="remarks" rows="3" class="{{ $field }} py-2"></textarea>
+                            </div>
+
+                            <div class="mt-5 flex justify-end">
+                                <button type="submit" name="btn-submit" class="h-10 cursor-pointer rounded-xl bg-forest-900 px-5 font-medium text-cream transition-colors hover:bg-forest-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500 dark:bg-forest-600 dark:hover:bg-forest-500">
+                                    <i class="fas fa-save mr-1"></i> Submit
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            @else
+                <section class="rounded-2xl border border-line bg-surface" id="creditLedger" data-list>
+                    <div class="flex flex-wrap items-center gap-3 border-b border-line p-4">
+                        <label class="relative w-full sm:w-auto sm:max-w-xs sm:flex-1">
+                            <span class="sr-only">Search entries</span>
+                            <span class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-ink/40"><i class="fas fa-magnifying-glass text-xs"></i></span>
+                            <input type="search" data-list-search placeholder="Search month, remarks" autocomplete="off" class="{{ $field }} mt-0 h-10 pl-9">
+                        </label>
+                        <p class="ml-auto text-ink/55" data-list-count aria-live="polite"></p>
+                    </div>
+
+                    {{-- relative: keeps the visually hidden labels in the cells
+                         inside this scroller instead of widening the page. --}}
+                    <div class="relative overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="border-b border-line text-xs text-ink/55">
                                 <tr>
-                                    <th>SL</th>
-                                    <th>VL</th>
-                                    <th>For the Month of</th>
-                                    <th>Remarks</th>
-                                    <th>Date</th>
-                                    <th></th>
-                                    <th class="text-center">Action</th>
+                                    <th scope="col" class="px-4 py-3 pl-5 text-right font-medium">SL</th>
+                                    <th scope="col" class="px-4 py-3 text-right font-medium">VL</th>
+                                    <th scope="col" class="px-4 py-3 font-medium">For the month of</th>
+                                    <th scope="col" class="px-4 py-3 font-medium max-md:hidden">Remarks</th>
+                                    <th scope="col" class="px-4 py-3 font-medium">Entry</th>
+                                    <th scope="col" class="px-4 py-3 pr-5 text-right font-medium">Actions</th>
                                 </tr>
-                            </thead> 
-                            <tbody>
+                            </thead>
+                            <tbody class="divide-y divide-line">
                                 @foreach($leaves as $leave)
-                                @php $date = ($leave->created_at) ? \Carbon\Carbon::parse($leave->created_at)->format('F d, Y') : '' @endphp
-                                    <tr id="tr-{{ $leave->id }}">
-                                        <td class="text-center">{{ $leave->earn_sl }}</td>
-                                        <td class="text-center">{{ $leave->earn_vl }}</td>
-                                        <td>{{ \Carbon\Carbon::parse($leave->date)->format('F Y') }}</td>
-                                        <td>{{ $leave->remarks }}</td>
-                                        <td>{{ $date }}</td>
-                                        <td class="text-center">@if($leave->stat == 0) <span class="badge badge-warning">(starting Balance)</span> @elseif($leave->stat == 1 && $leave->days == 0) <span class="badge badge-danger">deducted</span> @else <span class="badge badge-success">addedd</span> @endif</td>
-                                        <td  width="100" class="text-center">
-                                            <a href="#" class="btn btn-info btn-sm mb-2 leaves_edit" data-id="{{ $leave->id }}" title="Edit" data-toggle="modal" data-target="{{ ($leave->stat == 1 && $leave->days == 0) ?  '#leaveModalDeductEdit ' : '#leaveEditModal' }}  ">
-                                                <i class="fas fa-pen"></i>
-                                            </a>
-                                            <button class="btn {{ ($leave->stat == 0) ? 'btn-secondary' : 'btn-danger leaves_delete' }} btn-sm mb-2" value="{{ $leave->id }}" title="Delete">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
+                                    @php
+                                        $month = \Carbon\Carbon::parse($leave->date)->format('F Y');
+                                        $entered = $leave->created_at ? \Carbon\Carbon::parse($leave->created_at)->format('F d, Y') : '';
+                                        // stat 0 is the opening entry; an entry with no days is a deduction.
+                                        $kind = $leave->stat == 0 ? 'starting' : ($leave->stat == 1 && $leave->days == 0 ? 'deduction' : 'added');
+                                        $kinds = [
+                                            'starting'  => ['Starting balance', 'bg-sun-100 text-sun-700'],
+                                            'deduction' => ['Deducted', 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'],
+                                            'added'     => ['Added', 'bg-forest-100 text-forest-800'],
+                                        ];
+                                    @endphp
+                                    <tr id="tr-{{ $leave->id }}" data-row
+                                        data-search="{{ strtolower($month . ' ' . $leave->remarks . ' ' . $entered . ' ' . $kinds[$kind][0]) }}"
+                                        data-credit-id="{{ $leave->id }}" data-credit-kind="{{ $kind }}"
+                                        data-credit-summary="{{ $kinds[$kind][0] }}, {{ $month }}: SL {{ $leave->earn_sl }}, VL {{ $leave->earn_vl }}"
+                                        class="transition-colors hover:bg-paper/70">
+                                        <td class="px-4 py-3 pl-5 text-right tabular-nums">{{ $leave->earn_sl }}</td>
+                                        <td class="px-4 py-3 text-right tabular-nums">{{ $leave->earn_vl }}</td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <p>{{ $month }}</p>
+                                            @if($entered)
+                                                <p class="mt-0.5 text-xs text-ink/55">Entered {{ $entered }}</p>
+                                            @endif
                                         </td>
-                                    </tr> 
+                                        <td class="px-4 py-3 text-ink/75 max-md:hidden">{{ $leave->remarks }}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-block rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap {{ $kinds[$kind][1] }}">{{ $kinds[$kind][0] }}</span>
+                                        </td>
+                                        <td class="px-4 py-3 pr-5">
+                                            <div class="flex justify-end gap-1">
+                                                <button type="button" title="Edit" data-credit-edit class="{{ $rowAction }} cursor-pointer hover:bg-forest-100 hover:text-forest-700">
+                                                    <i class="fas fa-pen"></i><span class="sr-only">Edit</span>
+                                                </button>
+                                                {{-- The starting balance is corrected, never removed. --}}
+                                                @if($kind === 'starting')
+                                                    <span title="The starting balance cannot be deleted" aria-disabled="true" class="{{ $rowAction }} cursor-not-allowed text-ink/25"><i class="fas fa-trash"></i></span>
+                                                @else
+                                                    <button type="button" title="Delete" data-credit-delete class="{{ $rowAction }} cursor-pointer hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/10 dark:hover:text-red-300">
+                                                        <i class="fas fa-trash"></i><span class="sr-only">Delete</span>
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
                                 @endforeach
                             </tbody>
-                        </table>                    
+                        </table>
                     </div>
-                    @endif
-                @else
-                <form class="form-horizontal add-form" action="{{ route('LeaveAppCreate') }}" method="POST">
-                    @csrf
-                    <div class="form-group mtop">
-                        <div class="form-row">
-                            <div class="col-md-6">
-                                <label class="badge badge-secondary lbel">TYPE OF LEAVE TO AVAILED OF</label><br>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="1" name="leave_type" id="vacation-leave" required>
-                                    <label class="form-check-label" for="vacation-leave">
-                                        <b>Vacation Leave</b><span class="ft">(Sec. 51, Rule XVI, Omnibus Rules Implementing E.O No. 292)</span>
-                                    </label>
-                                    <input type="hidden" name="empid" value="{{ $employee->emp_ID }}">
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="2" name="leave_type" required>
-                                    <label class="form-check-label" for="radio2">
-                                        <b>Mandatory/Forced Leave</b> <span class="ft">(Sec. 51, Rule XVI, Omnibus Rules Implementing E.O No. 292)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="3" name="leave_type" id="sick-leave" required>
-                                    <label class="form-check-label" for="sick-leave">
-                                        <b>Sick Leave</b> <span class="ft">(Sec. 51, Rule XVI, Omnibus Rules Implementing E.O No. 292)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="4" name="leave_type" disabled required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>Maternity Leave</b> <span class="ft">(R.A No. 11210/IRR issued by CSC, DOLE and SSS)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="5" name="leave_type" disabled required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>Paternity Leave</b> <span class="ft">(R.A No. 8187/CSC MC No. 71,s. 1998, as amended)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="6" name="leave_type" required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>Special Privilege Leave</b> <span class="ft">(Sec. 21, Rule XVI, Omnibus Rules Implementing E.O No. 292)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="7" name="leave_type" disabled required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>Solo Parent Leave</b> <span class="ft">(R.A. No. 8972/CSC MC No. 8, s. 2004)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="15" name="leave_type" required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>Wellness Leave</b> <span class="ft"></span>
-                                    </label>
-                                </div>
-                            </div>   
-                            <div class="col-md-6"><br>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="8" name="leave_type" id="study-leave" disabled required>
-                                    <label class="form-check-label" for="study-leave">
-                                        <b>Study Leave</b><span class="ft">(Sec. 68, Rule XVI, Omnibus Rules Implementing E.O No. 292)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="9" name="leave_type" disabled required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>10-Day VAWC Leave</b> <span class="ft">(R.A No. 9262/CSC MO No. 15,s. 2005)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="10" name="leave_type" disabled required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>Rehabilitation Privilege</b> <span class="ft">(Sec. 55, Rule XVI, omnibus Rules Implementing E.O No. 292)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="11" name="leave_type" disabled required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>Special Leave Benefits for Women</b> <span class="ft">(R.A No. 9710/CSC MC No. 25,s. 2010)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="12" name="leave_type" disabled required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>Special Emergency (Calamity) Leave</b> <span class="ft">(CSC MC No. 2,s. 2012, as amended)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="13" name="leave_type" disabled required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>Adoption Leave</b> <span class="ft">(R.A. No. 8552)</span>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input leave-type" type="radio" value="14" name="leave_type" required>
-                                    <label class="form-check-label" for="radio3">
-                                        <b>Vacation Service Credit</b> <span class="ft">(R.A. No. 4670)</span>
-                                    </label>
-                                </div>
-                            </div> 
-                            <div class="col-md-6">
-                                <label class="badge badge-secondary lbel mt-2">DETAILS OF LEAVE</label><br>
-                                <i>In case of Vacation/Special Privilege Leave</i>
-                                <div class="form-check w-100">
-                                    <input class="form-check-input vacation-check" type="radio" value="1" name="leave_purpose" required disabled>
-                                    <label class="form-check-label" for="within-philippines">
-                                        <b>Within the Philippines</b>
-                                    </label>
-                                </div>
-                                <div class="form-check w-100">
-                                    <input class="form-check-input vacation-check" type="radio" value="2" name="leave_purpose" id="abroad" required disabled>
-                                    <label class="form-check-label" for="abroad">
-                                        <b>Abroad (Specify)</b>
-                                        <input class="input-details vacation-leave ml-5" type="text" id="leaves_1" name="leave_detail[]" autocomplete="off" >
-                                    </label>
-                                </div>                                   
-                                <i>In case of Sick Leave</i>
-                                <div class="form-check w-100">
-                                    <input class="form-check-input sick-leave-detail" type="radio" value="3" name="leave_purpose" id="in-hospital" required disabled>
-                                    <label class="form-check-label" for="in-hospital">
-                                        <b>In Hospital (Specify Illness)</b>
-                                    </label>
-                                </div>
-                                <div class="form-check w-100">
-                                    <input class="form-check-input sick-leave-detail" type="radio" value="4" name="leave_purpose" id="out-patient" required disabled>
-                                    <label class="form-check-label" for="out-patient">
-                                        <b>Out Patient (Specify Illness)</b> <input class="input-details sick-leave ml-2" type="text" id="leaves_2" name="leave_detail[]">
-                                    </label>
-                                </div>
-                            </div>  
-                            <div class="col-md-6">
-                                <br>
-                                <i>In case of Study Leave</i>
-                                <div class="form-check w-100">
-                                    <input class="form-check-input leave-check" type="radio" value="5" name="leave_purpose" required disabled>
-                                    <label class="form-check-label" for="radio1">
-                                        <b>Completion of Master's Degree</b>
-                                    </label>
-                                </div>
-                                <div class="form-check w-100">
-                                    <input class="form-check-input leave-check" type="radio" value="6" name="leave_purpose" required disabled>
-                                    <label class="form-check-label" for="radio1">
-                                        <b>BAR/Board Examination Review</b>
-                                        <input class="input-details study-leave ml-2" type="text" id="leaves_3" name="leave_detail[]" autocomplete="off" >
-                                    </label>
-                                </div>
-                                <i>Other Purpose</i>
-                                <input class="form-check-input" type="radio" value="" name="leave_purpose" style="display: none;" checked id="monetizationdefault">    
-                                <div class="form-check w-100 purpose-detail">
-                                    <input class="form-check-input" type="radio" value="7" name="leave_purpose" id="monetization" disabled>
-                                    
-                                    <label class="form-check-label" for="monetization">
-                                        <b>Monetization of Leave Credits</b>
-                                    </label>
-                                </div> 
-                                <div class="form-check w-100 purpose-detail">
-                                    <input class="form-check-input" type="radio" value="8" name="leave_purpose" id="terminal-leave" disabled>
-                                    <label class="form-check-label" for="terminal-leave">
-                                        <b>Terminal Leave</b> <input class="input-details ml-5" type="text" id="leaves_4" name="leave_detail[]" autocomplete="off" >
-                                    </label>
-                                </div>
-                            </div>  
-                            <div class="col-md-6">
-                                <label class="badge badge-secondary text-wrap text-center lbel mb-1 mt-2">INCLUSIVE DATES</label>
-                                <div style="display: flex; justify-content: space-between;">
-                                    <input type="text" id="date_range" name="date_range" class="form-control form-control-sm" placeholder="Select Date Range" required>
-                                </div>
-                            </div>  
 
-                            <div class="col-md-3">
-                                <label class="badge badge-secondary text-wrap text-center lbel mb-1 mt-2">DAYS APPLIED</label>
-                                <input type="text" id="day" name="days" class="form-control form-control-sm" autocomplete="off" style="flex: 1; margin-right: 5px;" readonly>
-                            </div>         
-                            <div class="col-md-3">
-                                <label class="badge badge-secondary text-wrap text-center lbel mb-1 mt-2">DATE OF FILING</label>
-                                <input type="date" name="date_filing" class="form-control form-control-sm" value="{{ \Carbon\Carbon::now()->toDateString() }}" readonly>
-                            </div>                                     
-                        </div>
+                    <p class="px-5 py-10 text-center text-ink/55" data-list-empty hidden>No entry matches that.</p>
+
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
+                        <label class="flex items-center gap-2 text-ink/55">
+                            Rows
+                            <select data-list-size class="h-9 rounded-xl border border-line bg-paper pr-7 pl-3 text-ink outline-none focus:border-forest-600 focus:ring-4 focus:ring-forest-600/15">
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="0">All</option>
+                            </select>
+                        </label>
+                        <nav aria-label="Pages" class="flex items-center gap-1" data-list-pager></nav>
                     </div>
-                    <button type="submit" class="btn btn-sm btn-success float-right">Submit</button>
-                </form>                
-                @endif
-            </div>                        
-        </div>
+                </section>
+            @endif
+        @else
+            @include('leaves.partials.application-form')
+        @endif
     </div>
 </div>
-</section>
-@include("leaves.modal")
+
+@if($guard == 'web')
+    @include('leaves.partials.credit-dialogs')
+@endif
 @endsection

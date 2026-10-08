@@ -1,314 +1,390 @@
-@extends('layouts.master')
+@extends('layouts.app')
+
+@php
+    // One view for two routes: /user lists, /user/edit/{id} lists with the
+    // editor already open on that account.
+    $uEdit = $uEdit ?? null;
+    $ownId = auth()->guard('web')->id();
+
+    $roles = ['Administrator', 'HR Administrator', 'Payroll Administrator'];
+
+    // What an account may open: place in users.access (a comma-joined row of
+    // 0s and 1s) => label. Place 5 is not used.
+    $permissions = [
+        0 => 'Employees',
+        1 => 'Offices',
+        2 => 'Payslip',
+        3 => 'Events',
+        4 => 'DTR',
+        7 => 'Leave',
+        6 => 'Settings',
+        8 => 'Kiosk',
+    ];
+    $granted = fn ($access) => collect($permissions)
+        ->filter(fn ($label, $place) => (explode(',', (string) $access)[$place] ?? '0') == '1');
+
+    // A save that failed validation comes back here with what was typed; the
+    // editor reopens on it rather than making the administrator start over.
+    $retry = $errors->any() && old('_token') ? [
+        'uid' => old('uid'), 'lname' => old('lname'), 'fname' => old('fname'), 'mname' => old('mname'),
+        'gender' => old('gender'), 'role' => old('role'), 'username' => old('username'),
+        'access' => array_keys((array) old('access', [])),
+    ] : null;
+
+    $field = 'rounded-xl border border-line bg-paper text-ink outline-none transition-shadow placeholder:text-ink/40 focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15';
+    $input = $field . ' mt-1 block h-10 w-full px-3';
+    $label = 'block text-xs font-medium text-ink/60';
+    $rowAction = 'grid size-9 place-items-center rounded-lg text-ink/55 transition-colors focus-visible:outline-2 focus-visible:outline-sun-500';
+    $primary = 'h-10 cursor-pointer rounded-xl bg-forest-900 px-5 font-medium text-cream transition-colors hover:bg-forest-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500 dark:bg-forest-600 dark:hover:bg-forest-500';
+    $secondary = 'h-10 cursor-pointer rounded-xl border border-line px-5 font-medium transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500';
+@endphp
+
+@if($uEdit)
+    @section('breadcrumb', 'Edit')
+@endif
+
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Users</h1>
+            <p class="mt-1 max-w-2xl text-cream/70">Accounts for administrators and HR staff. Employees sign in with their own employee record, not from here.</p>
+        </div>
+
+        <button type="button" data-user-new
+                class="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-cream bg-cream px-4 font-medium text-forest-900 transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            <i class="fas fa-user-plus"></i> Add user
+        </button>
+    </div>
+@endsection
 
 @section('body')
-@php
-    $current_route=request()->route()->getName();
-@endphp
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-3">
-            <div class="card card-info card-outline">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-plus"></i> {{ $current_route == "ulist" ? "Add" : "Edit" }}
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <form class="form-horizontal" action="{{ $current_route == "ulist" ? route('uCreate') : route('uUpdate') }}" method="POST">
-                        @csrf
-                        <div class="form-group">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <div class="input-group">
-                                        <div class="input-group-prepend">
-                                            <span class="input-group-text">
-                                                <i class="fas fa-user"></i>
-                                            </span>
-                                        </div>
-                                        <input type="hidden" name="uid" value="{{ $current_route == 'uEdit' ? $uEdit->id : '' }}">
-                                        <input type="text" name="lname" value="{{ $current_route == 'uEdit' ? $uEdit->lname : '' }}" oninput="this.value = this.value.toUpperCase()" placeholder="Enter Last Name" class="form-control form-control-sm" autocomplete="off" required="">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+<section class="rounded-2xl border border-line bg-surface" id="userList" data-list data-list-sort-by="name">
+    <div class="flex flex-wrap items-center gap-3 border-b border-line p-4">
+        <label class="relative w-full sm:w-auto sm:max-w-xs sm:flex-1">
+            <span class="sr-only">Search users</span>
+            <span class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-ink/40"><i class="fas fa-magnifying-glass text-xs"></i></span>
+            <input type="search" data-list-search placeholder="Search name, username" autocomplete="off" class="{{ $field }} h-10 w-full pr-3 pl-9">
+        </label>
 
-                        <div class="form-group">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <div class="input-group">
-                                        <div class="input-group-prepend">
-                                            <span class="input-group-text">
-                                                <i class="fas fa-user"></i>
-                                            </span>
-                                        </div>
-                                        <input type="text" name="fname" value="{{ $current_route == 'uEdit' ? $uEdit->fname : '' }}" placeholder="Enter First Name" class="form-control form-control-sm" autocomplete="off" required="">
-                                    </div>    
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <div class="input-group">
-                                        <div class="input-group-prepend">
-                                            <span class="input-group-text">
-                                                <i class="fas fa-user"></i>
-                                            </span>
-                                        </div>
-                                        <input type="text" name="mname" value="{{ $current_route == 'uEdit' ? $uEdit->mname : '' }}" oninput="this.value = this.value.toUpperCase()" placeholder="Enter Middle Name" class="form-control form-control-sm" autocomplete="off" required="">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <div class="input-group">
-                                        <div class="input-group-prepend">
-                                            <span class="input-group-text">
-                                                <i class="fas fa-venus-mars"></i>
-                                            </span>
-                                        </div>
-                                        <select name="gender" class="form-control form-control-sm" autocomplete="off" required="">
-                                            <option value="">--- Select Gender ---</option>
-                                            <option value="Male" @if($current_route == 'uEdit' && $uEdit->gender == 'Male') selected @endif>Male</option>
-                                            <option value="Female" @if($current_route == 'uEdit' && $uEdit->gender == 'Female') selected @endif>Female</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+        <label>
+            <span class="sr-only">Role</span>
+            <select data-list-filter="role" class="{{ $field }} h-10 pr-8 pl-3">
+                <option value="">All roles</option>
+                @foreach($roles as $role)
+                    <option value="{{ $role }}">{{ $role }}</option>
+                @endforeach
+            </select>
+        </label>
 
-
-                        <div class="form-group">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <div class="input-group">
-                                        <div class="input-group-prepend">
-                                            <span class="input-group-text">
-                                                <i class="fas fa-info-circle"></i>
-                                            </span>
-                                        </div>
-                                        <select class="form-control form-control-sm select_camp" name="role" id="roleSelect" onchange="updateCheckboxes()" autocomplete="off">
-                                            <option value=""> --- Select Role --- </option>
-                                            <option value="Administrator" @if($current_route == 'uEdit' && $uEdit->role == 'Administrator') selected @endif>Administrator</option>
-                                            <option value="HR Administrator" @if($current_route == 'uEdit' && $uEdit->role == 'HR Administrator') selected @endif>HR Administrator</option>
-                                            <option value="Payroll Administrator" @if($current_route == 'uEdit' && $uEdit->role == 'Payroll Administrator') selected @endif>Payroll Administrator</option>
-                                        </select>
-                                    </div>
-                                    <span id="error" style="color: #FF0000; font-size: 10pt;" class="form-text text-left Role_error"></span>
-                                </div>
-                            </div>
-                        </div> 
-                        <div class="form-group">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <div class="input-group">
-                                        <div class="input-group-prepend">
-                                            <span class="input-group-text">
-                                                <i class="fas fa-user"></i>
-                                            </span>
-                                        </div>
-                                        <input type="email" name="username"  value="{{ $current_route == 'uEdit' ? $uEdit->username : '' }}" placeholder="Enter Username" class="form-control form-control-sm" autocomplete="off">
-                                    </div>    
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Password. There was no field here at all, which is why
-                             a user created on this page could never sign in: the
-                             controller hashed request('password') and then left it
-                             out of the insert, so the account was stored with none.
-
-                             On EDIT it is optional — leaving it blank keeps the
-                             existing password, so an admin fixing a typo in
-                             somebody's surname does not have to reissue their
-                             credentials to do it. --}}
-                        <div class="form-group">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <div class="input-group">
-                                        <div class="input-group-prepend">
-                                            <span class="input-group-text">
-                                                <i class="fas fa-lock"></i>
-                                            </span>
-                                        </div>
-                                        <input type="password" name="password" id="userPassword"
-                                               placeholder="{{ $current_route == 'uEdit' ? 'Leave blank to keep current password' : 'Enter Password (min 8 characters)' }}"
-                                               class="form-control form-control-sm" autocomplete="new-password"
-                                               {{ $current_route == 'uEdit' ? '' : 'required' }}>
-                                        <div class="input-group-append">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleUserPassword"
-                                                    tabindex="-1" aria-label="Show password">
-                                                <i class="fas fa-eye" id="toggleUserPasswordIcon"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    @error('password')
-                                        <span style="color: #FF0000; font-size: 10pt;" class="form-text text-left">{{ $message }}</span>
-                                    @enderror
-                                </div>
-                            </div>
-                        </div>
-
-                        @php
-                            $accessArray = isset($uEdit) ? explode(',', $uEdit->access) : [];
-                        @endphp
-
-                        <div class="form-group">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <label>Access Permissions:</label>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input type="checkbox" name="access[0]" value="1" id="access0" class="form-check-input" @if(isset($accessArray[0]) && $accessArray[0] == '1') checked @endif>
-                                        <label for="access0" class="form-check-label">EMPLOYEES</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="checkbox" name="access[1]" value="1" id="access1" class="form-check-input" @if(isset($accessArray[1]) && $accessArray[1] == '1') checked @endif>
-                                        <label for="access1" class="form-check-label">OFFICES</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="checkbox" name="access[2]" value="1" id="access2" class="form-check-input" @if(isset($accessArray[2]) && $accessArray[2] == '1') checked @endif>
-                                        <label for="access2" class="form-check-label">PAYSLIP</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="checkbox" name="access[3]" value="1" id="access3" class="form-check-input" @if(isset($accessArray[3]) && $accessArray[3] == '1') checked @endif>
-                                        <label for="access3" class="form-check-label">EVENTS</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="checkbox" name="access[7]" value="1" id="access7" class="form-check-input" @if(isset($accessArray[7]) && $accessArray[7] == '1') checked @endif>
-                                        <label for="access7" class="form-check-label">LEAVE</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input type="checkbox" name="access[4]" value="1" id="access4" class="form-check-input" @if(isset($accessArray[4]) && $accessArray[4] == '1') checked @endif>
-                                        <label for="access4" class="form-check-label">DTR</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="checkbox" name="access[6]" value="1" id="access6" class="form-check-input" @if(isset($accessArray[6]) && $accessArray[6] == '1') checked @endif>
-                                        <label for="access6" class="form-check-label">SETTINGS</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="checkbox" name="access[8]" value="1" id="access7" class="form-check-input" @if(isset($accessArray[8]) && $accessArray[8] == '1') checked @endif>
-                                        <label for="access7" class="form-check-label">KIOSK</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>                                       
-
-                        <div class="form-group">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <button type="submit" name="btn-submit" class="btn btn-success btn-sm">
-                                        <i class="fas fa-save"></i> Save
-                                    </button>
-                                </div>
-                            </div>
-                        </div>    
-                    </form>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-9">
-            <div class="card card-info card-outline">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table id="example1" class="table table-bordered table-hover">
-                            <thead>
-                                <tr>
-                                    <th>No</th>
-                                    <th>Name</th>
-                                    <th>Username</th>
-                                    <th>Role</th>
-                                    <th>Access</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbody">
-                                @php $no = 1; @endphp
-                                @foreach($users as $user)
-                                <tr id="tr-{{ $user->uid }}">
-                                    <td>{{ $no++ }}</td>
-                                    <td>{{ strtoupper($user->lname).' '.strtoupper($user->fname).' '.strtoupper($user->mname) }}</td>
-                                    <td>{{ $user->username }}</td>
-                                    <td>{{ $user->role }}</td>
-                                    <td width="150">
-                                        @php 
-                                            $access = explode(",", $user->access);
-                                        @endphp
-                                        @if (isset($access[0]) && $access[0] == 1)
-                                            @if($access[0] == 1) <span class="badge badge-secondary">EMPLOYEES</span> @endif
-                                        @endif
-                                        @if (isset($access[1]) && $access[1] == 1)
-                                            @if($access[1] == 1) <span class="badge badge-secondary">OFFICES</span> @endif
-                                        @endif
-                                        @if (isset($access[2]) && $access[2] == 1)
-                                            @if($access[2] == 1) <span class="badge badge-secondary">PAYSLIP</span> @endif
-                                        @endif
-                                        @if (isset($access[3]) && $access[3] == 1)
-                                            @if($access[3] == 1) <span class="badge badge-secondary">EVENTS</span> @endif
-                                        @endif
-                                        @if (isset($access[4]) && $access[4] == 1)
-                                            @if($access[4] == 1) <span class="badge badge-secondary">DTR</span> @endif
-                                        @endif
-                                        @if (isset($access[6]) && $access[6] == 1)
-                                            @if($access[6] == 1) <span class="badge badge-secondary">SETTINGS</span> @endif
-                                        @endif
-                                        @if (isset($access[7]) && $access[7] == 1)
-                                            @if($access[7] == 1) <span class="badge badge-secondary">LEAVE</span> @endif
-                                        @endif
-                                        @if (isset($access[8]) && $access[8] == 1)
-                                            @if($access[8] == 1) <span class="badge badge-secondary">KIOSK</span> @endif
-                                        @endif
-                                    </td>                                                                        
-                                    <td class="text-center">
-                                        <div class="btn-actions justify-content-center">
-                                            <a href="{{ route('uEdit', $user->uid) }}" title="Edit user" class="btn-icon btn-icon--info">
-                                                <i class="fas fa-pen"></i>
-                                            </a>
-                                            <button value="{{ $user->uid }}" title="Delete user" class="btn-icon btn-icon--danger users-delete">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <p class="ml-auto text-ink/55" data-list-count aria-live="polite"></p>
     </div>
-</div>
 
-<script>
-    // Reveal toggle for the password field. An admin typing a password FOR
-    // someone else cannot rely on muscle memory to catch a typo, and the person
-    // it is issued to has no way to discover the mistake except by failing to
-    // sign in — so being able to read it back before saving matters more here
-    // than on a normal login form.
-    (function () {
-        var field = document.getElementById('userPassword');
-        var btn   = document.getElementById('toggleUserPassword');
-        var icon  = document.getElementById('toggleUserPasswordIcon');
+    {{-- relative: keeps the visually hidden labels in the cells inside this
+         scroller instead of widening the page on a phone. --}}
+    <div class="relative overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="border-b border-line text-xs text-ink/55">
+                <tr>
+                    @foreach(['name' => 'Name', 'username' => 'Username', 'role' => 'Role'] as $key => $heading)
+                        <th scope="col" class="px-4 py-3 font-medium first:pl-5 {{ $key === 'username' ? 'max-md:hidden' : '' }} {{ $key === 'role' ? 'max-sm:hidden' : '' }}">
+                            <button type="button" data-list-sort="{{ $key }}" class="-mx-1.5 inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-sun-500">
+                                {{ $heading }} <i class="fas fa-sort text-[10px] opacity-50"></i>
+                            </button>
+                        </th>
+                    @endforeach
+                    <th scope="col" class="px-4 py-3 font-medium max-lg:hidden">Access</th>
+                    <th scope="col" class="px-4 py-3 pr-5 text-right font-medium">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-line">
+                @foreach($users as $user)
+                    @php
+                        $name = trim($user->lname . ', ' . $user->fname . ' ' . $user->mname);
+                        $can = $granted($user->access);
+                        $isOwn = $user->uid == $ownId;
+                    @endphp
+                    <tr id="tr-{{ $user->uid }}" data-row
+                        data-search="{{ strtolower($name . ' ' . $user->username . ' ' . $user->role) }}"
+                        data-name="{{ strtolower($name) }}" data-username="{{ strtolower($user->username) }}" data-role="{{ $user->role }}"
+                        data-user-id="{{ $user->uid }}" data-user-lname="{{ $user->lname }}" data-user-fname="{{ $user->fname }}" data-user-mname="{{ $user->mname }}"
+                        data-user-gender="{{ $user->gender }}" data-user-username="{{ $user->username }}" data-user-access="{{ $can->keys()->implode(',') }}"
+                        class="transition-colors hover:bg-paper/70">
+                        <td class="px-4 py-3 pl-5">
+                            <p class="font-semibold">{{ $name }}</p>
+                            @if($isOwn)
+                                <p class="mt-0.5 text-xs text-ink/55">This is you</p>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 max-md:hidden">{{ $user->username }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap max-sm:hidden">{{ $user->role ?: 'No role' }}</td>
+                        <td class="px-4 py-3 max-lg:hidden">
+                            @if($can->isNotEmpty())
+                                <div class="flex max-w-xs flex-wrap gap-1">
+                                    @foreach($can as $permission)
+                                        <span class="inline-block rounded-md bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-800">{{ $permission }}</span>
+                                    @endforeach
+                                </div>
+                            @else
+                                <span class="text-ink/45">None ticked</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 pr-5">
+                            <div class="flex justify-end gap-1">
+                                <button type="button" title="Edit user" data-user-edit class="{{ $rowAction }} cursor-pointer hover:bg-forest-100 hover:text-forest-700">
+                                    <i class="fas fa-pen"></i><span class="sr-only">Edit {{ $name }}</span>
+                                </button>
+                                {{-- Deleting the account in use would sign its owner out for good. --}}
+                                @if($isOwn)
+                                    <span title="You cannot delete the account you are signed in with" aria-disabled="true" class="{{ $rowAction }} cursor-not-allowed text-ink/25"><i class="fas fa-trash"></i></span>
+                                @else
+                                    <button type="button" title="Delete user" data-user-delete class="{{ $rowAction }} cursor-pointer hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/10 dark:hover:text-red-300">
+                                        <i class="fas fa-trash"></i><span class="sr-only">Delete {{ $name }}</span>
+                                    </button>
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
 
-        if (!field || !btn) return;
+    <p class="px-5 py-10 text-center text-ink/55" data-list-empty hidden>No user matches that.</p>
 
-        btn.addEventListener('click', function () {
-            var shown = field.type === 'text';
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
+        <label class="flex items-center gap-2 text-ink/55">
+            Rows
+            <select data-list-size class="{{ $field }} h-9 pr-7 pl-3">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="0">All</option>
+            </select>
+        </label>
+        <nav aria-label="Pages" class="flex items-center gap-1" data-list-pager></nav>
+    </div>
+</section>
 
-            field.type = shown ? 'password' : 'text';
-            btn.setAttribute('aria-label', shown ? 'Show password' : 'Hide password');
+{{-- Add and edit share this form; the script points it at uCreate or uUpdate
+     and fills it from the row (or from what was typed, after a failed save). --}}
+<dialog id="userDialog" aria-labelledby="userDialogTitle"
+        class="m-auto max-h-[calc(100dvh-2rem)] w-[min(36rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl shadow-forest-950/25 backdrop:bg-forest-950/60"
+        data-create-url="{{ route('uCreate') }}" data-update-url="{{ route('uUpdate') }}"
+        @if($uEdit) data-open-on="{{ $uEdit->id }}" @endif
+        @if($retry) data-retry='@json($retry)' @endif>
+    <form method="POST" action="{{ route('uCreate') }}" class="p-6">
+        @csrf
+        <input type="hidden" name="uid">
 
-            if (icon) {
-                icon.classList.toggle('fa-eye', shown);
-                icon.classList.toggle('fa-eye-slash', !shown);
-            }
-        });
-    })();
-</script>
+        <div class="flex items-start justify-between gap-4">
+            <h2 class="font-display text-xl font-semibold tracking-tight" id="userDialogTitle">Add user</h2>
+            <button type="button" data-dialog-close aria-label="Close" class="-mt-1 -mr-2 grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg text-ink/50 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-sun-500">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+
+        @if($retry)
+            <div class="mt-4 rounded-xl bg-red-50 px-4 py-3 text-red-800 dark:bg-red-500/10 dark:text-red-300" role="alert" data-user-errors>
+                <p class="font-medium">That could not be saved:</p>
+                <ul class="mt-1 list-disc pl-5">
+                    @foreach($errors->all() as $message)
+                        <li>{{ $message }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        <div class="mt-5 grid gap-4 sm:grid-cols-6">
+            <div class="sm:col-span-2">
+                <label for="userLname" class="{{ $label }}">Last name</label>
+                <input type="text" id="userLname" name="lname" required autocomplete="off" data-uppercase class="{{ $input }}">
+            </div>
+            <div class="sm:col-span-2">
+                <label for="userFname" class="{{ $label }}">First name</label>
+                <input type="text" id="userFname" name="fname" required autocomplete="off" class="{{ $input }}">
+            </div>
+            <div class="sm:col-span-2">
+                <label for="userMname" class="{{ $label }}">Middle name</label>
+                <input type="text" id="userMname" name="mname" required autocomplete="off" data-uppercase class="{{ $input }}">
+            </div>
+
+            <div class="sm:col-span-2">
+                <label for="userGender" class="{{ $label }}">Gender</label>
+                <select id="userGender" name="gender" required class="{{ $field }} mt-1 block h-10 w-full pr-8 pl-3">
+                    <option value="" disabled selected>Select</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                </select>
+            </div>
+            <div class="sm:col-span-4">
+                <label for="userRole" class="{{ $label }}">Role</label>
+                <select id="userRole" name="role" required class="{{ $field }} mt-1 block h-10 w-full pr-8 pl-3">
+                    <option value="" disabled selected>Select</option>
+                    @foreach($roles as $role)
+                        <option value="{{ $role }}">{{ $role }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="sm:col-span-3">
+                <label for="userUsername" class="{{ $label }}">Username</label>
+                <input type="text" id="userUsername" name="username" required autocomplete="off" placeholder="name@mabinay.gov.ph" class="{{ $input }}">
+            </div>
+
+            {{-- Optional when editing: blank keeps the current password, so
+                 fixing a typo in a surname does not mean reissuing credentials.
+                 It can be shown because it is typed FOR somebody else, who
+                 would only find a mistake by failing to sign in. --}}
+            <div class="sm:col-span-3">
+                <label for="userPassword" class="{{ $label }}">Password</label>
+                <div class="relative mt-1">
+                    <input type="password" id="userPassword" name="password" autocomplete="new-password" class="{{ $field }} block h-10 w-full pr-16 pl-3">
+                    <button type="button" data-password-toggle aria-controls="userPassword"
+                            class="absolute inset-y-0 right-0 cursor-pointer rounded-r-xl px-3 text-xs font-medium text-forest-700 hover:text-forest-950 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sun-500">Show</button>
+                </div>
+                <p class="mt-1 text-xs text-ink/55" data-password-hint></p>
+            </div>
+        </div>
+
+        <fieldset class="mt-5">
+            <legend class="{{ $label }}">Access permissions</legend>
+            <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                @foreach($permissions as $place => $permission)
+                    <label class="flex cursor-pointer items-center gap-2.5 rounded-xl border border-line px-3 py-2 transition-colors hover:border-forest-600/40 has-checked:border-forest-600/50 has-checked:bg-forest-100">
+                        <input type="checkbox" name="access[{{ $place }}]" value="1" class="size-4 shrink-0 accent-forest-600">
+                        {{ $permission }}
+                    </label>
+                @endforeach
+            </div>
+        </fieldset>
+
+        <div class="mt-6 flex justify-end gap-2">
+            <button type="button" data-dialog-close class="{{ $secondary }}">Cancel</button>
+            <button type="submit" name="btn-submit" class="{{ $primary }}"><i class="fas fa-save mr-1"></i> Save</button>
+        </div>
+    </form>
+</dialog>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    var csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var list = document.getElementById('userList');
+    var dialog = document.getElementById('userDialog');
+    var form = dialog.querySelector('form');
+    var password = form.elements['password'];
+    var toggle = dialog.querySelector('[data-password-toggle]');
+
+    // values: { uid, lname, fname, mname, gender, role, username, access: [places] },
+    // or null for a blank form. A uid means an existing account.
+    function openEditor(values) {
+        values = values || {};
+        var editing = !!values.uid;
+
+        form.reset();
+        form.action = editing ? dialog.dataset.updateUrl : dialog.dataset.createUrl;
+        dialog.querySelector('#userDialogTitle').textContent = editing ? 'Edit user' : 'Add user';
+
+        ['uid', 'lname', 'fname', 'mname', 'username'].forEach(function (name) {
+            form.elements[name].value = values[name] || '';
+        });
+        form.elements['gender'].value = values.gender || '';
+        form.elements['role'].value = values.role || '';
+
+        var places = (values.access || []).map(String);
+        form.querySelectorAll('input[name^="access["]').forEach(function (box) {
+            box.checked = places.indexOf(box.name.replace(/\D/g, '')) !== -1;
+        });
+
+        password.type = 'password';
+        toggle.textContent = 'Show';
+        password.required = !editing;
+        dialog.querySelector('[data-password-hint]').textContent = editing
+            ? 'Leave blank to keep the current password.'
+            : 'At least 8 characters, with letters and numbers.';
+
+        dialog.showModal();
+        form.elements['lname'].focus();
+    }
+
+    function fromRow(row) {
+        var data = row.dataset;
+        return {
+            uid: data.userId, lname: data.userLname, fname: data.userFname, mname: data.userMname,
+            gender: data.userGender, role: data.role, username: data.userUsername,
+            access: data.userAccess ? data.userAccess.split(',') : []
+        };
+    }
+
+    document.querySelector('[data-user-new]').addEventListener('click', function () {
+        var errors = dialog.querySelector('[data-user-errors]');
+        if (errors) { errors.remove(); }
+        openEditor(null);
+    });
+
+    list.addEventListener('click', function (event) {
+        var edit = event.target.closest('[data-user-edit]');
+        if (!edit) return;
+
+        var errors = dialog.querySelector('[data-user-errors]');
+        if (errors) { errors.remove(); }
+        openEditor(fromRow(edit.closest('[data-row]')));
+    });
+
+    // Arriving after a failed save, or on /user/edit/{id}.
+    if (dialog.dataset.retry) {
+        openEditor(JSON.parse(dialog.dataset.retry));
+    } else if (dialog.dataset.openOn) {
+        var requested = document.getElementById('tr-' + dialog.dataset.openOn);
+        if (requested) { openEditor(fromRow(requested)); }
+    }
+
+    toggle.addEventListener('click', function () {
+        var show = password.type === 'password';
+        password.type = show ? 'text' : 'password';
+        toggle.textContent = show ? 'Hide' : 'Show';
+        password.focus();
+    });
+
+    // Last and middle names are kept in capitals, as before.
+    form.querySelectorAll('[data-uppercase]').forEach(function (input) {
+        input.addEventListener('input', function () {
+            var caret = input.selectionStart;
+            input.value = input.value.toUpperCase();
+            input.setSelectionRange(caret, caret);
+        });
+    });
+
+    /* -------------------------------------------------------------- delete */
+    list.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-user-delete]');
+        if (!button) return;
+
+        var row = button.closest('[data-row]');
+
+        hrisConfirm({
+            title: 'Delete this user?',
+            detail: row.querySelector('p').textContent + ' will no longer be able to sign in. You won\'t be able to revert this.',
+            button: 'Yes, delete it',
+            danger: true
+        }).then(function (go) {
+            if (!go) return;
+
+            fetch("{{ route('uDelete') }}", {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                body: new URLSearchParams({ id: row.dataset.userId })
+            })
+                .then(function (response) { return response.ok ? response.json() : Promise.reject(); })
+                .then(function (data) {
+                    if (data.status !== 200) { return Promise.reject(); }
+                    row.remove();
+                    list.hrisList.render();
+                    hrisToast('success', 'User deleted.');
+                })
+                .catch(function () { hrisToast('error', 'The user could not be deleted. Please try again.'); });
+        });
+    });
+})();
+</script>
+@endpush

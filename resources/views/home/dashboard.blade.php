@@ -1,658 +1,309 @@
-@extends('layouts.master')
+@extends('layouts.app')
 
-@section('body')
-<style>
-    .bg-white {
-        border-radius: 15px;
-    }
-    .icon{
-        position: absolute;
-        top: 37px !important;
-        right: 5px;
-    }
-    .border-radius{
-      border-radius: 8px !important;
-      width: 40px !important;
-      height: 40px !important;
-    } 
-</style>
-@if($guard == 'web')
-  @include('home.modal')
-@endif
-@if($guard == 'employee')
 @php
-    $profileUrl = asset('Profile/Employee/' . $employee->profile);
-    $profilePath = public_path('Profile/Employee/' . $employee->profile);
-    $profileImage = file_exists($profilePath) && $employee->profile ? $profileUrl : asset('Profile/Employee/default.png');
-    $fullName = trim(ucwords(strtolower($employee->fname . ' ' . $employee->lname)));
-    $todayLabel = now('Asia/Manila')->format('F j, Y');
+    $viewer = auth()->guard($guard)->user();
+    $viewerFirstName = ucwords(strtolower((string) $viewer->fname));
+
+    $card = 'rounded-2xl border border-line bg-surface';
+    $cardTitle = 'font-display text-lg font-semibold tracking-tight';
 @endphp
-<style>
-    .employee-dashboard {
-        color: #20312b;
-    }
-    .employee-hero {
-        background: linear-gradient(135deg, #f7fbf8 0%, #e7f3ec 48%, #fff7df 100%);
-        border: 1px solid rgba(24, 119, 68, .12);
-        border-radius: 8px;
-        padding: 22px;
-        margin-bottom: 18px;
-    }
-    .employee-avatar {
-        width: 78px;
-        height: 78px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 3px solid #fff;
-        box-shadow: 0 8px 24px rgba(0,0,0,.08);
-    }
-    .metric-card,
-    .action-card {
-        background: #fff;
-        border: 1px solid #e7ece9;
-        border-radius: 8px;
-        box-shadow: 0 8px 20px rgba(31,49,43,.05);
-        min-height: 112px;
-    }
-    .metric-card .icon-wrap {
-        width: 42px;
-        height: 42px;
-        border-radius: 8px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: #eaf7f0;
-        color: #187744;
-    }
-    .quick-action {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 14px;
-        border-radius: 8px;
-        color: #20312b;
-        border: 1px solid #e7ece9;
-        transition: all .15s ease;
-    }
-    .quick-action:hover {
-        color: #187744;
-        border-color: rgba(24, 119, 68, .35);
-        background: #f7fbf8;
-    }
-    .quick-action i {
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: #fff4d3;
-        color: #8b6b00;
-    }
-    /* The trailing tick/cross is a status glyph, not a second action icon —
-       none of the tile styling above applies to it. */
-    .quick-action .quick-action-status {
-        width: auto;
-        height: auto;
-        margin-left: auto;
-        background: none;
-        border-radius: 0;
-        font-size: 1.05rem;
-    }
-    .face-prompt-icon {
-        width: 64px;
-        height: 64px;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: #eaf7f0;
-        color: #187744;
-        font-size: 28px;
-    }
-    .dashboard-table td {
-        vertical-align: middle;
-    }
-    .punch-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-    .punch-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 4px 8px;
-        border-radius: 999px;
-        background: #f4f7f5;
-        border: 1px solid #e2e9e5;
-        font-size: 12px;
-        white-space: nowrap;
-    }
-    .punch-pill strong {
-        color: #187744;
-    }
-    .punch-pill.out strong {
-        color: #9a5b00;
-    }
-    .punch-pill.ot strong {
-        color: #6d4cc2;
-    }
-    .session-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(66px, 1fr));
-        gap: 6px;
-    }
-    .session-cell {
-        background: #f9fbfa;
-        border: 1px solid #e2e9e5;
-        border-radius: 8px;
-        padding: 6px;
-        text-align: center;
-        min-height: 52px;
-    }
-    .session-cell span {
-        display: block;
-        color: #738078;
-        font-size: 11px;
-        text-transform: uppercase;
-    }
-    .session-cell strong {
-        display: block;
-        color: #20312b;
-        font-size: 13px;
-        margin-top: 2px;
-    }
-    .official-hours-note {
-        color: #738078;
-        font-size: 12px;
-        line-height: 1.4;
-    }
-    .date-filter {
-        background: #fff;
-        border: 1px solid #e7ece9;
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 18px;
-        box-shadow: 0 8px 20px rgba(31,49,43,.04);
-    }
-    .date-filter .date-shell {
-        position: relative;
-    }
-    .date-filter .date-shell i {
-        position: absolute;
-        left: 14px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #187744;
-        z-index: 2;
-    }
-    .date-filter .date-input {
-        height: 42px;
-        border-radius: 8px;
-        border-color: #dfe8e3;
-        padding-left: 42px;
-        background: #f9fbfa;
-        cursor: pointer;
-    }
-</style>
-<div class="container-fluid employee-dashboard">
-    <div class="employee-hero">
-        <div class="d-flex flex-wrap align-items-center justify-content-between">
-            <div class="d-flex align-items-center mb-3 mb-md-0">
-                <img src="{{ $profileImage }}" class="employee-avatar mr-3" alt="Profile Image">
-                <div>
-                    <div class="text-muted text-sm">{{ $todayLabel }}</div>
-                    <h3 class="mb-1 font-weight-bold">Welcome, {{ $fullName }}</h3>
-                    <div class="text-muted">
-                        {{ $employee->position ?: 'Employee' }}
-                        @if($employee->emp_ID)
-                            <span class="mx-2">|</span>{{ $employee->emp_ID }}
-                        @endif
-                    </div>
-                </div>
+
+{{-- The greeting sits on the header banner, under the top bar. --}}
+@section('hero')
+    @if($guard == 'employee')
+        @php
+            $heroPhoto = $employee->profile && file_exists(public_path('Profile/Employee/' . $employee->profile))
+                ? asset('Profile/Employee/' . $employee->profile)
+                : asset('Profile/Employee/default.png');
+        @endphp
+        <div class="flex items-center gap-5">
+            <img src="{{ $heroPhoto }}" alt="" class="size-16 shrink-0 rounded-full object-cover ring-4 ring-cream/15 sm:size-20">
+            <div class="min-w-0">
+                <p class="text-cream/70 lg:hidden">{{ now('Asia/Manila')->format('F j, Y') }}</p>
+                <h1 class="font-display text-3xl/none font-semibold tracking-tight sm:text-4xl/none">
+                    Maayong adlaw, {{ $viewerFirstName }}<span class="text-sun-500">.</span>
+                </h1>
+                <p class="mt-2 text-cream/75">
+                    {{ $employee->position ?: 'Employee' }}
+                    @if($employee->emp_ID)
+                        <span class="mx-2 text-cream/30">|</span>{{ $employee->emp_ID }}
+                    @endif
+                </p>
             </div>
         </div>
-    </div>
+    @else
+        <p class="text-cream/70 lg:hidden">{{ now('Asia/Manila')->format('l, F j, Y') }}</p>
+        <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            Maayong adlaw, {{ $viewerFirstName }}<span class="text-sun-500">.</span>
+        </h1>
+    @endif
+@endsection
 
-    <form method="GET" action="{{ route('dashboard') }}" class="date-filter">
-        <div class="row align-items-end">
-            <div class="col-12">
-                <label class="text-muted mb-1" for="dashboard_date_range">Date Range</label>
-                <div class="date-shell">
-                    <i class="fas fa-calendar-alt"></i>
-                    <input type="text" id="dashboard_date_range" class="form-control date-input" value="{{ \Carbon\Carbon::parse($dateFrom)->format('M d, Y') }} - {{ \Carbon\Carbon::parse($dateTo)->format('M d, Y') }}" readonly>
-                </div>
-                <input type="hidden" id="date_from" name="date_from" value="{{ $dateFrom }}">
-                <input type="hidden" id="date_to" name="date_to" value="{{ $dateTo }}">
-            </div>
+@section('body')
+@include('partials.event-calendar')
+@if($guard == 'employee')
+    @php
+        // Shortcuts for the date filter. "This week" is the range the
+        // controller falls back to when no dates are given.
+        $manilaNow = now('Asia/Manila');
+        $ranges = [
+            'This week'   => [$manilaNow->copy()->startOfWeek(), $manilaNow->copy()->endOfWeek()],
+            'Today'       => [$manilaNow->copy(), $manilaNow->copy()],
+            'Last 7 days' => [$manilaNow->copy()->subDays(6), $manilaNow->copy()],
+            'This month'  => [$manilaNow->copy()->startOfMonth(), $manilaNow->copy()->endOfMonth()],
+            'Last month'  => [$manilaNow->copy()->subMonthNoOverflow()->startOfMonth(), $manilaNow->copy()->subMonthNoOverflow()->endOfMonth()],
+        ];
+
+        $metrics = array_values(array_filter([
+            $canFileLeave ? ['Leave Records', number_format($leaveCount), 'Total applications filed', 'fa-calendar-check'] : null,
+            ['Total Late', $totalLate, 'For selected range', 'fa-business-time'],
+            ['Total Undertime', $totalUndertime, 'For selected range', 'fa-hourglass-half'],
+            ['Service',
+             is_null($serviceYears) ? '--' : $serviceYears . ' yr' . ($serviceYears == 1 ? '' : 's'),
+             $employee->date_hired ? 'Since ' . \Carbon\Carbon::parse($employee->date_hired)->format('M d, Y') : 'Date hired not set',
+             'fa-id-badge'],
+        ]));
+    @endphp
+
+    {{-- Date range. Two plain date fields: the old shell used a jQuery
+         range picker here, and this layout carries no jQuery. --}}
+    <form method="GET" action="{{ route('dashboard') }}" class="{{ $card }} flex flex-wrap items-end gap-3 p-4">
+        <div>
+            <label for="date_from" class="block text-xs font-medium text-ink/60">From</label>
+            <input type="date" id="date_from" name="date_from" value="{{ $dateFrom }}"
+                   class="mt-1 block h-10 rounded-xl border border-line bg-paper px-3 text-ink outline-none transition-shadow focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15">
+        </div>
+        <div>
+            <label for="date_to" class="block text-xs font-medium text-ink/60">To</label>
+            <input type="date" id="date_to" name="date_to" value="{{ $dateTo }}"
+                   class="mt-1 block h-10 rounded-xl border border-line bg-paper px-3 text-ink outline-none transition-shadow focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15">
+        </div>
+        <button type="submit" class="h-10 cursor-pointer rounded-xl bg-forest-900 px-4 font-medium text-cream transition-colors hover:bg-forest-950 dark:bg-forest-600 dark:hover:bg-forest-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            Apply
+        </button>
+
+        <div class="flex flex-wrap gap-1 sm:ml-auto">
+            @foreach($ranges as $label => [$from, $to])
+                @php
+                    $current = $from->toDateString() === $dateFrom && $to->toDateString() === $dateTo;
+                @endphp
+                <a href="{{ route('dashboard', ['date_from' => $from->toDateString(), 'date_to' => $to->toDateString()]) }}"
+                   @if($current) aria-current="true" @endif
+                   class="rounded-lg px-3 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-sun-500 {{ $current ? 'bg-forest-100 font-medium text-forest-800' : 'text-ink/65 hover:bg-paper hover:text-ink' }}">
+                    {{ $label }}
+                </a>
+            @endforeach
         </div>
     </form>
 
-    <section class="content">
-        <div class="row">
-            @if($canFileLeave)
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="metric-card p-3">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <div class="text-muted">Leave Records</div>
-                            <h4 class="mb-0">{{ number_format($leaveCount) }}</h4>
-                        </div>
-                        <span class="icon-wrap"><i class="fas fa-calendar-check"></i></span>
-                    </div>
-                    <small class="text-muted">Total applications filed</small>
+    <div class="mt-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        @foreach($metrics as [$label, $value, $note, $icon])
+            <div class="{{ $card }} p-4 sm:p-5">
+                <div class="flex items-start justify-between gap-3">
+                    <p class="text-ink/60">{{ $label }}</p>
+                    <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-forest-100 text-forest-700"><i class="fas {{ $icon }}"></i></span>
                 </div>
+                <p class="mt-1 font-display text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{{ $value }}</p>
+                <p class="mt-1 text-xs text-ink/50">{{ $note }}</p>
             </div>
-            @endif
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="metric-card p-3">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <div class="text-muted">Total Late</div>
-                            <h4 class="mb-0">{{ $totalLate }}</h4>
-                        </div>
-                        <span class="icon-wrap"><i class="fas fa-business-time"></i></span>
-                    </div>
-                    <small class="text-muted">For selected range</small>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="metric-card p-3">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <div class="text-muted">Total Undertime</div>
-                            <h4 class="mb-0">{{ $totalUndertime }}</h4>
-                        </div>
-                        <span class="icon-wrap"><i class="fas fa-hourglass-half"></i></span>
-                    </div>
-                    <small class="text-muted">For selected range</small>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="metric-card p-3">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <div class="text-muted">Service</div>
-                            <h4 class="mb-0">{{ is_null($serviceYears) ? '--' : $serviceYears . ' yr' . ($serviceYears == 1 ? '' : 's') }}</h4>
-                        </div>
-                        <span class="icon-wrap"><i class="fas fa-id-badge"></i></span>
-                    </div>
-                    <small class="text-muted">{{ $employee->date_hired ? 'Since ' . \Carbon\Carbon::parse($employee->date_hired)->format('M d, Y') : 'Date hired not set' }}</small>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-lg-8">
-                <div class="card">
-                    <div class="card-header bg-white">
-                        <h3 class="card-title font-weight-bold">Events</h3>
-                    </div>
-                    <div class="card-body" style="background-color: #f4f7f5;">
-                        <div id="external-events"></div>
-                        <div id="calendar" class="bg-white"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-4">
-                <div class="card">
-                    <div class="card-header bg-white">
-                        <h3 class="card-title font-weight-bold">Recent DTR</h3>
-                    </div>
-                    <div class="card-body p-0">
-                        <table class="table table-sm dashboard-table mb-0">
-                            <tbody>
-                                @forelse($recentDtrs as $dtr)
-                                    <tr>
-                                        <td>
-                                            <strong>{{ \Carbon\Carbon::parse($dtr->date)->format('M d') }}</strong>
-                                            <div class="official-hours-note">
-                                                AM {{ $dtr->official_schedule['am'] }}<br>
-                                                PM {{ $dtr->official_schedule['pm'] }}
-                                            </div>
-                                        </td>
-                                        <td colspan="2">
-                                            <div class="session-grid">
-                                                <div class="session-cell">
-                                                    <span>AM In</span>
-                                                    <strong>{{ $dtr->daily_punches['am_in'] ?: '--' }}</strong>
-                                                </div>
-                                                <div class="session-cell">
-                                                    <span>AM Out</span>
-                                                    <strong>{{ $dtr->daily_punches['am_out'] ?: '--' }}</strong>
-                                                </div>
-                                                <div class="session-cell">
-                                                    <span>PM In</span>
-                                                    <strong>{{ $dtr->daily_punches['pm_in'] ?: '--' }}</strong>
-                                                </div>
-                                                <div class="session-cell">
-                                                    <span>PM Out</span>
-                                                    <strong>{{ $dtr->daily_punches['pm_out'] ?: '--' }}</strong>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td class="text-muted p-3">No DTR records yet.</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="action-card p-3 mb-3">
-                    <h5 class="font-weight-bold mb-3">Quick Actions</h5>
-                    <a class="quick-action mb-2" href="{{ route('empPDS') }}">
-                        <i class="fas fa-clipboard"></i>
-                        <span>Open PDS</span>
-                    </a>
-                    {{-- Face enrolment lives here rather than in the PDS submenu:
-                         the PDS is the HR-facing record, and this is the page an
-                         employee actually opens. The tick or cross is the whole
-                         point — "am I set up for the attendance kiosk" should be
-                         answerable at a glance. --}}
-                    <a class="quick-action mb-2" href="{{ route('faceRecognition') }}">
-                        <i class="fas fa-user-shield"></i>
-                        <span>Face Registration</span>
-                        <i class="quick-action-status fas {{ $faceRegistered ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }}"></i>
-                    </a>
-                    @if($canFileLeave)
-                        <a class="quick-action mb-2" href="{{ route('leavesReadEmp') }}">
-                            <i class="fas fa-calendar-plus"></i>
-                            <span>File or Check Leave</span>
-                        </a>
-                    @endif
-                    <a class="quick-action" href="{{ route('dtr-read') }}">
-                        <i class="fas fa-clock"></i>
-                        <span>View DTR</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
-</div>
-@else
-<div class="container-fluid">
-    <div class="wrapper">
-        <section class="content">
-            <div class="row">
-                <div class="col-lg-8 col-sm-12">
-                  <div class="row">
-                    <div class="col-12">
-                      <div class="row">
-                          <div class="col-lg-3 col-6">
-                              <!-- small box -->
-                              <div class="small-box pl-1 pt-2 bg-white">
-                                  <div class="inner">
-                                      <h6 class="text-gray">Employee</h6>
-                                      <h3 class="">{{ number_format($totalEmployees) }}</h3>
-                                  </div>
-                                  <div class="icon">
-                                      <i class="fa-solid fa-user-tie" style="color: #9E9E9E; font-size: 30px !important;"></i>
-                                  </div>
-                              </div>
-                          </div>
-                          <div class="col-lg-3 col-6">
-                              <!-- small box -->
-                              <div class="small-box pl-1 pt-2 bg-white">
-                                  <div class="inner">
-                                      <h6 class="text-muted">Present</h6>
-                                      <h3>{{ number_format($dtrCount) }}</h3>
-                                  </div>
-                                  <div class="icon">
-                                      <i class="fa-solid fa-users-viewfinder" style="color: #607D8B; font-size: 30px !important;"></i>
-                                  </div>
-                              </div>
-                          </div>
-                          <div class="col-lg-3 col-6">
-                              <!-- small box -->
-                              <div class="small-box pl-1 pt-2 bg-white">
-                                  <div class="inner">
-                                      <h6 class="text-muted">Absent</h6>
-                                      <h3>{{ number_format($totalEmployees - $dtrCount) }}</h3>
-                                  </div>
-                                  <div class="icon">
-                                      <i class="fas fa-users-viewfinder" style="color: #FF7043; font-size: 30px !important;"></i>
-                                  </div>
-                              </div>
-                          </div>
-                          
-                          <div class="col-lg-3 col-6">
-                            <!-- small box -->
-                            <a href="{{ route('readPending', 1) }}"> 
-                              <div class="small-box pl-1 pt-2 bg-white">
-                                  <div class="inner">
-                                      <h6 class="text-muted">Leave Application</h6>
-                                      <h3>{{ number_format($leaveappCount) }}</h3>
-                                  </div>
-                                  <div class="icon">
-                                      <i class="fas fa-file-alt"  style="color: #9575CD;  font-size: 30px !important;"></i>
-                                  </div>
-                              </div>
-                            </a>
-                          </div>
-
-                          <div class="col-lg-3 col-6">
-                            <!-- small box -->
-                            <a href="{{ route('readPending', 2) }}">
-                              <div class="small-box pl-1 pt-2 bg-white">
-                                  <div class="inner">
-                                      <h6 class="text-muted">Eligibility</h6>
-                                      <h3>{{ number_format($eliCount) }}</h3>
-                                  </div>
-                                  <div class="icon">
-                                      <i class="fas fa-award"  style="color: #FFEB3B;  font-size: 30px !important;"></i>
-                                  </div>
-                              </div>
-                            </a>
-                          </div>
-
-                          <div class="col-lg-3 col-6">
-                            <!-- small box -->
-                            <a href="{{ route('readPending', 3) }}">
-                              <div class="small-box pl-1 pt-2 bg-white">
-                                  <div class="inner">
-                                      <h6 class="text-muted">Working experience</h6>
-                                      <h3>{{ number_format($workexpCount) }}</h3>
-                                  </div>
-                                  <div class="icon">
-                                      <i class="fas fa-tools"  style="color: #FF5722;  font-size: 30px !important;"></i>
-                                  </div>
-                              </div>
-                            </a>
-                          </div>
-
-                          <div class="col-lg-3 col-6">
-                            <!-- small box -->
-                            <a href="{{ route('readPending', 5) }}">
-                              <div class="small-box pl-1 pt-2 bg-white">
-                                  <div class="inner">
-                                      <h6 class="text-muted">Learning & Development</h6>
-                                      <h3>{{ number_format($learDevCount) }}</h3>
-                                  </div>
-                                  <div class="icon">
-                                      <i class="fas fa-book"  style="color: #7986CB;  font-size: 30px !important;"></i>
-                                  </div>
-                              </div>
-                            </a>
-                          </div>
-
-                          <div class="col-lg-3 col-6">
-                            <!-- small box -->
-                            <a href="{{ route('readPending', 4) }}">
-                              <div class="small-box pl-1 pt-2 bg-white">
-                                  <div class="inner">
-                                      <h6 class="text-muted">Voluntary works</h6>
-                                      <h3>{{ number_format($volWorkCount) }}</h3>
-                                  </div>
-                                  <div class="icon">
-                                      <i class="fas fa-hands-helping"  style="color: #388E3C;  font-size: 30px !important;"></i>
-                                  </div>
-                              </div>
-                            </a>
-                          </div>
-                      </div>
-                    </div>
-                    <div class="col-12">
-                        <div class="card  p-0">
-                            <div class="card-body" style="background-color: #e9ecef;">
-                                <div id="external-events">
-  
-                                </div>
-                                <div id="calendar" class="bg-white"></div>
-                            </div>
-                        </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="col-lg-4 col-sm-6">
-                  {{-- <div class="row">
-                    <div class="col-12">
-                        <div class="row">
-                          <div class="col-12">
-                            <div class="card">
-                              <div class="card-header">
-                                <h3 class="card-title"><b>Male/Female</b></h3>
-                              </div>
-                              <!-- /.card-header -->
-                              <div class="card-body p-0">
-    
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                    </div> --}}
-                    <div class="col-12">
-                      <div class="card">
-                        <div class="card-header">
-                          <h3 class="card-title"><b>Employee Status</b></h3>
-                        </div>
-                        <!-- /.card-header -->
-                        <div class="card-body p-0">
-                          <table class="table table-sm">
-                            <tbody>
-                              <tr>
-                                  <td>Regular</td>
-                                  <td width="100">
-                                      <div class="progress progress-xs mt-2">
-                                          <div class="progress-bar bg-danger" style="width: {{ number_format($empStatusPercentages->get(1)['percentage'], 2) }}%"></div>
-                                      </div>
-                                  </td>
-                                  <td>
-                                      <span class="badge bg-danger">
-                                          {{ number_format($empStatusPercentages->get(1)['percentage'], 2) . '%' }} 
-                                      </span>  
-                                      <span class="badge badge-secondary float-right">{{ $empStatusPercentages->get(1)['count'] }}</span>
-                                  </td>
-                              </tr>
-                              <tr>
-                                  <td>Full-time / Part-time</td>
-                                  <td width="100">
-                                      <div class="progress progress-xs mt-2">
-                                          <div class="progress-bar bg-warning" style="width: {{ number_format($empStatusPercentages->get(2)['percentage'], 2) }}%"></div>
-                                      </div>
-                                  </td>
-                                  <td>
-                                      <span class="badge bg-warning">
-                                          {{ number_format($empStatusPercentages->get(2)['percentage'], 2) . '%' }}
-                                      </span>  
-                                      <span class="badge badge-secondary float-right">{{ $empStatusPercentages->get(2)['count'] }}</span>
-                                  </td>
-                              </tr>
-                              <tr>
-                                  <td>Part-time / Part-time</td>
-                                  <td width="100">
-                                      <div class="progress progress-xs mt-2 progress-striped active">
-                                          <div class="progress-bar bg-primary" style="width: {{ number_format($empStatusPercentages->get(3)['percentage'], 2) }}%"></div>
-                                      </div>
-                                  </td>
-                                  <td>
-                                      <span class="badge bg-primary">
-                                          {{ number_format($empStatusPercentages->get(3)['percentage'], 2) . '%' }}
-                                      </span>
-                                      <span class="badge badge-secondary float-right">{{ $empStatusPercentages->get(3)['count'] }}</span> 
-                                  </td>
-                              </tr>
-                              <tr>
-                                  <td>Job Order</td>
-                                  <td width="100"> 
-                                      <div class="progress progress-xs mt-2 progress-striped active">
-                                          <div class="progress-bar bg-success" style="width: {{ number_format($empStatusPercentages->get(4)['percentage'], 2) }}%"></div>
-                                      </div>
-                                  </td>
-                                  <td>
-                                      <span class="badge bg-success">
-                                          {{ number_format($empStatusPercentages->get(4)['percentage'], 2) . '%' }}  
-                                      </span>  
-                                      <span class="badge badge-secondary float-right">{{ $empStatusPercentages->get(4)['count'] }}</span>
-                                  </td>
-                              </tr>
-                          </tbody>
-                          
-                          </table>
-                        </div>
-                        <!-- /.card-body -->
-                      </div>
-                    </div>
-                    <div class="col-12">
-                      <div class="card">
-                        <div class="card-header">
-                          <h3 class="card-title"><b>Birthday</b></h3>
-                          <div class="card-tools">
-                            {{-- <input type="month" class="form-control form-control-sm" style="width: auto; display: inline-block;" id="monthInput"> --}}
-                          </div>
-                        </div>
-                        <div class="card-body p-0">
-                          <ul class="products-list product-list-in-card pl-2 pr-2">
-                            @foreach($upcomingBirthdays as $employee)
-                              <li class="item">
-                                <div class="product-img">
-                                    @php
-                                        $imageUrl = asset('Profile/Employee/' . $employee->profile);
-                                        $imagePath = public_path('Profile/Employee/' . $employee->profile);
-                                    @endphp
-                                    <img class="border-radius" src="{{ file_exists($imagePath) ? $imageUrl : asset('Profile/Employee/default.png') }}" alt="Product Image">
-                                </div>
-                                <div class="product-info">
-                                  <a href="#" class="product-title text-dark">{{ ucfirst(strtolower($employee->lname)) . ' ' . ucfirst(strtolower($employee->fname)) }}
-                                    @php
-                                        $birthday = Carbon\Carbon::parse($employee->bdate);
-                                    @endphp
-                                    
-                                    <span class="float-right" style="margin-top: -2px;">
-                                        @if ($employee->bdate->format('F j') == now('Asia/Manila')->format('F j'))
-                                            <i class="fas fa-birthday-cake" style="color: #e71515;"></i>
-                                        @endif
-                                    </span>
-                                  </a>
-                                  <span class="product-description">
-                                    {{ $employee->office_abbr }} <span class="float-right" style="margin-top: -2px;">{{ $employee->bdate->format('F j, Y') }}</span>
-                                  </span>
-                                </div>
-                              </li>
-                            @endforeach
-                          </ul>
-                        </div>
-                      </div>
-                    </div>                    
-                  </div>
-                </div>
-                
-            </div>
-        </section>
+        @endforeach
     </div>
-</div>
+
+    <div class="mt-5 grid gap-5 xl:grid-cols-3">
+        <section class="{{ $card }} p-4 sm:p-5 xl:col-span-2">
+            <h2 class="{{ $cardTitle }} mb-4">Events</h2>
+            <div id="calendar"></div>
+        </section>
+
+        <div class="grid gap-5 self-start md:grid-cols-2 xl:grid-cols-1">
+            <section class="{{ $card }}">
+                <h2 class="{{ $cardTitle }} px-5 pt-5 pb-3">Recent DTR</h2>
+
+                <ul class="divide-y divide-line border-t border-line">
+                    @forelse($recentDtrs as $dtr)
+                        <li class="flex items-center gap-4 px-5 py-3.5">
+                            <div class="w-24 shrink-0">
+                                <p class="font-semibold">{{ \Carbon\Carbon::parse($dtr->date)->format('M d') }}</p>
+                                <p class="mt-0.5 text-xs/snug text-ink/50">
+                                    AM {{ $dtr->official_schedule['am'] }}<br>
+                                    PM {{ $dtr->official_schedule['pm'] }}
+                                </p>
+                            </div>
+                            <dl class="grid min-w-0 flex-1 grid-cols-4 gap-1.5">
+                                @foreach(['am_in' => 'AM In', 'am_out' => 'AM Out', 'pm_in' => 'PM In', 'pm_out' => 'PM Out'] as $key => $slot)
+                                    <div class="rounded-lg bg-paper px-1 py-1.5 text-center">
+                                        <dt class="text-[10px] text-ink/50">{{ $slot }}</dt>
+                                        <dd class="mt-0.5 text-xs font-semibold tabular-nums">{{ $dtr->daily_punches[$key] ?: '--' }}</dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+                        </li>
+                    @empty
+                        <li class="px-5 py-6 text-ink/55">No DTR records yet.</li>
+                    @endforelse
+                </ul>
+            </section>
+
+            <section class="{{ $card }} p-5">
+                <h2 class="{{ $cardTitle }} mb-3">Quick Actions</h2>
+
+                @php
+                    $actions = array_values(array_filter([
+                        ['Open PDS', route('empPDS'), 'fa-clipboard'],
+                        // Face enrolment lives here rather than in the PDS submenu:
+                        // the PDS is the HR-facing record, and this is the page an
+                        // employee actually opens. The tick or cross is the whole
+                        // point — "am I set up for the attendance kiosk" should be
+                        // answerable at a glance.
+                        ['Face Registration', route('faceRecognition'), 'fa-user-shield', $faceRegistered],
+                        $canFileLeave ? ['File or Check Leave', route('leavesReadEmp'), 'fa-calendar-plus'] : null,
+                        ['View DTR', route('dtr-read'), 'fa-clock'],
+                    ]));
+                @endphp
+
+                <ul class="space-y-2">
+                    @foreach($actions as $action)
+                        <li>
+                            <a href="{{ $action[1] }}" class="group flex items-center gap-3 rounded-xl border border-line p-3 transition-colors hover:border-forest-600/40 hover:bg-paper focus-visible:outline-2 focus-visible:outline-sun-500">
+                                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-sun-100 text-sun-700"><i class="fas {{ $action[2] }}"></i></span>
+                                <span class="flex-1 font-medium">{{ $action[0] }}</span>
+                                @if(array_key_exists(3, $action))
+                                    @if($action[3])
+                                        <i class="fas fa-check-circle text-base text-forest-600" title="Registered"></i>
+                                    @else
+                                        <i class="fas fa-times-circle text-base text-red-600" title="Not registered"></i>
+                                    @endif
+                                @else
+                                    <i class="fas fa-arrow-right text-xs text-ink/30 transition-transform group-hover:translate-x-0.5"></i>
+                                @endif
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </section>
+        </div>
+    </div>
+@else
+    @php
+        // Each tile (home/stat-tile): label, number, icon, one line of context,
+        // then its chart (series, caption, hover unit) from
+        // MasterController::dashboardTrends.
+        // The second row is HR's review queue: each tile opens the pending
+        // list it counts, and lights up while there is something in it.
+        $share = fn ($count) => $totalEmployees > 0 ? round($count / $totalEmployees * 100) . '% of employees' : 'No employees yet';
+        $waitingFor = fn ($queue) => $queue['oldest']
+            ? 'Oldest waiting ' . $queue['oldest']->diffForHumans(now(), \Carbon\CarbonInterface::DIFF_ABSOLUTE)
+            : 'Nothing waiting';
+        $offices = $offCount->count();
+
+        $stats = [
+            ['label' => 'Employee', 'value' => $totalEmployees, 'icon' => 'fa-user-tie', 'href' => null, 'waiting' => false,
+             'note' => 'Across ' . $offices . ' ' . ($offices == 1 ? 'office' : 'offices'),
+             'series' => $trends['hires'], 'caption' => 'Hires, last 12 months', 'unit' => 'hired'],
+            ['label' => 'Present', 'value' => $dtrCount, 'icon' => 'fa-users-viewfinder', 'href' => null, 'waiting' => false,
+             'note' => $share($dtrCount),
+             'series' => $trends['present'], 'caption' => '10 working days to today', 'unit' => 'present'],
+            ['label' => 'Absent', 'value' => $totalEmployees - $dtrCount, 'icon' => 'fa-user-clock', 'href' => null, 'waiting' => false,
+             'note' => 'No time record today',
+             'series' => $trends['absent'], 'caption' => '10 working days to today', 'unit' => 'absent'],
+        ];
+
+        $queues = [
+            ['Leave Application', $leaveappCount, 'fa-file-alt', 1, 'leave', 'Filed, last 14 days', 'filed'],
+            ['Eligibility', $eliCount, 'fa-award', 2, 'eligibility', 'Submitted, last 14 days', 'submitted'],
+            ['Working experience', $workexpCount, 'fa-tools', 3, 'experience', 'Submitted, last 14 days', 'submitted'],
+            ['Learning & Development', $learDevCount, 'fa-book', 5, 'learning', 'Submitted, last 14 days', 'submitted'],
+            ['Voluntary works', $volWorkCount, 'fa-hands-helping', 4, 'voluntary', 'Submitted, last 14 days', 'submitted'],
+        ];
+
+        foreach ($queues as [$label, $count, $icon, $pending, $key, $caption, $unit]) {
+            $stats[] = [
+                'label' => $label, 'value' => $count, 'icon' => $icon,
+                'href' => route('readPending', $pending), 'waiting' => $count > 0,
+                'note' => $waitingFor($trends[$key]),
+                'series' => $trends[$key]['series'], 'caption' => $caption, 'unit' => $unit,
+            ];
+        }
+
+        $statuses = [
+            1 => 'Regular',
+            2 => 'Full-time / Part-time',
+            3 => 'Part-time / Part-time',
+            4 => 'Job Order',
+        ];
+    @endphp
+
+    <div class="grid gap-5 xl:grid-cols-3">
+        <div class="space-y-5 xl:col-span-2">
+            <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                @foreach($stats as $stat)
+                    @include('home.stat-tile', $stat)
+                @endforeach
+            </div>
+
+            <section class="{{ $card }} p-4 sm:p-5">
+                <div id="calendar"></div>
+            </section>
+        </div>
+
+        <div class="grid gap-5 self-start md:grid-cols-2 xl:grid-cols-1">
+            <section class="{{ $card }}">
+                <h2 class="{{ $cardTitle }} px-5 pt-5 pb-3">Employee Status</h2>
+
+                <ul class="divide-y divide-line border-t border-line">
+                    @foreach($statuses as $status => $label)
+                        @php
+                            $share = $empStatusPercentages->get($status);
+                        @endphp
+                        <li class="px-5 py-3.5">
+                            <div class="flex items-baseline justify-between gap-4">
+                                <span>{{ $label }}</span>
+                                <span class="tabular-nums text-ink/55">
+                                    <strong class="font-semibold text-ink">{{ $share['count'] }}</strong>
+                                    <span class="mx-1 text-ink/25">&middot;</span>{{ number_format($share['percentage'], 2) }}%
+                                </span>
+                            </div>
+                            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-line/70">
+                                <div class="h-full rounded-full bg-forest-600 dark:bg-forest-500" style="width: {{ number_format($share['percentage'], 2) }}%"></div>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </section>
+
+            <section class="{{ $card }}">
+                <h2 class="{{ $cardTitle }} px-5 pt-5 pb-3">Birthday</h2>
+
+                <ul class="divide-y divide-line border-t border-line">
+                    @forelse($upcomingBirthdays as $celebrant)
+                        @php
+                            $photo = $celebrant->profile && file_exists(public_path('Profile/Employee/' . $celebrant->profile))
+                                ? asset('Profile/Employee/' . $celebrant->profile)
+                                : asset('Profile/Employee/default.png');
+                            $isToday = $celebrant->bdate->format('F j') == now('Asia/Manila')->format('F j');
+                        @endphp
+                        <li class="flex items-center gap-3 px-5 py-3">
+                            <img src="{{ $photo }}" alt="" class="size-10 shrink-0 rounded-xl object-cover">
+                            <div class="min-w-0 flex-1 leading-tight">
+                                <p class="truncate font-medium">{{ ucfirst(strtolower($celebrant->lname)) . ' ' . ucfirst(strtolower($celebrant->fname)) }}</p>
+                                <p class="mt-0.5 truncate text-xs text-ink/55">{{ $celebrant->office_abbr }}</p>
+                            </div>
+                            <p class="shrink-0 text-right text-xs text-ink/55">
+                                @if($isToday)
+                                    <i class="fas fa-birthday-cake mr-1 text-sun-600" title="Today"></i>
+                                @endif
+                                {{ $celebrant->bdate->format('F j, Y') }}
+                            </p>
+                        </li>
+                    @empty
+                        <li class="px-5 py-6 text-ink/55">No birthdays to show.</li>
+                    @endforelse
+                </ul>
+            </section>
+        </div>
+    </div>
 @endif
-<script>
-    history.pushState(null, null, location.href);
-    window.onpopstate = function () {
-        history.go(1);
-    };
-</script>
+
 {{-- Shown to any employee with no face on file, every time the dashboard
      loads, until they enrol. See MasterController::dashboard for why this is no
      longer once-per-sign-in: an employee with no biometric cannot use the
@@ -662,101 +313,52 @@
      Still escapable ("I'll do this later") rather than a hard gate: enrolment
      needs a camera and reasonable light, and somebody checking their payslip
      from a phone on the road should be reminded, not locked out of the
-     dashboard. The backdrop is static so it has to be answered deliberately
-     instead of dismissed by a stray tap. --}}
+     dashboard. It ignores Escape and clicks on the backdrop, so it has to be
+     answered deliberately instead of dismissed by a stray tap. --}}
 @if($guard == 'employee' && ($promptFaceRegistration ?? false))
-<div class="modal fade" id="facePromptModal" tabindex="-1" role="dialog"
-     aria-labelledby="facePromptLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content" style="border-radius: 12px; border: none;">
-            <div class="modal-body text-center p-4">
-                <div class="face-prompt-icon mb-3">
-                    <i class="fas fa-user-shield"></i>
-                </div>
-                <h5 class="font-weight-bold mb-2" id="facePromptLabel">Register your face</h5>
-                <p class="text-muted mb-4">
-                    You have no face registered yet. Registering lets you clock in and
-                    out at the attendance kiosk without typing anything. It takes about
-                    a minute and needs a camera with decent light.
-                </p>
-                <a href="{{ route('faceRecognition') }}" class="btn btn-block text-white font-weight-bold"
-                   style="background: #187744; border-radius: 8px;">
-                    Register now
-                </a>
-                <button type="button" class="btn btn-link btn-block text-muted" data-dismiss="modal">
-                    I'll do this later
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // AdminLTE ships jQuery + Bootstrap 4; if either is missing the prompt
-        // simply does not appear rather than throwing on every dashboard load.
-        if (window.jQuery && jQuery.fn.modal) {
-            jQuery('#facePromptModal').modal({
-                // Answered deliberately, not dismissed by a stray tap outside
-                // it or a reflexive Escape.
-                backdrop: 'static',
-                keyboard: false,
-                show: true,
-            });
-        }
-    });
-</script>
+    <dialog id="facePromptDialog" data-dialog-static aria-labelledby="facePromptLabel"
+            class="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-7 text-center text-ink shadow-2xl shadow-forest-950/25 backdrop:bg-forest-950/60">
+        <span class="mx-auto grid size-16 place-items-center rounded-full bg-forest-100 text-2xl text-forest-700">
+            <i class="fas fa-user-shield"></i>
+        </span>
+        <h2 class="mt-4 font-display text-xl font-semibold tracking-tight" id="facePromptLabel">Register your face</h2>
+        <p class="mt-2 leading-relaxed text-ink/60">
+            You have no face registered yet. Registering lets you clock in and
+            out at the attendance kiosk without typing anything. It takes about
+            a minute and needs a camera with decent light.
+        </p>
+        <a href="{{ route('faceRecognition') }}"
+           class="mt-6 flex h-11 items-center justify-center rounded-xl bg-forest-900 font-medium text-cream transition-colors hover:bg-forest-950 dark:bg-forest-600 dark:hover:bg-forest-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            Register now
+        </a>
+        <button type="button" data-dialog-close
+                class="mt-2 h-10 w-full cursor-pointer rounded-xl text-ink/55 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-sun-500">
+            I'll do this later
+        </button>
+    </dialog>
 @endif
-@if($guard == 'employee')
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        if (!window.jQuery || !jQuery.fn.daterangepicker) {
-            return;
-        }
-
-        const rangeInput = $('#dashboard_date_range');
-        const dateFrom = $('#date_from');
-        const dateTo = $('#date_to');
-
-        rangeInput.daterangepicker({
-            startDate: moment(dateFrom.val(), 'YYYY-MM-DD'),
-            endDate: moment(dateTo.val(), 'YYYY-MM-DD'),
-            autoUpdateInput: true,
-            locale: {
-                format: 'MMM D, YYYY',
-                separator: ' - '
-            },
-            ranges: {
-                'This Week': [moment().startOf('week'), moment().endOf('week')],
-                'Today': [moment(), moment()],
-                'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-                'This Month': [moment().startOf('month'), moment().endOf('month')],
-                'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
-            }
-        }, function (start, end) {
-            dateFrom.val(start.format('YYYY-MM-DD'));
-            dateTo.val(end.format('YYYY-MM-DD'));
-            rangeInput.closest('form').trigger('submit');
-        });
-    });
-</script>
-@endif
-{{-- <script>
-  // Get the current date
-  const currentDate = new Date();
-  
-  // Get the current month and year
-  const currentMonth = currentDate.getMonth() + 1; // Months are zero-indexed
-  const currentYear = currentDate.getFullYear();
-  
-  // Format the month to always have two digits
-  const formattedMonth = currentMonth < 10 ? '0' + currentMonth : currentMonth;
-  
-  // Set the value of the input to the current month and year
-  document.getElementById('monthInput').value = `${currentYear}-${formattedMonth}`;
-  
-  // Disable the year selection
-  document.getElementById('monthInput').addEventListener('click', function() {
-      this.showPicker = () => {};
-  });
-</script> --}}
 @endsection
+
+@push('scripts')
+<script>
+    // Events calendar, read-only: partials/event-calendar with no options.
+    // Events are added and changed on the Events page.
+    document.addEventListener('DOMContentLoaded', function () {
+        var calendarEl = document.getElementById('calendar');
+        if (calendarEl && window.FullCalendar) { hrisEventCalendar(calendarEl); }
+    });
+
+    // The face prompt waits its turn behind the privacy consent: that one
+    // cannot be skipped, and this one comes back on the next dashboard load.
+    (function () {
+        var prompt = document.getElementById('facePromptDialog');
+        if (prompt && !document.getElementById('dpnDialog')) { prompt.showModal(); }
+    })();
+
+    // Back cannot return to the page before the dashboard (the sign-in form).
+    history.pushState(null, null, location.href);
+    window.onpopstate = function () {
+        history.go(1);
+    };
+</script>
+@endpush

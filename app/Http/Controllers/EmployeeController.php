@@ -505,48 +505,18 @@ class EmployeeController extends Controller
     public function OfficialTimeRead(Request $request, $empid)
     {
         $offtimes = OfficialTime::where('empid', '=', $empid)->first();
-        $monmorn = explode('-', $offtimes->morn_mon);
-        $monnoon = explode('-', $offtimes->aft_mon);
 
-        $tuemorn = explode('-', $offtimes->morn_tue);
-        $tuenoon = explode('-', $offtimes->aft_tue);
+        // Each column holds one half-day as "in-out". An employee whose hours
+        // were never set has the row but nothing in it (or no row at all);
+        // that used to be a 500 here, and is now simply five empty days.
+        $split = fn ($range) => array_pad(explode('-', (string) $range, 2), 2, '');
 
-        $wedmorn = explode('-', $offtimes->morn_wed);
-        $wednoon = explode('-', $offtimes->aft_wed);
+        $data = [];
+        foreach (['mon', 'tue', 'wed', 'thu', 'fri'] as $day) {
+            [$data["{$day}_mornin"], $data["{$day}_mornout"]] = $split($offtimes?->{"morn_{$day}"});
+            [$data["{$day}_noonin"], $data["{$day}_noonout"]] = $split($offtimes?->{"aft_{$day}"});
+        }
 
-        $thumorn = explode('-', $offtimes->morn_thu);
-        $thunoon = explode('-', $offtimes->aft_thu);
-
-        $frimorn = explode('-', $offtimes->morn_fri);
-        $frinoon = explode('-', $offtimes->aft_fri);
-
-        $data = [
-            'mon_mornin' => $monmorn[0],
-            'mon_mornout' => $monmorn[1],
-            'mon_noonin' => $monnoon[0],
-            'mon_noonout' => $monnoon[1],
-
-            'tue_mornin' => $tuemorn[0],
-            'tue_mornout' => $tuemorn[1],
-            'tue_noonin' => $tuenoon[0],
-            'tue_noonout' => $tuenoon[1],
-
-            'wed_mornin' => $wedmorn[0],
-            'wed_mornout' => $wedmorn[1],
-            'wed_noonin' => $wednoon[0],
-            'wed_noonout' => $wednoon[1],
-
-            'thu_mornin' => $thumorn[0],
-            'thu_mornout' => $thumorn[1],
-            'thu_noonin' => $thunoon[0],
-            'thu_noonout' => $thunoon[1],
-
-            'fri_mornin' => $frimorn[0],
-            'fri_mornout' => $frimorn[1],
-            'fri_noonin' => $frinoon[0],
-            'fri_noonout' => $frinoon[1],
-        ];
-    
         return response()->json([
             'success' => true,
             'data' => $data,

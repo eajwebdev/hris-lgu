@@ -1,124 +1,76 @@
-@extends('layouts.master')
+@extends('layouts.app')
+
+@php
+    $field = 'mt-1 block h-10 rounded-xl border border-line bg-paper text-ink outline-none transition-shadow focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15';
+    $label = 'block text-xs font-medium text-ink/60';
+
+    // $data is set once a report has been asked for (DtrController::dtrLogs).
+    $data = $data ?? null;
+@endphp
+
+@section('breadcrumb', 'Logs')
+
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Daily Time Record</h1>
+            <p class="mt-1 text-cream/70">Every punch between two dates, with the device it came from.</p>
+        </div>
+        @include('dtr.submenu')
+    </div>
+@endsection
 
 @section('body')
-<div class="container-fluid">
-    <div class="row" style="padding-top: 10px;">
-        <div class="col-md-2">
-            @include('dtr.submenu')
-        </div>
-        <div class="col-lg-10">
-            <div class="card card-info card-outline">
-                <div class="card-header">
-                    <h2 class="card-title text-success1">
-                        <b>LOGS</b>
-                    </h2>
-                </div>
-                <div class="card-body">
-                    <form class="form-horizontal add-form" action="{{ route('dtrLogspost') }}" method="POST">
-                        @csrf
-                        <div class="form-group mtop">
-                            <div class="form-row">
-                                @if($guard == "web")
-                                    <div class="col-md-3 col-sm-12">
-                                        <label class="badge badge-secondary lbel">Employee Name</label><br>
-                                        <select class="form-control form-control-sm {{ (auth()->guard($guard)->user()->role == "employee") ? '' : 'select2' }}" name="employee" id="employee"  @if(auth()->guard($guard)->user()->role == "employee") style="pointer-events: none;" @endif required>
-                                            <option disabled selected>Select</option>
-                                            @if(auth()->guard($guard)->user()->role !== "employee")
-                                                @foreach($employeeall as $emp)
-                                                    <option value="{{ $emp->emp_ID }}" @if(($data != null) && $emp->emp_ID == $data['employeeId']) selected @endif>
-                                                        {{ strtoupper(ucwords($emp->lname)) }}
-                                                        {{ strtoupper(ucwords($emp->prefix)) }}
-                                                        {{ strtoupper(ucwords($emp->fname)) }}
-                                                        {{ strtoupper(ucwords($emp->mname)) }}
-                                                    </option>
-                                                @endforeach
-                                            @else
-                                                <option value="{{ $employeeall->emp_ID }}" selected>
-                                                    {{ strtoupper(ucwords($employeeall->lname)) }}
-                                                    {{ strtoupper(ucwords($employeeall->prefix)) }}
-                                                    {{ strtoupper(ucwords($employeeall->fname)) }}
-                                                    {{ strtoupper(ucwords($employeeall->mname)) }}
-                                                </option>
-                                            @endif
-                                        </select>                                    
-                                    </div>
-                                @else
-                                    @if($acctstat == 1)
-                                    <div class="col-md-3 col-sm-12">
-                                        <label class="badge badge-secondary lbel">Employee Name</label><br>
-                                        <select class="form-control form-control-sm select2" name="employee" id="employee" required>
-                                            <option disabled selected>Select</option>
-                                                @foreach($employeeall as $emp)
-                                                    <option value="{{ $emp->emp_ID }}" @if(isset($employee) && $employee && $emp->emp_ID == $employee->emp_ID) selected @endif>
-                                                        {{ $emp->lname }}
-                                                        {{ $emp->prefix }}
-                                                        {{ $emp->fname }}
-                                                        {{ isset($emp->mname) ?substr($emp->mname, 0, 1).'.' : '' }}
-                                                    </option>
-                                                @endforeach
-                                        </select>                                    
-                                    </div>
-                                    @endif
-                                @endif
-                                <input type="text" name="acctstat" value="{{ $acctstat }}" hidden>
-                                <div class="col-md-3 col-sm-6">
-                                    <label class="badge badge-secondary lbel">From</label>
-                                    <input type="date" name="date_from" class="form-control form-control-sm" id="inc_date1" value="{{ ($data != null) ? $data['dateFrom'] : '' }}" required>
-                                </div>
-                                <div class="col-md-3 col-sm-6">
-                                    <label class="badge badge-secondary lbel">To</label>
-                                    <input type="date" name="date_to" class="form-control form-control-sm" id="inc_date2" value="{{ ($data != null) ? $data['dateTo'] : '' }}" required>
-                                </div>
-                                <div class="col-md-1 col-sm-6 d-flex align-items-center">
-                                    <div>
-                                        <label class="badge badge-secondary lbel d-block">Overtime</label>
-                                        <input type="checkbox" value="1" name="overtime" class="form-control form-control-sm" style="margin-top: 9px;" {{ ($data['overtime'] ?? 0) == 1 ? 'checked' : '' }}>
-                                    </div>
-                                </div>
-                                <div class="col-md-2 col-sm-6 d-flex align-items-end">
-                                    <button type="submit" class="btn btn-success btn-sm btn-block"><i class="fas fa-file-pdf"></i> Generate</button>
-                                </div>
-                            </div>
-                        </div>                        
-                    </form> 
-                    <div class="pdf-frame">
-                        @if(isset($data) && $data !== null)
-                            <div class="pdf-frame__loader" id="logPdfLoader">
-                                <div class="pdf-frame__spinner"></div>
-                                <div>Generating the log report&hellip;</div>
-                            </div>
-                            <iframe id="logPdfFrame" src="{{ route('logDtrView', ['employeeId' => $data['employeeId'] ?? 0, 'dateFrom' => $data['dateFrom'] ?? null, 'dateTo' => $data['dateTo'] ?? null, 'overtime' => $data['overtime'] ?? null]) }}"></iframe>
-                        @else
-                            <div class="pdf-frame__empty">Choose an employee and a date range, then select Generate.</div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<script>
-    history.pushState(null, null, location.href);
-    window.onpopstate = function () {
-        history.go(1);
-    };
+<form action="{{ route('dtrLogspost') }}" method="POST" data-generates-pdf
+      class="flex flex-wrap items-end gap-3 rounded-2xl border border-line bg-surface p-4">
+    @csrf
 
+    @include('dtr.partials.employee-field', ['selected' => $data['employeeId'] ?? null])
+
+    <div>
+        <label for="date_from" class="{{ $label }}">From</label>
+        <input type="date" name="date_from" id="date_from" value="{{ $data['dateFrom'] ?? '' }}" required class="{{ $field }} px-3">
+    </div>
+
+    <div>
+        <label for="date_to" class="{{ $label }}">To</label>
+        <input type="date" name="date_to" id="date_to" value="{{ $data['dateTo'] ?? '' }}" required class="{{ $field }} px-3">
+    </div>
+
+    <label class="flex h-10 cursor-pointer items-center gap-2.5 rounded-xl border border-line px-3.5 has-checked:border-forest-600/50 has-checked:bg-forest-100">
+        <input type="checkbox" value="1" name="overtime" class="size-4 accent-forest-600" {{ ($data['overtime'] ?? 0) == 1 ? 'checked' : '' }}>
+        Overtime
+    </label>
+
+    @include('partials.generate-button')
+</form>
+
+@include('partials.pdf-preview', [
+    'pdfUrl' => $data
+        ? route('logDtrView', ['employeeId' => $data['employeeId'] ?? 0, 'dateFrom' => $data['dateFrom'] ?? null, 'dateTo' => $data['dateTo'] ?? null, 'overtime' => $data['overtime'] ?? null])
+        : null,
+    'working' => 'Generating the log report',
+    'prompt' => $acctstat == 1
+        ? 'Choose an employee and a date range, then select Generate.'
+        : 'Choose a date range, then select Generate.',
+])
+@endsection
+
+@push('scripts')
+<script>
+    // "To" cannot be earlier than "From": it is held back, and emptied if it
+    // has just been overtaken.
     (function () {
-        var frame = document.getElementById('logPdfFrame');
-        var loader = document.getElementById('logPdfLoader');
-        if (frame && loader) {
-            frame.addEventListener('load', function () { loader.hidden = true; });
+        var from = document.getElementById('date_from');
+        var to = document.getElementById('date_to');
+
+        function hold() {
+            if (from.value) { to.min = from.value; } else { to.removeAttribute('min'); }
+            if (from.value && to.value && to.value < from.value) { to.value = ''; }
         }
 
-        document.querySelectorAll('form').forEach(function (form) {
-            form.addEventListener('submit', function () {
-                var btn = form.querySelector('button[type="submit"], button:not([type])');
-                if (!btn || btn.dataset.busy) return;
-                btn.dataset.busy = '1';
-                btn.disabled = true;
-                btn.innerHTML = '<span class="btn-spinner"></span> Generating&hellip;';
-            });
-        });
+        from.addEventListener('change', hold);
+        hold();
     })();
 </script>
-@endsection
+@endpush

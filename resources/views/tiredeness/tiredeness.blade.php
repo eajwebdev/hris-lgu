@@ -1,56 +1,49 @@
-@extends('layouts.master')
+@extends('layouts.app')
+
+@php
+    $field = 'mt-1 block h-10 rounded-xl border border-line bg-paper text-ink outline-none transition-shadow focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15';
+    $label = 'block text-xs font-medium text-ink/60';
+
+    // Set once a report has been asked for. $employeeId is 0 for everyone.
+    $generated = request()->isMethod('post') && isset($employeeId, $month);
+@endphp
+
+@section('hero')
+    <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Tardiness &amp; Undertime</h1>
+    <p class="mt-1 text-cream/70">Late arrivals and early departures for a month, for one employee or everyone.</p>
+@endsection
 
 @section('body')
-<div class="container-fluid">
-    <div class="row" style="padding-top: 10px;">
-        <div class="col-lg-12">
-            <div class="card card-info card-outline">
-                <div class="card-header">
-                    <h2 class="card-title text-success1">
-                        <b>TARDINESS & UNDERTIME</b>
-                    </h2>
-                </div>
-                <div class="card-body">
-                    <form class="form-horizontal add-form" action="{{ route('tirednessSearch') }}" method="POST">
-                        @csrf
-                        <div class="form-group mtop">
-                            <div class="form-row">
-                                <div class="col-md-3 col-sm-12">
-                                    <label class="badge badge-secondary lbel">Employee Name</label><br>
-                                    <select class="form-control form-control-sm {{ (auth()->guard($guard)->user()->role == "employee") ? '' : 'select2' }}" name="employee" id="employee"  @if(auth()->guard($guard)->user()->role == "employee") style="pointer-events: none;" @endif required>
-                                        <option value="0" selected>ALL</option>
-                                        @if(auth()->guard($guard)->user()->role !== "employee")
-                                            @foreach($employeeall as $emp)
-                                                <option value="{{ $emp->emp_ID }}" @if(isset($employee) && $employee && $emp->emp_ID == $employee->emp_ID) selected @endif>
-                                                    {{ $emp->lname }} {{ $emp->prefix }} {{ $emp->fname }} {{ isset($emp->mname) ? substr($emp->mname, 0, 1).'.' : '' }}
-                                                </option>
-                                            @endforeach
-                                        @endif
-                                    </select>                                    
-                                </div>
-                                <div class="col-md-3 col-sm-6">
-                                    <label class="badge badge-secondary lbel">TO</label> 
-                                    <input type="month" name="month" class="form-control form-control-sm" id="date" value="{{ ($month !== null) ? $month : date('Y-m') }}" required>
-                                </div>
-                                <div class="col-md-2 col-sm-6 d-flex align-items-end">
-                                    <button class="btn btn-success btn-sm btn-block"><i class="fas fa-file-pdf"></i> Generate</button>
-                                </div>
-                            </div>
-                        </div>                        
-                    </form>
-                    @php
-                        $iframeSrc = request()->isMethod('post') && isset($employeeId, $month) ? route('pdfTirednes', ['employeeId' => $employeeId, 'month' => $month]) : '';
-                    @endphp
-                    <iframe src="{{ $iframeSrc }}" width="100%" height="600px"></iframe>
-                 </div>
-            </div>
-        </div>
+<form action="{{ route('tirednessSearch') }}" method="POST" data-generates-pdf
+      class="flex flex-wrap items-end gap-3 rounded-2xl border border-line bg-surface p-4">
+    @csrf
+
+    <div class="w-full sm:w-64">
+        <label for="employee" class="{{ $label }}">Employee</label>
+        <select name="employee" id="employee" required class="{{ $field }} w-full pr-8 pl-3">
+            <option value="0">All employees</option>
+            @if(auth()->guard($guard)->user()->role !== 'employee')
+                {{-- Surname first and in order, so typing one in the open list jumps to it. --}}
+                @foreach($employeeall->sortBy(fn ($emp) => strtolower($emp->lname . ' ' . $emp->fname)) as $emp)
+                    <option value="{{ $emp->emp_ID }}" @if($employee && $emp->emp_ID == $employee->emp_ID) selected @endif>
+                        {{ $emp->lname }}, {{ trim($emp->prefix . ' ' . $emp->fname) }} {{ isset($emp->mname) ? substr($emp->mname, 0, 1) . '.' : '' }}
+                    </option>
+                @endforeach
+            @endif
+        </select>
     </div>
-</div>
-<script>
-    history.pushState(null, null, location.href);
-    window.onpopstate = function () {
-        history.go(1);
-    };
-</script>
+
+    <div>
+        <label for="month" class="{{ $label }}">Month</label>
+        <input type="month" name="month" id="month" value="{{ $month ?? date('Y-m') }}" required class="{{ $field }} px-3">
+    </div>
+
+    @include('partials.generate-button')
+</form>
+
+@include('partials.pdf-preview', [
+    'pdfUrl' => $generated ? route('pdfTirednes', ['employeeId' => $employeeId, 'month' => $month]) : null,
+    'working' => 'Generating the tardiness report',
+    'prompt' => 'Choose an employee or everyone, and a month, then select Generate.',
+])
 @endsection

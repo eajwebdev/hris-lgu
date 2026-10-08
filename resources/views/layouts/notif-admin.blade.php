@@ -1,8 +1,7 @@
 <!-- Job Application Notifications -->
-{{-- Was pinned to a single carried-over username that does not exist here, so
-     no administrator ever saw these. Any Administrator / HR Administrator —
-     the same people the recruitment routes admit — sees them now. --}}
-@if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
+{{-- Who sees these is decided by sees_job_applications() in
+     app/Helpers/helpers.php, shared with the Tailwind shell. --}}
+@if(sees_job_applications($guard))
 <li class="nav-item dropdown">
     <a class="nav-link" href="#" data-toggle="dropdown" title="Job Applications">
         <i class="fas fa-envelope text-success1"></i>

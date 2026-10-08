@@ -1,3 +1,12 @@
+{{-- Notification rows for administrators: the top bar list and the "load more"
+     response (NotificationController::loadMore).
+
+     Drawn inside two shells, so every element carries two sets of classes: the
+     Bootstrap ones for the AdminLTE top bar, and Tailwind utilities for
+     layouts/app-topbar. Each page loads one stylesheet or the other. Where a
+     Tailwind name also exists in Bootstrap or AdminLTE (px-4, border, text-xs)
+     it is avoided or written as an arbitrary value, so the old pages do not
+     pick up a stray rule. --}}
 @php 
 $leaveTypes = [
     1 => 'Vacation Leave',
@@ -36,15 +45,15 @@ $leaveTypes = [
             $action = $notif->category == 1 ? "is applying for" : "is awaiting approval for";
             $remarks = "{$action} " . strtolower($leaveTypes[$notif->leave_type] ?? '') . " (Application No: #{$notif->transnum})";
         @endphp
-        <a href="{{ route('leaveStatus', $notif->leave_emp_id) }}" class="dropdown-item d-flex align-items-center">
-            <div class="mr-3">
-                <span class="notification-initials">{{ $initials($notif->leave_emp_fullname) }}</span>
+        <a href="{{ route('leaveStatus', $notif->leave_emp_id) }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
+            <div class="mr-3 shrink-0">
+                <span class="notification-initials grid size-10 place-items-center rounded-full bg-forest-100 text-[13px] font-semibold text-forest-800 ring-1 ring-forest-600/20">{{ $initials($notif->leave_emp_fullname) }}</span>
             </div>                            
-            <div>
-                <p class="mb-0">
+            <div class="min-w-0">
+                <p class="mb-0 leading-snug">
                     <strong>{{ ucwords(strtolower($notif->leave_emp_fullname)) }}</strong> {{ $remarks }}
                 </p>
-                <span class="{{ $notif->notifstat == 0 ? 'text-primary font-weight-bold' : 'text-muted' }} text-sm">
+                <span class="{{ $notif->notifstat == 0 ? 'text-primary font-weight-bold font-semibold text-forest-700' : 'text-muted text-ink/50' }} text-sm">
                     {{ $timeDifference }}
                 </span>
             </div>
@@ -96,15 +105,15 @@ $leaveTypes = [
             @break
         @endswitch
 
-        <a href="{{ route('updateNotif', ['menid' => $menid, 'lappid' => $lappid, 'menu' => $menu]) }}" class="dropdown-item d-flex align-items-center">
-            <div class="mr-3">
-                <span class="notification-initials">{{ $initials($fullname) }}</span>
+        <a href="{{ route('updateNotif', ['menid' => $menid, 'lappid' => $lappid, 'menu' => $menu]) }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
+            <div class="mr-3 shrink-0">
+                <span class="notification-initials grid size-10 place-items-center rounded-full bg-forest-100 text-[13px] font-semibold text-forest-800 ring-1 ring-forest-600/20">{{ $initials($fullname) }}</span>
             </div>
-            <div>
-                <p class="mb-0">
+            <div class="min-w-0">
+                <p class="mb-0 leading-snug">
                     <strong>{{ ucwords(strtolower($fullname)) }}</strong> {{ $remarks }}
                 </p>
-                <span class="{{ $notif->notifstat == 0 ? 'text-primary font-weight-bold' : 'text-muted' }} text-sm">
+                <span class="{{ $notif->notifstat == 0 ? 'text-primary font-weight-bold font-semibold text-forest-700' : 'text-muted text-ink/50' }} text-sm">
                     {{ $timeDifference }}
                 </span>
             </div>
@@ -121,17 +130,17 @@ $leaveTypes = [
             $attAction = $notif->att_action === 'out' ? 'clocked OUT' : 'clocked IN';
             $remarks = "{$attAction} {$attDistance} from {$notif->att_station_name} — outside station range, for clarification.";
         @endphp
-        <a href="{{ route('attendanceMonitor') }}" class="dropdown-item d-flex align-items-center">
-            <div class="mr-3">
-                <span class="notification-initials" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A;">
+        <a href="{{ route('attendanceMonitor') }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
+            <div class="mr-3 shrink-0">
+                <span class="notification-initials grid size-10 place-items-center rounded-full text-[13px] font-semibold" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A;">
                     <i class="fas fa-location-dot"></i>
                 </span>
             </div>
-            <div>
-                <p class="mb-0">
+            <div class="min-w-0">
+                <p class="mb-0 leading-snug">
                     <strong>{{ ucwords(strtolower($notif->att_emp_fullname ?? 'Unknown employee')) }}</strong> {{ $remarks }}
                 </p>
-                <span class="{{ $notif->notifstat == 0 ? 'text-primary font-weight-bold' : 'text-muted' }} text-sm">
+                <span class="{{ $notif->notifstat == 0 ? 'text-primary font-weight-bold font-semibold text-forest-700' : 'text-muted text-ink/50' }} text-sm">
                     {{ $timeDifference }}
                 </span>
             </div>
@@ -139,5 +148,5 @@ $leaveTypes = [
     @break
 @endswitch
 
-<div class="dropdown-divider"></div>
+<div class="dropdown-divider border-t border-line"></div>
 @endforeach

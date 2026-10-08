@@ -11,8 +11,6 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="{{ asset('template/plugins/fontawesome-free-v6/css/all.min.css') }}">
-    <!-- fullCalendar -->
-    <link rel="stylesheet" href="{{ asset('template/plugins/fullcalendar/main.css') }}">
     <!-- icheck bootstrap -->
     <link rel="stylesheet" href="{{ asset('template/plugins/icheck-bootstrap/icheck-bootstrap.min.css') }}">
     <!-- Theme style -->
@@ -393,15 +391,11 @@
 </script>
 
 @include('script.masterScript')
-@include('script.officeScript')
 @if(request()->is('pds/family-bg/*') || request()->is('pds/family-bg'))
     @include('script.familybgScript')
 @endif
 @if(request()->is('employees') || request()->is('employees/*'))
     @include('script.employeeScript')
-@endif
-@if(request()->is('user') || request()->is('user/*'))
-    @include('script.userScript')
 @endif
 @if(request()->is('pds') || request()->is('pds/personal-info') || request()->is('pds/personal-info/*'))
     @include('script.personInfoScript')
