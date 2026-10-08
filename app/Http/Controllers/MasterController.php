@@ -224,6 +224,101 @@ class MasterController extends Controller
         }
     }
 
+    /**
+     * The small chart on each tile of the administrator's dashboard.
+     *
+     * Every series is a list of ['label' => ..., 'value' => ...] points, oldest
+     * first, ending on the current period — which is the one the tile's own
+     * number counts. The review-queue tiles also get the date of the oldest
+     * entry still waiting.
+     *
+     * @param  \Illuminate\Support\Collection  $activeEmployees  Employees with stat_1 = 1
+     */
+    private function dashboardTrends($activeEmployees): array
+    {
+        $now = Carbon::now('Asia/Manila');
+        $headcount = $activeEmployees->count();
+
+        // Attendance: today, and the nine working days before it. Weekends are
+        // left out because nearly nobody clocks in, and a run of near-empty
+        // days would flatten every real one beside it.
+        $days = collect([$now->copy()->startOfDay()]);
+        for ($day = $now->copy()->subDay()->startOfDay(); $days->count() < 10; $day->subDay()) {
+            if (!$day->isWeekend()) {
+                $days->prepend($day->copy());
+            }
+        }
+
+        // Counted the way the Present tile counts today: DTR rows per date.
+        $presentOn = Dtr::whereBetween('date', [$days->first()->toDateString(), $days->last()->toDateString()])
+            ->selectRaw('date, COUNT(*) as total')
+            ->groupBy('date')
+            ->get()
+            ->mapWithKeys(fn ($row) => [Carbon::parse($row->date)->toDateString() => (int) $row->total]);
+
+        $present = $days->map(fn ($day) => [
+            'label' => $day->format('D, M j'),
+            'value' => $presentOn[$day->toDateString()] ?? 0,
+        ]);
+
+        // Absent is "headcount minus present", as on the tile. Earlier days are
+        // measured against today's headcount, which is all there is to go on:
+        // nothing records how many people were employed on a past date.
+        $absent = $present->map(fn ($point) => [
+            'label' => $point['label'],
+            'value' => max(0, $headcount - $point['value']),
+        ]);
+
+        // Hires per month over the last twelve, from date_hired.
+        $hiredIn = $activeEmployees->pluck('date_hired')->filter()
+            ->countBy(fn ($date) => Carbon::parse($date)->format('Y-m'));
+
+        $hires = collect(range(11, 0))
+            ->map(fn ($back) => $now->copy()->startOfMonth()->subMonthsNoOverflow($back))
+            ->map(fn ($month) => [
+                'label' => $month->format('M Y'),
+                'value' => $hiredIn[$month->format('Y-m')] ?? 0,
+            ]);
+
+        // Review queues: what came in per day over the last fortnight, and how
+        // long the oldest entry still waiting has been there. $waiting is the
+        // same filter the tile's count uses.
+        $since = $now->copy()->subDays(13)->startOfDay();
+
+        $queue = function (string $model, \Closure $waiting) use ($since, $now) {
+            $filedOn = $model::where('created_at', '>=', $since)
+                ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
+                ->groupBy('day')
+                ->pluck('total', 'day');
+
+            $oldest = $waiting($model::query())->min('created_at');
+
+            return [
+                'series' => collect(range(13, 0))
+                    ->map(fn ($back) => $now->copy()->subDays($back))
+                    ->map(fn ($day) => [
+                        'label' => $day->format('D, M j'),
+                        'value' => (int) ($filedOn[$day->toDateString()] ?? 0),
+                    ])
+                    ->all(),
+                'oldest' => $oldest ? Carbon::parse($oldest) : null,
+            ];
+        };
+
+        $unreviewed = fn ($query) => $query->where('status', 0);
+
+        return [
+            'hires'      => $hires->all(),
+            'present'    => $present->all(),
+            'absent'     => $absent->all(),
+            'leave'      => $queue(LeaveApplication::class, fn ($query) => $query->where('emp_esign', 0)->where('history', 1)->where('status', 1)),
+            'eligibility' => $queue(Eligibility::class, $unreviewed),
+            'experience' => $queue(WorkExperience::class, $unreviewed),
+            'learning'   => $queue(LearningDev::class, $unreviewed),
+            'voluntary'  => $queue(VoluntaryWork::class, $unreviewed),
+        ];
+    }
+
     public function dashboard(Request $request)
     {
         $guard = $this->getGuard();
@@ -269,7 +364,9 @@ class MasterController extends Controller
                 $employee->bdate = Carbon::parse($employee->bdate);
             });
         
-            return view("home.dashboard", compact('eliCount', 'workexpCount', 'learDevCount', 'volWorkCount', 'dtrCount', 'totalEmployees', 'leaveappCount', 'eliCount', 'offCount', 'userCount', 'chartEmployee', 'empStatusPercentages', 'upcomingBirthdays', 'guard'));
+            $trends = $this->dashboardTrends($chartEmployee);
+
+            return view("home.dashboard", compact('eliCount', 'workexpCount', 'learDevCount', 'volWorkCount', 'dtrCount', 'totalEmployees', 'leaveappCount', 'eliCount', 'offCount', 'userCount', 'chartEmployee', 'empStatusPercentages', 'upcomingBirthdays', 'trends', 'guard'));
         }
     
         if (\Auth::guard('employee')->check()) {

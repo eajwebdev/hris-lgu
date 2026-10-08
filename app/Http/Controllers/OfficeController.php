@@ -18,6 +18,15 @@ class OfficeController extends Controller
         }
     }
     
+    /** Employees assigned to each office, keyed by office id. */
+    private function headcounts()
+    {
+        return Employee::whereNotNull('emp_dept')
+            ->selectRaw('emp_dept, COUNT(*) as total')
+            ->groupBy('emp_dept')
+            ->pluck('total', 'emp_dept');
+    }
+
     public function officeList() {
         $guard = $this->getGuaard();
         $office = Office::leftJoin('employees', 'offices.office_head_id', '=', 'employees.id')
@@ -25,8 +34,9 @@ class OfficeController extends Controller
                 ->get(['offices.*', 'employees.fname as efname', 'employees.lname as elname' , 'oic.fname as ofname', 'oic.lname as olname']);      
         
         $employee = Employee::all()->where('emp_status', 1);
-        
-        return view("offdept.officelist", compact('office', 'employee', 'guard'));
+        $headcounts = $this->headcounts();
+
+        return view("offdept.officelist", compact('office', 'employee', 'headcounts', 'guard'));
     }
 
     public function officeCreate(Request $request){
@@ -72,8 +82,9 @@ class OfficeController extends Controller
                 ->get(['offices.*', 'employees.fname as efname', 'employees.lname as elname', 'oic.fname as ofname', 'oic.lname as olname']);         
  
         $offEdit = Office::find($id);
+        $headcounts = $this->headcounts();
 
-        return view("offdept.officelist", compact('offEdit', 'office', 'employee', 'guard'));
+        return view("offdept.officelist", compact('offEdit', 'office', 'employee', 'headcounts', 'guard'));
     }
     
     public function officeUpdate(Request $request){
@@ -92,7 +103,7 @@ class OfficeController extends Controller
         else{
             $select = Office::where('office_name', $request->OfficeName)->where('id', '!=', $request->oid)->exists();
             if ($select) {
-                return redirect()->back()->with('success', 'Office Already Exist!');
+                return redirect()->back()->with('error', 'Office Already Exist!');
             }
             else
             {

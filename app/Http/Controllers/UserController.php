@@ -19,8 +19,24 @@ class UserController extends Controller
         }
     }
 
+    /**
+     * Administrator accounts are managed by administrators only.
+     *
+     * The sidebar has only ever offered this page to the Administrator role,
+     * but the routes checked nothing beyond being signed in: an HR
+     * administrator, or any employee, who typed /user could list the
+     * accounts, create an administrator for themselves, or delete one.
+     */
+    private function authorizeAdmin(): void
+    {
+        $user = auth()->guard('web')->user();
+
+        abort_unless($user && $user->role === 'Administrator', 403);
+    }
+
     public function ulist()
     {
+        $this->authorizeAdmin();
         $guard = $this->getGuaard();
 
         $users = User::select('users.id as uid', 'users.*')->get();
@@ -30,6 +46,7 @@ class UserController extends Controller
 
     public function uCreate(Request $request)
     {
+        $this->authorizeAdmin();
         $validator = Validator::make($request->all(), [
             'lname' => 'required',
             'fname' => 'required',
@@ -86,6 +103,7 @@ class UserController extends Controller
     
     public function uEdit($id)
     {
+        $this->authorizeAdmin();
         $guard = $this->getGuaard();
         $users = User::select('id as uid', 'users.*')->get();
         $uEdit = User::find($id);
@@ -99,6 +117,7 @@ class UserController extends Controller
 
     public function uUpdate(Request $request)
     {
+        $this->authorizeAdmin();
         $validator = Validator::make($request->all(), [
             'lname' => 'required',
             'fname' => 'required',
@@ -154,6 +173,7 @@ class UserController extends Controller
     }    
 
     public function uDelete(Request $request) {
+        $this->authorizeAdmin();
         $user = User::find($request->id);
     
         if (!$user) {

@@ -35,11 +35,41 @@ class AttendanceAdminController extends Controller
 
         $stations = AttendanceStation::orderBy('name')->get();
 
+        // Punches per day over the last six months, so the day picker can
+        // mark the days worth opening.
+        $busyDays = AttendancePunchLog::where('created_at', '>=', now()->subMonths(6)->startOfMonth())
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
+            ->groupBy('day')
+            ->pluck('total', 'day');
+
+        // The fortnight ending on the day being looked at, for the small
+        // charts on the tiles: punches, and the two kinds HR follows up.
+        $shown = \Carbon\Carbon::parse($date);
+        $perDay = AttendancePunchLog::whereBetween('created_at', [$shown->copy()->subDays(13)->startOfDay(), $shown->copy()->endOfDay()])
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as total, SUM(out_of_range = 1) as far, SUM(lat IS NULL) as unlocated')
+            ->groupBy('day')
+            ->get()
+            ->keyBy('day');
+
+        $fortnight = collect(range(13, 0))->map(function ($back) use ($shown, $perDay) {
+            $day = $shown->copy()->subDays($back);
+            $row = $perDay[$day->toDateString()] ?? null;
+
+            return [
+                'label'     => $day->format('D, M j'),
+                'total'     => (int) ($row->total ?? 0),
+                'far'       => (int) ($row->far ?? 0),
+                'unlocated' => (int) ($row->unlocated ?? 0),
+            ];
+        });
+
         return view('attendance.monitor', [
             'guard'    => 'web',
             'date'     => $date,
             'logs'     => $logs,
             'stations' => $stations,
+            'busyDays' => $busyDays,
+            'fortnight'=> $fortnight,
             'flagged'  => $logs->where('out_of_range', true)->count(),
             'unlocated'=> $logs->whereNull('lat')->count(),
         ]);

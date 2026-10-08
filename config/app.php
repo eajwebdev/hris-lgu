@@ -56,6 +56,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Demo Mode
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the sign-in pages list every account and let anybody sign
+    | in as any of them with one click, no password. It exists for local demos
+    | and testing only and is never shipped to production. Defaults to off, so
+    | an environment that does not set APP_DEMO never gets it.
+    |
+    */
+
+    'demo' => (bool) env('APP_DEMO', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |

@@ -155,6 +155,17 @@ class TirednessController extends Controller
 
             $officialtimes = OfficialTime::where('empid', '=', $employeeId)->first();
 
+            // Lateness is measured against the employee's official hours, and
+            // the report reads all ten half-days of them. With any missing it
+            // used to fail with a 500 inside the preview frame; say what is
+            // wrong instead.
+            $halfDays = ['morn_mon', 'aft_mon', 'morn_tue', 'aft_tue', 'morn_wed', 'aft_wed', 'morn_thu', 'aft_thu', 'morn_fri', 'aft_fri'];
+            $hoursSet = $officialtimes && collect($halfDays)->every(fn ($column) => str_contains((string) $officialtimes->{$column}, '-'));
+
+            if (! $hoursSet) {
+                return response()->view('tiredeness.no-hours');
+            }
+
             $form = 'tiredeness.tiredeness-pdf1';
         }
         

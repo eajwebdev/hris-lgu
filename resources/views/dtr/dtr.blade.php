@@ -1,137 +1,59 @@
-@extends('layouts.master')
+@extends('layouts.app')
+
+@php
+    $field = 'mt-1 block h-10 rounded-xl border border-line bg-paper text-ink outline-none transition-shadow focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15';
+    $label = 'block text-xs font-medium text-ink/60';
+
+    // Set once a DTR has been asked for (DtrController::dtrSearch).
+    $generated = isset($employee, $period, $date) && $employee;
+@endphp
+
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Daily Time Record</h1>
+            <p class="mt-1 text-cream/70">The printable DTR for half a month or a whole one.</p>
+        </div>
+        @include('dtr.submenu')
+    </div>
+@endsection
 
 @section('body')
-<div class="container-fluid">
-    <div class="row" style="padding-top: 10px;">
-        <div class="col-md-2">
-            @include('dtr.submenu')
-        </div>
-        <div class="col-lg-10">
-            <div class="card card-info card-outline">
-                <div class="card-header">
-                    <h2 class="card-title text-success1">
-                        <b>DAILY TIME RECORD</b>
-                    </h2>
-                </div>
-                <div class="card-body">
-                    <form class="form-horizontal add-form" action="{{ route('dtrSearch') }}" method="POST">
-                        @csrf
-                        <div class="form-group mtop">
-                            <div class="form-row">
-                                @if($guard == "web")
-                                <div class="col-md-3 col-sm-12">
-                                    <label class="badge badge-secondary lbel">Employee Name</label><br>
-                                    <select class="form-control form-control-sm {{ (auth()->guard($guard)->user()->role == "employee") ? '' : 'select2' }}" name="employee" id="employee"  @if(auth()->guard($guard)->user()->role == "employee") style="pointer-events: none;" @endif required>
-                                        <option disabled selected>Select</option>
-                                        @if(auth()->guard($guard)->user()->role !== "employee")
-                                            @foreach($employeeall as $emp)
-                                                <option value="{{ $emp->emp_ID }}" @if(isset($employee) && $employee && $emp->emp_ID == $employee->emp_ID) selected @endif>
-                                                    {{ $emp->lname }}
-                                                    {{ $emp->prefix }}
-                                                    {{ $emp->fname }}
-                                                    {{ isset($emp->mname) ?substr($emp->mname, 0, 1).'.' : '' }}
-                                                </option>
-                                            @endforeach
-                                        @else
-                                            <option value="{{ $employeeall->emp_ID }}" selected>
-                                                {{ $employeeall->lname }}
-                                                {{ $employeeall->prefix }}
-                                                {{ $employeeall->fname }}
-                                                {{ isset($employeeall->mname) ?substr($employeeall->mname, 0, 1).'.' : '' }}
-                                            </option>
-                                        @endif
-                                    </select>                                    
-                                </div>
-                                @else
-                                    @if($acctstat == 1)
-                                    <div class="col-md-3 col-sm-12">
-                                        <label class="badge badge-secondary lbel">Employee Name</label><br>
-                                        <select class="form-control form-control-sm select2" name="employee" id="employee" required>
-                                            <option disabled selected>Select</option>
-                                                @foreach($employeeall as $emp)
-                                                    <option value="{{ $emp->emp_ID }}" @if(isset($employee) && $employee && $emp->emp_ID == $employee->emp_ID) selected @endif>
-                                                        {{ $emp->lname }}
-                                                        {{ $emp->prefix }}
-                                                        {{ $emp->fname }}
-                                                        {{ isset($emp->mname) ?substr($emp->mname, 0, 1).'.' : '' }}
-                                                    </option>
-                                                @endforeach
-                                        </select>                                    
-                                    </div>
-                                    @endif
-                                @endif
-                                <input type="text" name="acctstat" value="{{ $acctstat }}" hidden>
-                                <div class="col-md-3 col-sm-6">
-                                    <label class="badge badge-secondary lbel">Period</label><br>
-                                    <select class="form-control form-control-sm" name="period" required>
-                                        <option value="1" @if(isset($employee) && $period == 1) selected @endif>1st half</option>
-                                        <option value="2" @if(isset($employee) && $period == 2) selected @endif>2nd half</option>
-                                        <option value="3" @if(isset($employee) && $period == 3) selected @endif>Whole Month</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3 col-sm-6">
-                                    <label class="badge badge-secondary lbel">Month</label>
-                                    <input type="month" name="date" class="form-control form-control-sm" id="date" value="{{ isset($employee) ? $date : '' }}" required>
-                                </div>
-                                <div class="col-md-1 col-sm-6 d-flex align-items-center">
-                                    <div>
-                                        <label class="badge badge-secondary lbel d-block">Overtime</label>
-                                        <input type="checkbox" value="1" name="overtime" class="form-control form-control-sm" style="margin-top: 9px;" {{ isset($employee) && $overtime == 1 ? 'checked' : '' }}>
-                                    </div>
-                                </div>
-                                <div class="col-md-2 col-sm-6 d-flex align-items-end">
-                                    <button class="btn btn-success btn-sm btn-block"><i class="fas fa-file-pdf"></i> Generate</button>
-                                </div>
-                            </div>
-                        </div>                        
-                    </form>
-                    @php
-                        $dtrPdfUrl = isset($employee, $period, $date)
-                            ? route('dtr-pdf', ['employee' => $employee->emp_ID, 'period' => $period, 'date' => $date, 'overtime' => $overtime])
-                            : null;
-                    @endphp
+<form action="{{ route('dtrSearch') }}" method="POST" data-generates-pdf
+      class="flex flex-wrap items-end gap-3 rounded-2xl border border-line bg-surface p-4">
+    @csrf
 
-                    <div class="pdf-frame">
-                        @if($dtrPdfUrl)
-                            <div class="pdf-frame__loader" id="dtrPdfLoader">
-                                <div class="pdf-frame__spinner"></div>
-                                <div>Generating the DTR&hellip;</div>
-                            </div>
-                            <iframe id="dtrPdfFrame" src="{{ $dtrPdfUrl }}"></iframe>
-                        @else
-                            <div class="pdf-frame__empty">Choose an employee and a period, then select Generate.</div>
-                        @endif
-                    </div>
-                 </div>
-            </div>
-        </div>
+    @include('dtr.partials.employee-field', ['selected' => $generated ? $employee->emp_ID : null])
+
+    <div>
+        <label for="period" class="{{ $label }}">Period</label>
+        <select name="period" id="period" required class="{{ $field }} pr-8 pl-3">
+            <option value="1" @if($generated && $period == 1) selected @endif>1st half</option>
+            <option value="2" @if($generated && $period == 2) selected @endif>2nd half</option>
+            <option value="3" @if($generated && $period == 3) selected @endif>Whole Month</option>
+        </select>
     </div>
-</div>
-<script>
-    history.pushState(null, null, location.href);
-    window.onpopstate = function () {
-        history.go(1);
-    };
 
-    // Hide the spinner once the PDF has actually rendered in the frame.
-    (function () {
-        var frame = document.getElementById('dtrPdfFrame');
-        var loader = document.getElementById('dtrPdfLoader');
-        if (frame && loader) {
-            frame.addEventListener('load', function () { loader.hidden = true; });
-        }
+    <div>
+        <label for="date" class="{{ $label }}">Month</label>
+        <input type="month" name="date" id="date" value="{{ $generated ? $date : '' }}" required class="{{ $field }} px-3">
+    </div>
 
-        // The form reloads the page before the PDF is built, so tell the user
-        // the click registered instead of leaving the button looking idle.
-        document.querySelectorAll('form').forEach(function (form) {
-            form.addEventListener('submit', function () {
-                var btn = form.querySelector('button[type="submit"], button:not([type])');
-                if (!btn || btn.dataset.busy) return;
-                btn.dataset.busy = '1';
-                btn.disabled = true;
-                btn.innerHTML = '<span class="btn-spinner"></span> Generating&hellip;';
-            });
-        });
-    })();
-</script>
+    <label class="flex h-10 cursor-pointer items-center gap-2.5 rounded-xl border border-line px-3.5 has-checked:border-forest-600/50 has-checked:bg-forest-100">
+        <input type="checkbox" value="1" name="overtime" class="size-4 accent-forest-600" {{ $generated && $overtime == 1 ? 'checked' : '' }}>
+        Overtime
+    </label>
+
+    @include('partials.generate-button')
+</form>
+
+@include('partials.pdf-preview', [
+    'pdfUrl' => $generated
+        ? route('dtr-pdf', ['employee' => $employee->emp_ID, 'period' => $period, 'date' => $date, 'overtime' => $overtime])
+        : null,
+    'working' => 'Generating the DTR',
+    'prompt' => $acctstat == 1
+        ? 'Choose an employee and a period, then select Generate.'
+        : 'Choose a period, then select Generate.',
+])
 @endsection

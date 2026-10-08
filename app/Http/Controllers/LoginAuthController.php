@@ -19,7 +19,7 @@ class LoginAuthController extends Controller
             return redirect()->route('dashboard');
         }
         
-        return view('login-page');
+        return view('login-page', ['demoAccounts' => $this->demoAccounts()]);
     }
 
     public function getLogin()
@@ -30,7 +30,7 @@ class LoginAuthController extends Controller
             return redirect()->route('dashboard');
         }
 
-        return view('login');
+        return view('login', ['demoAccounts' => $this->demoAccounts()]);
     }
     
     public function postLogin(Request $request)
@@ -70,6 +70,83 @@ class LoginAuthController extends Controller
         }
 
         return redirect()->back()->with('error', 'Invalid Credentials');
+    }
+
+    /**
+     * Demo quick access: sign in as any listed account without a password.
+     *
+     * Exists only while APP_DEMO is on — the route is public but the action
+     * 404s otherwise, so nothing reaches it in production. It also skips the
+     * "replace the issued password" hold, since a demo is rarely given by
+     * somebody who wants to stop and set eighty passwords first.
+     */
+    public function demoLogin(Request $request)
+    {
+        abort_unless(config('app.demo'), 404);
+
+        $request->validate([
+            'account' => ['required', 'regex:/^(web|employee):\d+$/'],
+        ]);
+
+        [$guard, $id] = explode(':', $request->account);
+
+        $account = $guard === 'web' ? User::find($id) : Employee::find($id);
+
+        if (! $account) {
+            return redirect()->back()->with('error', 'Invalid Credentials');
+        }
+
+        if ($guard === 'employee' && $account->stat_1 != 1) {
+            return redirect()->back()->with('error', 'Account Suspended');
+        }
+
+        // One identity per session. LoginAuth checks the "web" guard first, so
+        // a left-over admin login would otherwise win over the account just
+        // picked — drop the other guard before logging this one in.
+        Auth::guard($guard === 'web' ? 'employee' : 'web')->logout();
+        Auth::guard($guard)->login($account);
+
+        $request->session()->regenerate();
+        $request->session()->forget(EnsurePasswordChanged::SESSION_KEY);
+
+        return redirect()->route('dashboard')->with('success', 'Login Successfully');
+    }
+
+    /**
+     * The accounts the demo panel offers, grouped the way it lists them.
+     * Null when demo mode is off, so the views render nothing.
+     */
+    private function demoAccounts(): ?array
+    {
+        if (! config('app.demo')) {
+            return null;
+        }
+
+        $label = fn ($account) => trim($account->fname . ' ' . $account->lname) ?: $account->username;
+
+        $admins = User::orderBy('id')->get(['id', 'fname', 'lname', 'username', 'role'])
+            ->map(fn ($user) => [
+                'key'      => 'web:' . $user->id,
+                'name'     => $label($user),
+                'username' => $user->username,
+                'role'     => $user->role ?: 'Administrator',
+            ]);
+
+        $employees = Employee::orderBy('lname')->orderBy('fname')
+            ->get(['id', 'fname', 'lname', 'username', 'role', 'position', 'stat_1'])
+            ->map(fn ($employee) => [
+                'key'      => 'employee:' . $employee->id,
+                'name'     => $label($employee),
+                'username' => $employee->username,
+                'role'     => $employee->stat_1 != 1
+                    ? 'Suspended'
+                    : ($employee->position ?: ucfirst((string) ($employee->role ?: 'employee'))),
+            ]);
+
+        return array_filter([
+            'Administrators' => $admins->all(),
+            'Employees'      => $employees->all(),
+        ]);
     }
 
     /**

@@ -1,0 +1,230 @@
+/*
+ * Tailwind entry. Loaded only by the views that have been moved to Tailwind
+ * (the sign-in landing page, and everything on layouts/app) — the rest of the
+ * app is still AdminLTE / Bootstrap 4 on layouts/master, and Tailwind's reset
+ * must not reach those pages.
+ *
+ * source(none) + @source: scan the Blade views and nothing else. Left to
+ * auto-detect, Tailwind also reads public/template and emits a utility for
+ * every class-shaped string in the vendor JavaScript there.
+ */
+@import "tailwindcss" source(none);
+@source "../views";
+
+@theme {
+    --font-sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-display: "Bricolage Grotesque", "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+
+    /* Greens and oranges are stepped out from the two colours on the
+       municipal seal: forest-600 and sun-500 are the seal's own. */
+    --color-forest-950: #0A2A1A;
+    --color-forest-900: #0F3D26;
+    --color-forest-800: #164B2E;
+    --color-forest-700: #17663A;
+    --color-forest-600: #1E7A45;
+    --color-forest-500: #2E9E5E;
+    --color-forest-100: #E3F1E8;
+
+    --color-sun-700: #B26205;
+    --color-sun-600: #D97C0B;
+    --color-sun-500: #EF9017;
+    --color-sun-100: #FBEBD0;
+    --color-sun-50:  #FFFBF4;
+
+    /* The four a theme swaps (see "Dark theme" below): page, panel, text
+       and rule. Cream is not one of them — it is the fixed light colour for
+       text on the green panels, which stay dark in both themes. */
+    --color-paper:   #FAF8F3;
+    --color-surface: #FFFFFF;
+    --color-ink:     #14201A;
+    --color-line:    #DEDDD4;
+    --color-cream:   #F6F1E4;
+
+    /* One-shot entrances. Used behind motion-safe: only. */
+    --animate-sunrise: sunrise 1.6s cubic-bezier(.2, .7, .2, 1) both;
+    --animate-settle: settle .6s cubic-bezier(.2, .7, .2, 1) both;
+
+    @keyframes sunrise {
+        from { transform: translateY(70px); }
+        to   { transform: translateY(0); }
+    }
+    @keyframes settle {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   App shell state (layouts/app). All are set as data attributes on <html>.
+   --------------------------------------------------------------------------- */
+
+/* dark: — the dark theme is on. Chosen with the toggle in the top bar, not
+   taken from the operating system: the pages still on the old shell have no
+   dark version, and following the system would flip between the two. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* rail: — desktop sidebar collapsed to icons only. */
+@custom-variant rail {
+    @media (width >= 64rem) {
+        &:where([data-sidebar="collapsed"] *) {
+            @slot;
+        }
+    }
+}
+
+/* drawer: — sidebar slid in over the page on phones and tablets. */
+@custom-variant drawer {
+    @media (width < 64rem) {
+        &:where([data-drawer="open"] *) {
+            @slot;
+        }
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Dark theme (layouts/app)
+   ---------------------------------------------------------------------------
+   Mostly a change of tokens rather than a second set of classes: the page,
+   panel, text and rule colours swap, and so do the tints and the greens and
+   oranges that are used as text on them. forest-900 / 950 / 600 and the
+   base oranges are left alone — they fill the sidebar, the banner, buttons
+   and chart marks, which are dark-on-photo or carry light text either way.
+   Anything a token swap cannot express uses the dark: variant in the markup.
+   --------------------------------------------------------------------------- */
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-paper:   #0C1410;
+    --color-surface: #141D18;
+    --color-ink:     #E7EDE8;
+    --color-line:    #25342C;
+
+    --color-forest-100: #163123;
+    --color-forest-700: #86D3A5;
+    --color-forest-800: #A5E0BC;
+
+    --color-sun-50:  #251C0D;
+    --color-sun-100: #3A2A10;
+    --color-sun-600: #F0A545;
+    --color-sun-700: #F2B866;
+}
+
+/* The photo behind the header banner (see layouts/app). Kept wide enough to
+   stay behind a tall banner on a phone, and lifted so the sign on the
+   building sits in the top bar. The element supplies the image itself, since
+   only Blade knows its URL. */
+@layer components {
+    .shell-photo {
+        --photo-width: max(100vw, 80rem);
+        background-repeat: no-repeat;
+        background-size: var(--photo-width) auto;
+        /* The sign is a tenth of the photo's width down from its top; the
+           middle of the bar is 2rem down from the banner's. */
+        background-position: center calc(2rem - var(--photo-width) * 0.097);
+    }
+
+    /* Green wash over it: heavy on the left, where the text is; even all the
+       way across on a phone, where the text runs the full width. */
+    .shell-wash {
+        background-image: linear-gradient(to right,
+            color-mix(in oklab, var(--color-forest-950) 95%, transparent),
+            color-mix(in oklab, var(--color-forest-950) 82%, transparent) 50%,
+            color-mix(in oklab, var(--color-forest-900) 62%, transparent));
+    }
+
+    @media (width < 40rem) {
+        .shell-wash {
+            background-image: linear-gradient(to right,
+                color-mix(in oklab, var(--color-forest-950) 95%, transparent),
+                color-mix(in oklab, var(--color-forest-950) 82%, transparent));
+        }
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Things Tailwind does not own
+   ---------------------------------------------------------------------------
+   Deliberately outside any @layer. FullCalendar ships its own unlayered
+   stylesheet and the privacy notice is one long inline-styled document, and
+   unlayered rules beat every layered one whatever their specificity — so
+   these have to be unlayered too to have a say.
+   --------------------------------------------------------------------------- */
+
+.fc {
+    --fc-border-color: var(--color-line);
+    --fc-page-bg-color: var(--color-surface);
+    --fc-neutral-bg-color: var(--color-paper);
+    --fc-today-bg-color: var(--color-sun-50);
+    --fc-list-event-hover-bg-color: var(--color-paper);
+    --fc-button-text-color: var(--color-cream);
+    --fc-button-bg-color: var(--color-forest-900);
+    --fc-button-border-color: var(--color-forest-900);
+    --fc-button-hover-bg-color: var(--color-forest-950);
+    --fc-button-hover-border-color: var(--color-forest-950);
+    --fc-button-active-bg-color: var(--color-forest-600);
+    --fc-button-active-border-color: var(--color-forest-600);
+    font-size: .875rem;
+}
+.fc .fc-header-toolbar {
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-bottom: 1rem;
+}
+.fc .fc-toolbar-title {
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    font-weight: 600;
+    letter-spacing: -.02em;
+}
+.fc .fc-button {
+    padding: .45rem .8rem;
+    border-radius: .75rem;
+    font-size: .8125rem;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+.fc .fc-button:focus,
+.fc .fc-button-primary:not(:disabled):active:focus,
+.fc .fc-button-primary:not(:disabled).fc-button-active:focus {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-sun-500) 45%, transparent);
+}
+.fc .fc-col-header-cell-cushion {
+    padding: .6rem .25rem;
+    font-weight: 500;
+    color: color-mix(in srgb, var(--color-ink) 60%, transparent);
+}
+.fc .fc-daygrid-day-number {
+    padding: .4rem .55rem;
+    color: color-mix(in srgb, var(--color-ink) 75%, transparent);
+}
+.fc .fc-day-today .fc-daygrid-day-number {
+    font-weight: 600;
+    color: var(--color-sun-700);
+}
+.fc .fc-daygrid-dot-event {
+    gap: .35rem;
+    padding: .15rem .35rem;
+    border-radius: .375rem;
+}
+.fc .fc-event-swatch {
+    flex: none;
+    width: .5rem;
+    height: .5rem;
+    border-radius: 9999px;
+}
+.fc .fc-event-when {
+    flex: none;
+    color: color-mix(in srgb, var(--color-ink) 55%, transparent);
+}
+.fc .fc-event-what {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+/* The reset takes the paragraph spacing and the bullets off data-privacy
+   .blade.php, which the old shell got from Bootstrap. */
+.privacy-container p { margin-bottom: .9rem; }
+.privacy-container ul { list-style: disc; padding-left: 1.25rem; }
+.privacy-container li { margin-bottom: .35rem; }

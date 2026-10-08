@@ -35,6 +35,10 @@ class ComparativeAssessmentController extends Controller
 {
     public function __construct(private PsbScoring $psb)
     {
+        // The base constructor shares what the top bar draws (notifications,
+        // job applications). Without this call every page of this controller
+        // failed on an undefined $notifications.
+        parent::__construct();
     }
 
     private function authorizeAdmin(): void

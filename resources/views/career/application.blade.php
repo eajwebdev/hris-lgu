@@ -1,759 +1,481 @@
-@extends('layouts.master')
+@extends('layouts.app')
+
+@php
+    // Everyone who has applied, and where each application stands. The steps
+    // an application moves through, and what HR can do at each:
+    //
+    //   0 submitted   -> give it a control number (which unlocks its files)
+    //   1 reviewing   -> qualify (schedules the interview) or disqualify
+    //   2 qualified   -> not selected, or on to the top five
+    //   5 top five    -> not hired, or hired
+    //
+    // Setting a control number and every change of status emails the
+    // applicant (ApplicationController::setCtrlNo, updateStatus).
+
+    // status => [label, pill colours]
+    $statuses = [
+        0 => ['Application Submitted', 'bg-line/60 text-ink/70'],
+        1 => ['Reviewing', 'bg-sun-100 text-sun-700'],
+        2 => ['Qualified / Ready for Interview', 'bg-forest-100 text-forest-800'],
+        3 => ['Disqualified', 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'],
+        4 => ['Qualified yet not selected', 'bg-sun-100 text-sun-700'],
+        5 => ['Top 5 / Psychological or Pre-Employment Test', 'bg-forest-100 text-forest-800'],
+        6 => ['Not Hired', 'bg-line/60 text-ink/70'],
+        7 => ['Hired', 'bg-forest-600 text-white'],
+    ];
+
+    // column on the application => [short name, what it is]
+    $files = [
+        'pds' => ['PDS', 'Personal Data Sheet'],
+        'wes' => ['WES', 'Work Experience Sheet'],
+        'intent' => ['Intent', 'Intent Letter'],
+        'resume' => ['Resume', 'Resume'],
+        'tor' => ['TOR', 'Transcript of Records'],
+        'coe' => ['COE', 'Certificate of Employment'],
+        'cert_training' => ['COT', 'Certificate of Training'],
+    ];
+
+    $field = 'rounded-xl border border-line bg-paper text-ink outline-none transition-shadow placeholder:text-ink/40 focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15';
+    $input = $field . ' mt-1 block h-10 w-full px-3';
+    $label = 'block text-xs font-medium text-ink/60';
+    $dialog = 'm-auto max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl shadow-forest-950/25 backdrop:bg-forest-950/60';
+    $primary = 'h-10 cursor-pointer rounded-xl bg-forest-900 px-5 font-medium text-cream transition-colors hover:bg-forest-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500 dark:bg-forest-600 dark:hover:bg-forest-500';
+    $secondary = 'h-10 cursor-pointer rounded-xl border border-line px-5 font-medium transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500';
+    $closeButton = '-mt-1 -mr-2 grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg text-ink/50 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-sun-500';
+    $step = 'inline-flex h-8 cursor-pointer items-center rounded-lg border px-2.5 text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-sun-500';
+    $stepGo = $step . ' border-forest-600/40 text-forest-800 hover:bg-forest-100';
+    $stepStop = $step . ' border-line text-ink/70 hover:border-ink/30';
+    $removeRow = 'grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg text-ink/50 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink/50 dark:hover:bg-red-500/10';
+@endphp
+
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Applications</h1>
+            <p class="mt-1 max-w-2xl text-cream/70">Everyone who has applied for a vacancy, and where each application stands.</p>
+        </div>
+
+        <button type="button" data-dialog-open="applicantDialog"
+                class="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-cream bg-cream px-4 font-medium text-forest-900 transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            <i class="fas fa-plus"></i> Add applicant
+        </button>
+    </div>
+@endsection
 
 @section('body')
-@php
-    $current_route = request()->route()->getName();
-    $status_labels = [
-        0 => 'Application Submitted',
-        1 => 'Reviewing',
-        2 => 'Qualified / Ready for Interview',
-        3 => 'Disqualified',
-        4 => 'Qualified yet not selected',
-        5 => 'Top 5 / Psychological or Pre-Employment Test',
-        6 => 'Not Hired',
-        7 => 'Hired',
-    ];
-@endphp
-<style>
-    .application-filter .select2-container--default .select2-selection--single {
-        height: calc(1.8125rem + 2px);
-        border: 1px solid #ced4da;
-    }
+{{-- Which applications to list. The same choices drive the printable report. --}}
+<form method="GET" action="{{ route('appList') }}" class="flex flex-wrap items-end gap-3 rounded-2xl border border-line bg-surface p-4">
+    <div class="w-full sm:w-72">
+        <label for="filterPosition" class="{{ $label }}">Position</label>
+        <select name="position_id" id="filterPosition" class="{{ $field }} mt-1 block h-10 w-full pr-8 pl-3">
+            <option value="">All positions</option>
+            @foreach($jobs as $job)
+                <option value="{{ $job->id }}" @selected((string) request('position_id') === (string) $job->id)>
+                    {{ $job->title }}{{ !empty($job->plantilla_item_no) ? ' - Plantilla No. ' . $job->plantilla_item_no : '' }}
+                </option>
+            @endforeach
+        </select>
+    </div>
 
-    .application-filter .select2-container--default .select2-selection--single .select2-selection__rendered {
-        color: #495057;
-        font-size: .875rem;
-        font-weight: 400;
-        line-height: calc(1.8125rem + 2px);
-        padding-left: .5rem;
-        padding-right: 1.75rem;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
+    <div class="w-full sm:w-64">
+        <label for="filterStatus" class="{{ $label }}">Status</label>
+        <select name="status" id="filterStatus" class="{{ $field }} mt-1 block h-10 w-full pr-8 pl-3">
+            <option value="">All statuses</option>
+            @foreach($statuses as $value => [$statusLabel])
+                <option value="{{ $value }}" @selected((string) request('status') === (string) $value)>{{ $statusLabel }}</option>
+            @endforeach
+        </select>
+    </div>
 
-    .application-filter .select2-container--default .select2-selection--single .select2-selection__arrow {
-        height: calc(1.8125rem + 2px);
-    }
-</style>
+    <div>
+        <label for="filterFrom" class="{{ $label }}">Applied from</label>
+        <input type="date" name="date_from" id="filterFrom" value="{{ request('date_from') }}" class="{{ $field }} mt-1 block h-10 px-3">
+    </div>
+    <div>
+        <label for="filterTo" class="{{ $label }}">Applied to</label>
+        <input type="date" name="date_to" id="filterTo" value="{{ request('date_to') }}" class="{{ $field }} mt-1 block h-10 px-3">
+    </div>
 
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12 mb-2">
-            <div class="card card-info card-outline">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-briefcase"></i> Application List
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <form method="GET" action="{{ route('appList') }}" class="application-filter border rounded bg-light p-3 mb-3">
-                        <div class="row align-items-end">
-                            <div class="col-md-3">
-                                <div class="form-group mb-md-0">
-                                    <label for="filter_position_id">Position</label>
-                                    <select name="position_id" id="filter_position_id" class="form-control form-control-sm select2">
-                                        <option value="">All Positions</option>
-                                        @foreach($jobs as $job)
-                                            <option value="{{ $job->id }}" {{ (string) request('position_id') === (string) $job->id ? 'selected' : '' }}>
-                                                {{ $job->title }}{{ !empty($job->plantilla_item_no) ? ' - Plantilla No. '.$job->plantilla_item_no : '' }}
-                                            </option>
-                                        @endforeach
-                                    </select>
+    <button type="submit" class="{{ $primary }}">Apply</button>
+    <button type="submit" formaction="{{ route('applicationReport') }}" formtarget="_blank" class="{{ $secondary }}">
+        <i class="fas fa-file-pdf mr-1"></i> Report
+    </button>
+</form>
+
+<section class="mt-5 rounded-2xl border border-line bg-surface" id="applicationList" data-list>
+    <div class="flex flex-wrap items-center gap-3 border-b border-line p-4">
+        <label class="relative w-full sm:w-auto sm:max-w-xs sm:flex-1">
+            <span class="sr-only">Search applications</span>
+            <span class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-ink/40"><i class="fas fa-magnifying-glass text-xs"></i></span>
+            <input type="search" data-list-search placeholder="Search name, number, email" autocomplete="off" class="{{ $field }} h-10 w-full pr-3 pl-9">
+        </label>
+        <p class="ml-auto text-ink/55" data-list-count aria-live="polite"></p>
+    </div>
+
+    <div class="relative overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="border-b border-line text-xs text-ink/55">
+                <tr>
+                    <th scope="col" class="px-4 py-3 pl-5 font-medium">Applicant</th>
+                    <th scope="col" class="px-4 py-3 font-medium max-md:hidden">Position</th>
+                    <th scope="col" class="px-4 py-3 font-medium max-xl:hidden">Files</th>
+                    <th scope="col" class="px-4 py-3 font-medium max-lg:hidden">Applied</th>
+                    <th scope="col" class="px-4 py-3 font-medium">Status</th>
+                    <th scope="col" class="px-4 py-3 pr-5 text-right font-medium">Next step</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-line">
+                @foreach($applications as $app)
+                    @php
+                        $name = trim(preg_replace('/\s+/', ' ', $app->first_name . ' ' . $app->middle_name . ' ' . $app->last_name));
+                        [$statusLabel, $statusLook] = $statuses[$app->status] ?? ['Unknown', 'bg-line/60 text-ink/70'];
+                    @endphp
+                    <tr id="tr-{{ $app->id }}" data-row
+                        data-search="{{ strtolower($name . ' ' . $app->app_number . ' ' . $app->ctrl_no . ' ' . $app->email . ' ' . $app->mobile . ' ' . $app->position) }}"
+                        class="align-top transition-colors hover:bg-paper/70">
+                        <td class="px-4 py-3 pl-5">
+                            <p class="font-semibold">{{ $name }}</p>
+                            <p class="mt-0.5 text-xs whitespace-nowrap text-ink/55">
+                                {{ $app->app_number }}@if($app->ctrl_no) <span class="mx-1 text-ink/25">|</span>Control no. {{ $app->ctrl_no }}@endif
+                            </p>
+                            <p class="mt-0.5 text-xs whitespace-nowrap text-ink/55">{{ ucfirst($app->sex) }}<span class="mx-1 text-ink/25">|</span>{{ $app->mobile }}</p>
+                            <p class="mt-0.5 text-xs text-ink/55">{{ $app->email }}</p>
+                        </td>
+                        <td class="px-4 py-3 max-md:hidden">
+                            <p>{{ $app->position }}</p>
+                            @if(!empty($app->plantilla_item_no))
+                                <p class="mt-0.5 text-xs text-ink/55">Plantilla No. {{ $app->plantilla_item_no }}</p>
+                            @endif
+                        </td>
+                        {{-- The uploaded files stay locked until the application
+                             has been given a control number. --}}
+                        <td class="px-4 py-3 max-xl:hidden">
+                            @if(empty($app->ctrl_no))
+                                <span class="text-ink/45">Locked until a control no. is set</span>
+                            @else
+                                <div class="flex max-w-56 flex-wrap gap-1">
+                                    @foreach($files as $column => [$short, $long])
+                                        @if(!empty($app->{$column}))
+                                            <a href="{{ asset('storage/' . $app->{$column}) }}" target="_blank" title="{{ $long }}"
+                                               class="inline-flex h-7 items-center rounded-md border border-line px-2 text-xs font-medium transition-colors hover:border-forest-600/40 hover:bg-forest-100 hover:text-forest-800 focus-visible:outline-2 focus-visible:outline-sun-500">{{ $short }}</a>
+                                        @endif
+                                    @endforeach
                                 </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group mb-md-0">
-                                    <label for="filter_status">Status</label>
-                                    <select name="status" id="filter_status" class="form-control form-control-sm">
-                                        <option value="">All Statuses</option>
-                                        @foreach($status_labels as $value => $label)
-                                            <option value="{{ $value }}" {{ (string) request('status') === (string) $value ? 'selected' : '' }}>{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="form-group mb-md-0">
-                                    <label for="filter_date_from">Applied From</label>
-                                    <input type="date" name="date_from" id="filter_date_from" class="form-control form-control-sm" value="{{ request('date_from') }}">
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <div class="form-group mb-md-0">
-                                    <label for="filter_date_to">Applied To</label>
-                                    <input type="date" name="date_to" id="filter_date_to" class="form-control form-control-sm" value="{{ request('date_to') }}">
-                                </div>
-                            </div>
-                            <div class="col-md-1">
-                                <label class="d-none d-md-block">&nbsp;</label>
-                                <button type="submit" class="btn btn-info btn-sm btn-block" title="Apply Filter">
-                                    <i class="fas fa-check"></i>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap max-lg:hidden">
+                            <p>{{ $app->created_at->format('M d, Y') }}</p>
+                            <p class="mt-0.5 text-xs text-ink/55">{{ $app->created_at->format('h:i A') }}</p>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="inline-block max-w-44 rounded-md px-2 py-0.5 text-xs font-medium {{ $statusLook }}">{{ $statusLabel }}</span>
+                        </td>
+                        <td class="px-4 py-3 pr-5">
+                            <div class="ml-auto flex w-60 max-w-full flex-wrap justify-end gap-1">
+                                <button type="button" class="{{ $app->ctrl_no ? $stepStop : $stepGo }}" data-ctrl-for="{{ $app->id }}" data-ctrl-no="{{ $app->ctrl_no }}" data-applicant="{{ $name }}">
+                                    {{ $app->ctrl_no ? 'Edit control no.' : 'Set control no.' }}
                                 </button>
+
+                                @if($app->status == 1)
+                                    <button type="button" class="{{ $stepGo }}" data-qualify="{{ $app->id }}" data-applicant="{{ $name }}">Qualify</button>
+                                    <button type="button" class="{{ $stepStop }}" data-disqualify="{{ $app->id }}" data-applicant="{{ $name }}">Disqualify</button>
+                                @elseif($app->status == 2 || $app->status == 5)
+                                    @php
+                                        // [new status, button, colour, question]
+                                        $moves = $app->status == 2
+                                            ? [[5, 'Top 5', $stepGo, 'Select ' . $name . ' for the next stage (Top 5)?'],
+                                               [4, 'Not selected', $stepStop, 'Mark ' . $name . ' as qualified yet not selected?']]
+                                            : [[7, 'Hired', $stepGo, 'Mark ' . $name . ' as hired?'],
+                                               [6, 'Not hired', $stepStop, 'Mark ' . $name . ' as not hired?']];
+                                    @endphp
+                                    @foreach($moves as [$to, $moveLabel, $moveLook, $question])
+                                        <form method="POST" action="{{ route('updateStatus') }}"
+                                              data-confirm="{{ $question }}" data-confirm-detail="The applicant is sent an email about it." data-confirm-button="Yes, {{ strtolower($moveLabel) }}">
+                                            @csrf
+                                            <input type="hidden" name="id" value="{{ $app->id }}">
+                                            <input type="hidden" name="status" value="{{ $to }}">
+                                            <button type="submit" class="{{ $moveLook }}">{{ $moveLabel }}</button>
+                                        </form>
+                                    @endforeach
+                                @endif
                             </div>
-                            <div class="col-md-1">
-                                <label class="d-none d-md-block">&nbsp;</label>
-                                <button type="submit"
-                                        class="btn btn-danger btn-sm btn-block"
-                                        formaction="{{ route('applicationReport') }}"
-                                        formtarget="_blank"
-                                        title="Generate Report">
-                                    <i class="fas fa-file-pdf"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                    <button class="btn btn-success btn-sm float-right mt-1 mb-1" data-toggle="modal" data-target="#add-applicant">+ ADD APPLICANT</button>
-                    <!-- Add Applicant Modal -->
-                    <div class="modal fade" id="add-applicant" role="dialog" aria-labelledby="addApplicantLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-lg" role="document">
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
 
-                            <form action="{{ route('applicationStore') }}" method="POST">
-                                @csrf
+    @if($applications->isEmpty())
+        <div class="px-5 py-14 text-center">
+            <span class="mx-auto grid size-14 place-items-center rounded-full bg-sun-100 text-xl text-sun-700"><i class="fas fa-briefcase"></i></span>
+            <p class="mt-4 font-medium">No applications {{ request()->hasAny(['position_id', 'status', 'date_from', 'date_to']) ? 'match those choices' : 'yet' }}.</p>
+            <p class="mt-1 text-ink/55">Applicants apply through the careers page; one handed in on paper can be added here.</p>
+        </div>
+    @else
+        <p class="px-5 py-10 text-center text-ink/55" data-list-empty hidden>No application matches that.</p>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
+            <label class="flex items-center gap-2 text-ink/55">
+                Rows
+                <select data-list-size class="{{ $field }} h-9 pr-7 pl-3">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="0">All</option>
+                </select>
+            </label>
+            <nav aria-label="Pages" class="flex items-center gap-1" data-list-pager></nav>
+        </div>
+    @endif
+</section>
 
-                                <div class="modal-content">
+{{-- Control number --}}
+<dialog id="ctrlDialog" aria-labelledby="ctrlDialogTitle" class="{{ $dialog }} w-[min(26rem,calc(100vw-2rem))]">
+    <form method="POST" action="{{ route('setCtrlNo') }}" class="p-6">
+        @csrf
+        <input type="hidden" name="id">
 
-                                    <div class="modal-body" style="background-color: #e9ecef;">
-
-                                        <!-- Position -->
-                                        <div class="row">
-                                            <div class="col-md-8">
-                                                <div class="form-group">
-                                                    <label>Position Applied</label>
-                                                    <select name="jid" class="form-control select2" required>
-                                                        <option value="">Select Position</option>
-                                                        @foreach($jobs as $job)
-                                                            <option value="{{ $job->id }}">
-                                                                {{ $job->title }}{{ !empty($job->plantilla_item_no) ? ' - Plantilla No. '.$job->plantilla_item_no : '' }}
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <label>Date Applied</label>
-                                                    <input type="datetime-local"
-                                                        name="created_at"
-                                                        class="form-control"
-                                                        value="{{ now()->format('Y-m-d\TH:i') }}"
-                                                        required>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Name -->
-                                        <div class="row">
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <label>First Name</label>
-                                                    <input type="text" name="first_name" class="form-control" autocomplete="off" required>
-                                                </div>
-                                            </div>
-
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <label>Middle Name</label>
-                                                    <input type="text" name="middle_name" class="form-control" autocomplete="off">
-                                                </div>
-                                            </div>
-
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <label>Last Name</label>
-                                                    <input type="text" name="last_name" class="form-control" autocomplete="off" required>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Personal Info -->
-                                        <div class="row">
-                                            <div class="col-md-2">
-                                                <div class="form-group">
-                                                    <label>Age</label>
-                                                    <input type="number" name="age" class="form-control" min="18" max="65" required>
-                                                </div>
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <div class="form-group">
-                                                    <label>Sex</label>
-                                                    <select name="sex" class="form-control" required>
-                                                        <option value="">Select Sex</option>
-                                                        <option value="Male">Male</option>
-                                                        <option value="Female">Female</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <div class="form-group">
-                                                    <label>Mobile No.</label>
-                                                    <input type="text" name="mobile" class="form-control" autocomplete="off" required>
-                                                </div>
-                                            </div>
-
-                                            <div class="col-md-4">
-                                                <div class="form-group">
-                                                    <label>Email Address</label>
-                                                    <input type="email" name="email" class="form-control" autocomplete="off" required>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Address -->
-                                        <div class="row">
-                                            <div class="col-md-12">
-                                                <div class="form-group">
-                                                    <label>Address</label>
-                                                    <textarea name="address" class="form-control" rows="2" required></textarea>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Education -->
-                                        <hr>
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <label class="mb-0"><strong>Educational Background</strong></label>
-                                            <button type="button" class="btn btn-success btn-sm" id="addEducation">
-                                                <i class="fas fa-plus"></i>
-                                            </button>
-                                        </div>
-
-                                        <div id="educationWrapper">
-                                            <div class="row education-row">
-                                                <div class="col-md-5">
-                                                    <div class="form-group">
-                                                        <label>School / Course / Description</label>
-                                                        <input type="text" name="education[]" class="form-control" required>
-                                                    </div>
-                                                </div>
-
-                                                <div class="col-md-3">
-                                                    <div class="form-group">
-                                                        <label>Level</label>
-                                                        <input type="text" name="elevel[]" class="form-control" placeholder="College, HS, etc." required>
-                                                    </div>
-                                                </div>
-
-                                                <div class="col-md-3">
-                                                    <div class="form-group">
-                                                        <label>Year</label>
-                                                        <input type="text" name="eyear[]" class="form-control" placeholder="2020" required>
-                                                    </div>
-                                                </div>
-
-                                                <div class="col-md-1 d-flex align-items-center">
-                                                    <button type="button" class="btn btn-danger btn-sm removeEducation mt-3" disabled>
-                                                        <i class="fas fa-times"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Eligibility -->
-                                        <hr>
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <label class="mb-0"><strong>Eligibility</strong></label>
-                                            <button type="button" class="btn btn-success btn-sm" id="addEligibility">
-                                                <i class="fas fa-plus"></i>
-                                            </button>
-                                        </div>
-
-                                        <div id="eligibilityWrapper">
-                                            <div class="row eligibility-row">
-                                                <div class="col-md-11">
-                                                    <div class="form-group">
-                                                        <input type="text" name="eligibility[]" class="form-control" placeholder="Civil Service, PRC, etc.">
-                                                    </div>
-                                                </div>
-
-                                                <div class="col-md-1 d-flex align-items-center">
-                                                    <button type="button" class="btn btn-danger btn-sm removeEligibility mt-3" disabled>
-                                                        <i class="fas fa-times"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                    </div>
-
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                                            <i class="fas fa-times"></i> Close
-                                        </button>
-
-                                        <button type="submit" class="btn btn-success">
-                                            <i class="fas fa-save"></i> Save Applicant
-                                        </button>
-                                    </div>
-
-                                </div>
-                            </form>
-
-                        </div>
-                    </div>
-
-                    <div class="table-responsive mt-3">
-                        <table id="example1" class="table table-bordered table-hover">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th>No</th>
-                                    <th>App No.</th>
-                                    <th>Control No.</th>
-                                    <th>Applicant Name</th>
-                                    <th>Position</th>
-                                    <th>Sex</th>
-                                    <th>Mobile</th>
-                                    <th>Email</th>
-                                    <th>Files</th>
-                                    <th>Date Applied</th>
-                                    <th>Status</th>
-                                    <th class="text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @php $no = 1; @endphp
-                                @foreach($applications as $app)
-                                <tr id="tr-{{ $app->id }}">
-                                    <td class="align-middle">{{ $no++ }}</td>
-                                    <td class="align-middle">{{ $app->app_number }}</td>
-                                    <td class="align-middle">
-                                        <span>{{ $app->ctrl_no }}</span>
-                                    </td>
-                                    <td class="align-middle">{{ $app->first_name }} {{ $app->middle_name }} {{ $app->last_name }}</td>
-                                    <td class="align-middle">
-                                        {{ $app->position }}
-                                        @if(!empty($app->plantilla_item_no))
-                                            <br>
-                                            <small class="text-muted">Plantilla No. {{ $app->plantilla_item_no }}</small>
-                                        @endif
-                                    </td>
-                                    <td class="align-middle">{{ ucfirst($app->sex) }}</td>
-                                    <td class="align-middle">{{ $app->mobile }}</td>
-                                    <td class="align-middle">{{ $app->email }}</td>
-
-                                    {{-- 🔹 File Access --}}
-                                    <td class="align-middle text-center">
-                                        @if (empty($app->ctrl_no))
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-warning set-ctrl"
-                                                    value="{{ $app->id }}"
-                                                    data-toggle="modal"
-                                                    data-target="#setCtrlModal"
-                                                    title="Set Control Number to unlock file access">
-                                                <i class="fas fa-key"></i> Set Control No.
-                                            </button>
-                                        @else
-                                            <div class="d-flex flex-wrap" style="gap: 4px;">
-                                                @if(!empty($app->pds))
-                                                <a href="{{ asset('storage/' . $app->pds) }}" class="btn btn-sm btn-outline-primary" target="_blank" title="Personal Data Sheet">
-                                                    <i class="fas fa-file-alt"></i> PDS
-                                                </a>
-                                                @endif
-                                                @if(!empty($app->wes))
-                                                <a href="{{ asset('storage/' . $app->wes) }}" class="btn btn-sm btn-outline-info" target="_blank" title="Work Experience Sheet">
-                                                    <i class="fas fa-briefcase"></i> WES
-                                                </a>
-                                                @endif
-                                                @if(!empty($app->intent))
-                                                <a href="{{ asset('storage/' . $app->intent) }}" class="btn btn-sm btn-outline-secondary" target="_blank" title="Intent Letter">
-                                                    <i class="fas fa-envelope-open-text"></i> Intent
-                                                </a>
-                                                @endif
-                                                @if(!empty($app->resume))
-                                                <a href="{{ asset('storage/' . $app->resume) }}" class="btn btn-sm btn-outline-success" target="_blank" title="Resume">
-                                                    <i class="fas fa-user"></i> Resume
-                                                </a>
-                                                @endif
-                                                @if(!empty($app->tor))
-                                                <a href="{{ asset('storage/' . $app->tor) }}" class="btn btn-sm btn-outline-danger" target="_blank" title="Transcript of Records">
-                                                    <i class="fas fa-graduation-cap"></i> TOR
-                                                </a>         
-                                                @endif
-                                                @if(!empty($app->coe))
-                                                    <a href="{{ asset('storage/' . $app->coe) }}"
-                                                    class="btn btn-sm btn-outline-info"
-                                                    target="_blank"
-                                                    title="Certificate of Employment">
-                                                        <i class="fas fa-briefcase"></i> COE
-                                                    </a>
-                                                @endif                         
-                                                @if(!empty($app->cert_training))
-                                                    <a href="{{ asset('storage/' . $app->cert_training) }}"
-                                                    class="btn btn-sm btn-outline-warning"
-                                                    target="_blank"
-                                                    title="Certificate of Training">
-                                                        <i class="fas fa-certificate"></i> COT
-                                                    </a>
-                                                @endif
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td class="text-center align-middle bold">{{ strtoupper($app->created_at->format('M. d, Y h:i A')) }}</td>
-                                    {{-- 🔹 Status --}}
-                                    <td class="text-center align-middle">
-                                        @php
-                                            $status_labels = [
-                                                0 => 'Application Submitted',
-                                                1 => 'Reviewing',
-                                                2 => 'Qualified / Ready for Interview',
-                                                3 => 'Disqualified',
-                                                4 => 'Qualified yet not selected',
-                                                5 => 'Top 5 / Psychological or Pre-Employment Test',
-                                                6 => 'Not Hired',
-                                                7 => 'Hired',
-                                            ];
-
-                                            $badge_colors = [
-                                                0 => 'secondary',
-                                                1 => 'info',
-                                                2 => 'success',
-                                                3 => 'danger',
-                                                4 => 'warning',
-                                                5 => 'primary',
-                                                6 => 'dark',
-                                                7 => 'success',
-                                            ];
-                                        @endphp
-                                        <span class="badge badge-{{ $badge_colors[$app->status] ?? 'secondary' }}">
-                                            {{ $status_labels[$app->status] ?? 'Unknown' }}
-                                        </span>
-                                    </td>
-                                    {{-- 🔹 Actions --}}
-                                    <td class="text-center align-middle">
-                                        @if($app->ctrl_no)
-                                            <button type="button"
-                                                    class="btn btn-sm btn-info set-ctrl"
-                                                    value="{{ $app->id }}"
-                                                    data-ctrl-no="{{ $app->ctrl_no }}"
-                                                    data-toggle="modal"
-                                                    data-target="#setCtrlModal"
-                                                    title="Edit Control Number">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                        @endif
-                                        @if ($app->status == 1)
-                                            {{-- Qualified --}}
-                                            <button type="button"
-                                                    class="btn btn-sm btn-success q-btn"
-                                                    data-app-id="{{ $app->id }}"
-                                                    data-toggle="modal"
-                                                    data-target="#qualifyModal"
-                                                    title="Mark as Qualified / Set Interview">
-                                                <i class="fas fa-check"></i>
-                                            </button>
-
-                                            {{-- Disqualified --}}
-                                            <button type="button"
-                                                    class="btn btn-sm btn-danger dq-btn"
-                                                    data-app-id="{{ $app->id }}"
-                                                    data-toggle="modal"
-                                                    data-target="#dqModal"
-                                                    title="Disqualify Applicant">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-
-                                        @elseif ($app->status == 2)
-                                            {{-- Move to next or skip --}}
-                                            <form method="POST" action="{{ route('updateStatus') }}" style="display:inline;">
-                                                @csrf
-                                                <input type="hidden" name="id" value="{{ $app->id }}">
-                                                <input type="hidden" name="status" value="4">
-                                                <button type="submit" class="btn btn-sm btn-warning" title="Not selected for next stage">
-                                                    <i class="fas fa-user-clock"></i>
-                                                </button>
-                                            </form>
-
-                                            <form method="POST" action="{{ route('updateStatus') }}" style="display:inline;">
-                                                @csrf
-                                                <input type="hidden" name="id" value="{{ $app->id }}">
-                                                <input type="hidden" name="status" value="5">
-                                                <button type="submit" class="btn btn-sm btn-primary" title="Select for next stage (Top 5)">
-                                                    <i class="fas fa-arrow-right"></i>
-                                                </button>
-                                            </form>
-
-                                        @elseif ($app->status == 5)
-                                            {{-- Not Hired --}}
-                                            <form method="POST" action="{{ route('updateStatus') }}" style="display:inline;">
-                                                @csrf
-                                                <input type="hidden" name="id" value="{{ $app->id }}">
-                                                <input type="hidden" name="status" value="6">
-                                                <button type="submit" class="btn btn-sm btn-dark" title="Mark as Not Hired">
-                                                    <i class="fas fa-user-slash"></i>
-                                                </button>
-                                            </form>
-
-                                            {{-- Hired --}}
-                                            <form method="POST" action="{{ route('updateStatus') }}" style="display:inline;">
-                                                @csrf
-                                                <input type="hidden" name="id" value="{{ $app->id }}">
-                                                <input type="hidden" name="status" value="7">
-                                                <button type="submit" class="btn btn-sm btn-success" title="Mark as Hired">
-                                                    <i class="fas fa-user-check"></i>
-                                                </button>
-                                            </form>
-
-                                        @else
-                                            <button class="btn btn-sm btn-outline-secondary" disabled title="No actions available">
-                                                <i class="fas fa-ban"></i>
-                                            </button>
-                                        @endif
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+                <h2 class="font-display text-xl font-semibold tracking-tight" id="ctrlDialogTitle">Control number</h2>
+                <p class="mt-0.5 truncate text-ink/60" data-applicant-name></p>
             </div>
+            <button type="button" data-dialog-close aria-label="Close" class="{{ $closeButton }}"><i class="fas fa-xmark"></i></button>
         </div>
-    </div>
-</div>
 
-{{-- 🔸 Set Control No. Modal --}}
-<div class="modal fade" id="setCtrlModal" tabindex="-1" role="dialog" aria-labelledby="setCtrlModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content border-0 shadow-lg rounded">
-      <div class="modal-header bg-warning text-dark">
-        <h5 class="modal-title font-weight-bold" id="setCtrlModalLabel">
-          <i class="fas fa-key mr-2"></i> Set Control Number
-        </h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
+        <div class="mt-5">
+            <label for="ctrlNo" class="{{ $label }}">Control number</label>
+            <input type="text" id="ctrlNo" name="ctrl_no" placeholder="Enter control number" autocomplete="off" required class="{{ $input }}">
+            <p class="mt-1 text-xs text-ink/55">Setting it unlocks the applicant's files and starts the review.</p>
+        </div>
 
-      <form id="ctrlForm" method="POST" action="{{ route('setCtrlNo') }}">
+        <div class="mt-6 flex justify-end gap-2">
+            <button type="button" data-dialog-close class="{{ $secondary }}">Cancel</button>
+            <button type="submit" class="{{ $primary }}"><i class="fas fa-save mr-1"></i> Save</button>
+        </div>
+    </form>
+</dialog>
+
+{{-- Qualify: the interview schedule goes out with the notice --}}
+<dialog id="qualifyDialog" aria-labelledby="qualifyDialogTitle" class="{{ $dialog }} w-[min(28rem,calc(100vw-2rem))]">
+    <form method="POST" action="{{ route('updateStatus') }}" class="p-6">
         @csrf
-        <div class="modal-body">
-          <input type="hidden" name="id" id="ctrlAppId">
-          <div class="form-group">
-            <label for="ctrl_no">Control Number</label>
-            <input type="text" name="ctrl_no" id="ctrl_no" class="form-control" placeholder="Enter Control Number" autocomplete="off" required>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-warning text-dark">
-            <i class="fas fa-save"></i> Save
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-{{-- 🔸 Qualified (Interview Schedule) Modal --}}
-<div class="modal fade" id="qualifyModal" tabindex="-1" role="dialog" aria-labelledby="qualifyModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content border-0 shadow rounded">
-      <div class="modal-header bg-success text-white">
-        <h5 class="modal-title font-weight-bold" id="qualifyModalLabel">
-          <i class="fas fa-calendar-check mr-2"></i> Set Interview Schedule
-        </h5>
-        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-
-      <form method="POST" action="{{ route('updateStatus') }}">
-        @csrf
-        <input type="hidden" name="id" id="qualifyAppId">
+        <input type="hidden" name="id">
         <input type="hidden" name="status" value="2">
 
-        <div class="modal-body">
-          <div class="form-group">
-            <label for="interview_datetime">Interview Schedule <span class="text-danger">*</span></label>
-            <input type="datetime-local" id="interview_datetime" name="interview_datetime" class="form-control" required>
-            <small class="form-text text-muted">Example: September 16, 2025, at 2:00 PM</small>
-          </div>
-
-          <div class="form-group">
-            <label for="venue">Venue <span class="text-danger">*</span></label>
-            <textarea id="venue" name="venue" class="form-control" rows="2" required>Conference Room, Admin Building/Bidding Room/Accreditation/ Mini Hotel</textarea>
-          </div>
+        <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+                <h2 class="font-display text-xl font-semibold tracking-tight" id="qualifyDialogTitle">Set interview schedule</h2>
+                <p class="mt-0.5 truncate text-ink/60" data-applicant-name></p>
+            </div>
+            <button type="button" data-dialog-close aria-label="Close" class="{{ $closeButton }}"><i class="fas fa-xmark"></i></button>
         </div>
 
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">
-            <i class="fas fa-times"></i> Cancel
-          </button>
-          <button type="submit" class="btn btn-success">
-            <i class="fas fa-check"></i> Confirm & Qualify
-          </button>
+        <div class="mt-5 space-y-4">
+            <div>
+                <label for="interviewAt" class="{{ $label }}">Interview schedule</label>
+                <input type="datetime-local" id="interviewAt" name="interview_datetime" required class="{{ $input }}">
+            </div>
+            <div>
+                <label for="interviewVenue" class="{{ $label }}">Venue</label>
+                <textarea id="interviewVenue" name="venue" rows="2" required class="{{ $field }} mt-1 block w-full px-3 py-2">Conference Room, Admin Building/Bidding Room/Accreditation/ Mini Hotel</textarea>
+            </div>
         </div>
-      </form>
-    </div>
-  </div>
-</div>
 
-{{-- 🔸 Disqualification Reason Modal --}}
-<div class="modal fade" id="dqModal" tabindex="-1" role="dialog" aria-labelledby="dqModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content border-0 shadow rounded">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title font-weight-bold" id="dqModalLabel">
-          <i class="fas fa-times-circle mr-2"></i> Disqualify Applicant
-        </h5>
-        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
+        <div class="mt-6 flex justify-end gap-2">
+            <button type="button" data-dialog-close class="{{ $secondary }}">Cancel</button>
+            <button type="submit" class="{{ $primary }}">Confirm and qualify</button>
+        </div>
+    </form>
+</dialog>
 
-      <form method="POST" action="{{ route('updateStatus') }}">
+{{-- Disqualify --}}
+<dialog id="disqualifyDialog" aria-labelledby="disqualifyDialogTitle" class="{{ $dialog }} w-[min(28rem,calc(100vw-2rem))]">
+    <form method="POST" action="{{ route('updateStatus') }}" class="p-6">
         @csrf
-        <input type="hidden" name="id" id="dqAppId">
+        <input type="hidden" name="id">
         <input type="hidden" name="status" value="3">
 
-        <div class="modal-body">
-          <div class="form-group">
-            <label for="dqReason">Reason for Disqualification <span class="text-danger">*</span></label>
-            <textarea name="reason" id="dqReason" class="form-control" rows="3" placeholder="Enter reason..." required></textarea>
-          </div>
+        <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+                <h2 class="font-display text-xl font-semibold tracking-tight" id="disqualifyDialogTitle">Disqualify applicant</h2>
+                <p class="mt-0.5 truncate text-ink/60" data-applicant-name></p>
+            </div>
+            <button type="button" data-dialog-close aria-label="Close" class="{{ $closeButton }}"><i class="fas fa-xmark"></i></button>
         </div>
 
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">
-            <i class="fas fa-times"></i> Cancel
-          </button>
-          <button type="submit" class="btn btn-danger">
-            <i class="fas fa-check"></i> Confirm Disqualification
-          </button>
+        <div class="mt-5">
+            <label for="dqReason" class="{{ $label }}">Reason for disqualification</label>
+            <textarea id="dqReason" name="reason" rows="3" placeholder="Enter reason" required class="{{ $field }} mt-1 block w-full px-3 py-2"></textarea>
         </div>
-      </form>
-    </div>
-  </div>
-</div>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.edit-applicant').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const app = JSON.parse(btn.dataset.application || '{}');
 
-            document.getElementById('edit_app_id').value = app.id || '';
-            document.getElementById('edit_jid').value = app.jid || '';
-            document.getElementById('edit_first_name').value = app.first_name || '';
-            document.getElementById('edit_middle_name').value = app.middle_name || '';
-            document.getElementById('edit_last_name').value = app.last_name || '';
-            document.getElementById('edit_age').value = app.age || '';
-            document.getElementById('edit_sex').value = app.sex || '';
-            document.getElementById('edit_mobile').value = app.mobile || '';
-            document.getElementById('edit_email').value = app.email || '';
-            document.getElementById('edit_address').value = app.address || '';
-            document.getElementById('edit_education').value = app.education || '';
-            document.getElementById('edit_eligibility').value = app.eligibility || '';
-            document.getElementById('edit_created_at').value = app.created_at || '';
+        <div class="mt-6 flex justify-end gap-2">
+            <button type="button" data-dialog-close class="{{ $secondary }}">Cancel</button>
+            <button type="submit" class="h-10 cursor-pointer rounded-xl bg-red-700 px-5 font-medium text-white transition-colors hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">Confirm disqualification</button>
+        </div>
+    </form>
+</dialog>
 
-            $('#edit_jid').trigger('change');
-        });
-    });
+{{-- Add an applicant by hand (an application handed in on paper). --}}
+<dialog id="applicantDialog" aria-labelledby="applicantDialogTitle" class="{{ $dialog }} w-[min(46rem,calc(100vw-2rem))]">
+    <form action="{{ route('applicationStore') }}" method="POST" class="p-6">
+        @csrf
 
-    // Set Control No.
-    document.querySelectorAll('.set-ctrl').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.getElementById('ctrlAppId').value = btn.value;
-        });
-    });
+        <div class="flex items-start justify-between gap-4">
+            <h2 class="font-display text-xl font-semibold tracking-tight" id="applicantDialogTitle">Add applicant</h2>
+            <button type="button" data-dialog-close aria-label="Close" class="{{ $closeButton }}"><i class="fas fa-xmark"></i></button>
+        </div>
 
-    // Qualified modal
-    document.querySelectorAll('.q-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.getElementById('qualifyAppId').value = btn.dataset.appId;
-        });
-    });
-
-    // Disqualified modal
-    document.querySelectorAll('.dq-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.getElementById('dqAppId').value = btn.dataset.appId;
-        });
-    });
-});
-</script>
-<script>
-$(function () {
-    $('#filter_position_id').select2({
-        width: '100%',
-        placeholder: 'All Positions'
-    });
-
-    $('#add-applicant').on('shown.bs.modal', function () {
-        $('.select2').select2({
-            dropdownParent: $('#add-applicant'),
-            width: '100%',
-            placeholder: 'Search Position'
-        });
-    });
-
-    $('#edit-applicant').on('shown.bs.modal', function () {
-        $('.select2-edit').select2({
-            dropdownParent: $('#edit-applicant'),
-            width: '100%',
-            placeholder: 'Search Position'
-        });
-    });
-
-    $('#addEducation').click(function () {
-        $('#educationWrapper').append(`
-            <div class="row education-row">
-                <div class="col-md-5">
-                    <div class="form-group">
-                        <label>School / Course / Description</label>
-                        <input type="text" name="education[]" class="form-control" required>
-                    </div>
-                </div>
-
-                <div class="col-md-3">
-                    <div class="form-group">
-                        <label>Level</label>
-                        <input type="text" name="elevel[]" class="form-control" required>
-                    </div>
-                </div>
-
-                <div class="col-md-3">
-                    <div class="form-group">
-                        <label>Year</label>
-                        <input type="text" name="eyear[]" class="form-control" required>
-                    </div>
-                </div>
-
-                <div class="col-md-1 d-flex align-items-center">
-                    <button type="button" class="btn btn-danger btn-sm removeEducation mt-3">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
+        <div class="mt-5 grid gap-4 sm:grid-cols-6">
+            <div class="sm:col-span-4">
+                <label for="newJid" class="{{ $label }}">Position applied</label>
+                <select id="newJid" name="jid" required class="{{ $field }} mt-1 block h-10 w-full pr-8 pl-3">
+                    <option value="" disabled selected>Select position</option>
+                    @foreach($jobs as $job)
+                        <option value="{{ $job->id }}">{{ $job->title }}{{ !empty($job->plantilla_item_no) ? ' - Plantilla No. ' . $job->plantilla_item_no : '' }}</option>
+                    @endforeach
+                </select>
             </div>
-        `);
-    });
-
-    $(document).on('click', '.removeEducation', function () {
-        $(this).closest('.education-row').remove();
-    });
-
-    $('#addEligibility').click(function () {
-        $('#eligibilityWrapper').append(`
-            <div class="row eligibility-row">
-                <div class="col-md-11">
-                    <div class="form-group">
-                        <input type="text" name="eligibility[]" class="form-control" placeholder="Civil Service, PRC, etc.">
-                    </div>
-                </div>
-
-                <div class="col-md-1 d-flex align-items-center">
-                    <button type="button" class="btn btn-danger btn-sm removeEligibility mt-3">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
+            <div class="sm:col-span-2">
+                <label for="newApplied" class="{{ $label }}">Date applied</label>
+                <input type="datetime-local" id="newApplied" name="created_at" value="{{ now()->format('Y-m-d\TH:i') }}" required class="{{ $input }}">
             </div>
-        `);
-    });
 
-    $(document).on('click', '.removeEligibility', function () {
-        $(this).closest('.eligibility-row').remove();
-    });
+            <div class="sm:col-span-2">
+                <label for="newFirst" class="{{ $label }}">First name</label>
+                <input type="text" id="newFirst" name="first_name" autocomplete="off" required class="{{ $input }}">
+            </div>
+            <div class="sm:col-span-2">
+                <label for="newMiddle" class="{{ $label }}">Middle name</label>
+                <input type="text" id="newMiddle" name="middle_name" autocomplete="off" class="{{ $input }}">
+            </div>
+            <div class="sm:col-span-2">
+                <label for="newLast" class="{{ $label }}">Last name</label>
+                <input type="text" id="newLast" name="last_name" autocomplete="off" required class="{{ $input }}">
+            </div>
 
-});
-</script>
+            <div class="sm:col-span-1">
+                <label for="newAge" class="{{ $label }}">Age</label>
+                <input type="number" id="newAge" name="age" min="18" max="65" required class="{{ $input }}">
+            </div>
+            <div class="sm:col-span-1">
+                <label for="newSex" class="{{ $label }}">Sex</label>
+                <select id="newSex" name="sex" required class="{{ $field }} mt-1 block h-10 w-full pr-8 pl-3">
+                    <option value="" disabled selected>Select</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                </select>
+            </div>
+            <div class="sm:col-span-2">
+                <label for="newMobile" class="{{ $label }}">Mobile no.</label>
+                <input type="text" id="newMobile" name="mobile" autocomplete="off" required class="{{ $input }}">
+            </div>
+            <div class="sm:col-span-2">
+                <label for="newEmail" class="{{ $label }}">Email address</label>
+                <input type="email" id="newEmail" name="email" autocomplete="off" required class="{{ $input }}">
+            </div>
+
+            <div class="sm:col-span-6">
+                <label for="newAddress" class="{{ $label }}">Address</label>
+                <textarea id="newAddress" name="address" rows="2" required class="{{ $field }} mt-1 block w-full px-3 py-2"></textarea>
+            </div>
+        </div>
+
+        {{-- Education and eligibility take any number of rows. The first of
+             each cannot be removed; the rest come from the patterns below. --}}
+        <div class="mt-6 flex items-center justify-between gap-3">
+            <h3 class="font-medium">Educational background</h3>
+            <button type="button" data-add-row="education" class="h-9 cursor-pointer rounded-lg border border-line px-3 font-medium transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-sun-500"><i class="fas fa-plus mr-1"></i> Add</button>
+        </div>
+        <div class="mt-2 space-y-2" data-rows="education">
+            <div class="flex items-end gap-2" data-row-of="education">
+                <div class="min-w-0 flex-1"><label class="{{ $label }}">School / course / description<input type="text" name="education[]" required class="{{ $input }}"></label></div>
+                <div class="w-36"><label class="{{ $label }}">Level<input type="text" name="elevel[]" placeholder="College, HS" required class="{{ $input }}"></label></div>
+                <div class="w-24"><label class="{{ $label }}">Year<input type="text" name="eyear[]" placeholder="2020" required class="{{ $input }}"></label></div>
+                <button type="button" disabled title="The first row stays" class="{{ $removeRow }}"><i class="fas fa-xmark"></i></button>
+            </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-between gap-3">
+            <h3 class="font-medium">Eligibility</h3>
+            <button type="button" data-add-row="eligibility" class="h-9 cursor-pointer rounded-lg border border-line px-3 font-medium transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-sun-500"><i class="fas fa-plus mr-1"></i> Add</button>
+        </div>
+        <div class="mt-2 space-y-2" data-rows="eligibility">
+            <div class="flex items-end gap-2" data-row-of="eligibility">
+                <input type="text" name="eligibility[]" placeholder="Civil Service, PRC, etc." aria-label="Eligibility" class="{{ $field }} block h-10 w-full min-w-0 flex-1 px-3">
+                <button type="button" disabled title="The first row stays" class="{{ $removeRow }}"><i class="fas fa-xmark"></i></button>
+            </div>
+        </div>
+
+        <div class="mt-6 flex justify-end gap-2">
+            <button type="button" data-dialog-close class="{{ $secondary }}">Cancel</button>
+            <button type="submit" class="{{ $primary }}"><i class="fas fa-save mr-1"></i> Save applicant</button>
+        </div>
+    </form>
+
+    <template data-pattern="education">
+        <div class="flex items-end gap-2" data-row-of="education">
+            <input type="text" name="education[]" aria-label="School / course / description" required class="{{ $field }} block h-10 min-w-0 flex-1 px-3">
+            <input type="text" name="elevel[]" aria-label="Level" required class="{{ $field }} block h-10 w-36 px-3">
+            <input type="text" name="eyear[]" aria-label="Year" required class="{{ $field }} block h-10 w-24 px-3">
+            <button type="button" data-remove-row title="Remove this row" class="{{ $removeRow }}"><i class="fas fa-xmark"></i></button>
+        </div>
+    </template>
+    <template data-pattern="eligibility">
+        <div class="flex items-end gap-2" data-row-of="eligibility">
+            <input type="text" name="eligibility[]" placeholder="Civil Service, PRC, etc." aria-label="Eligibility" class="{{ $field }} block h-10 w-full min-w-0 flex-1 px-3">
+            <button type="button" data-remove-row title="Remove this row" class="{{ $removeRow }}"><i class="fas fa-xmark"></i></button>
+        </div>
+    </template>
+</dialog>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    var list = document.getElementById('applicationList');
+
+    // Opens one of the three per-applicant dialogs for the row's application.
+    function open(id, button, applicationId, fill) {
+        var dialog = document.getElementById(id);
+        var form = dialog.querySelector('form');
+        form.reset();
+        form.elements['id'].value = applicationId;
+        dialog.querySelector('[data-applicant-name]').textContent = button.dataset.applicant;
+        if (fill) { fill(form); }
+        dialog.showModal();
+    }
+
+    list.addEventListener('click', function (event) {
+        var button;
+
+        if ((button = event.target.closest('[data-ctrl-for]'))) {
+            open('ctrlDialog', button, button.dataset.ctrlFor, function (form) {
+                form.elements['ctrl_no'].value = button.dataset.ctrlNo || '';
+            });
+        } else if ((button = event.target.closest('[data-qualify]'))) {
+            open('qualifyDialog', button, button.dataset.qualify);
+        } else if ((button = event.target.closest('[data-disqualify]'))) {
+            open('disqualifyDialog', button, button.dataset.disqualify);
+        }
+    });
+
+    // Extra education and eligibility rows on the Add applicant form.
+    var applicant = document.getElementById('applicantDialog');
+
+    applicant.addEventListener('click', function (event) {
+        var add = event.target.closest('[data-add-row]');
+        if (add) {
+            var kind = add.dataset.addRow;
+            var row = applicant.querySelector('template[data-pattern="' + kind + '"]').content.firstElementChild.cloneNode(true);
+            applicant.querySelector('[data-rows="' + kind + '"]').appendChild(row);
+            row.querySelector('input').focus();
+            return;
+        }
+
+        var remove = event.target.closest('[data-remove-row]');
+        if (remove) { remove.closest('[data-row-of]').remove(); }
+    });
+})();
+</script>
+@endpush

@@ -1,152 +1,102 @@
-@extends('layouts.master')
+@extends('layouts.app')
 
-@section('body')
-<div class="container-fluid">
-    <div class="rec-page">
+@php
+    $field = 'block h-10 w-full rounded-xl border border-line bg-paper px-3 text-ink outline-none transition-shadow placeholder:text-ink/40 focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15';
+    $roles = ['Chairperson', 'Vice-Chairperson', 'Member'];
 
-        <div class="rec-head">
-            <div>
-                <h1>Personnel Selection Board</h1>
-                <div class="sub">
-                    The signatory block printed beneath every Comparative Assessment Form.
-                    Names are stored as typed, so a past assessment still prints correctly
-                    after a member leaves.
-                </div>
-            </div>
-            <div class="rec-actions">
-                <a href="{{ route('positionDescriptionList') }}" class="rec-btn">
-                    <i class="fas fa-arrow-left"></i> Position Descriptions
-                </a>
-            </div>
+    // The rows to draw: the board as saved, or one blank row to start from.
+    $rows = $members->isNotEmpty() ? $members : collect([null]);
+@endphp
+
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Selection Board</h1>
+            <p class="mt-1 max-w-2xl text-cream/70">
+                The Personnel Selection Board: the signatory block printed beneath every Comparative Assessment Form.
+                Names are stored as typed, so a past assessment still prints correctly after a member leaves.
+            </p>
         </div>
 
-        @if(session('success'))
-            <div class="alert alert-success"><i class="fas fa-check"></i> {{ session('success') }}</div>
-        @endif
-        @if($errors->any())
-            <div class="alert alert-danger">
-                <ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
-            </div>
-        @endif
-
-        <form method="POST" action="{{ route('psbMembersSave') }}" id="board-form">
-            @csrf
-            <div class="rec-card">
-                <header>
-                    <span class="n"><i class="fas fa-user-tie"></i></span>
-                    <h2>Board membership</h2>
-                    <span class="hint">the chairperson prints first</span>
-                </header>
-                <div class="body">
-                    <table class="rec-rows" id="member-rows">
-                        <thead>
-                            <tr>
-                                <th>Printed name</th>
-                                <th style="width:120px;">Credentials</th>
-                                <th style="width:160px;">Role</th>
-                                <th style="width:220px;">Employee record</th>
-                                <th style="width:80px;" class="text-center">Active</th>
-                                <th style="width:44px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($members as $i => $m)
-                                <tr>
-                                    <td>
-                                        <input type="hidden" name="members[{{ $i }}][id]" value="{{ $m->id }}">
-                                        <input type="text" name="members[{{ $i }}][name]" value="{{ $m->name }}">
-                                    </td>
-                                    <td><input type="text" name="members[{{ $i }}][credentials]" value="{{ $m->credentials }}" placeholder="RN, JD"></td>
-                                    <td>
-                                        <select name="members[{{ $i }}][role]">
-                                            @foreach(['Chairperson', 'Vice-Chairperson', 'Member'] as $role)
-                                                <option value="{{ $role }}" @selected($m->role === $role)>{{ $role }}</option>
-                                            @endforeach
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select name="members[{{ $i }}][employee_id]">
-                                            <option value="">— Not linked —</option>
-                                            @foreach($employees as $e)
-                                                <option value="{{ $e->id }}" @selected($m->employee_id == $e->id)>
-                                                    {{ ucfirst($e->lname) }}, {{ ucfirst($e->fname) }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                    </td>
-                                    <td class="text-center" style="padding-top:.55rem;">
-                                        <input type="hidden" name="members[{{ $i }}][active]" value="0">
-                                        <input type="checkbox" name="members[{{ $i }}][active]" value="1" @checked($m->active)>
-                                    </td>
-                                    <td><button type="button" class="rec-btn ghost-danger js-remove"><i class="fas fa-times"></i></button></td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td><input type="hidden" name="members[0][id]" value=""><input type="text" name="members[0][name]"></td>
-                                    <td><input type="text" name="members[0][credentials]"></td>
-                                    <td><select name="members[0][role]">
-                                        @foreach(['Chairperson', 'Vice-Chairperson', 'Member'] as $role)
-                                            <option value="{{ $role }}">{{ $role }}</option>
-                                        @endforeach
-                                    </select></td>
-                                    <td><select name="members[0][employee_id]">
-                                        <option value="">— Not linked —</option>
-                                        @foreach($employees as $e)
-                                            <option value="{{ $e->id }}">{{ ucfirst($e->lname) }}, {{ ucfirst($e->fname) }}</option>
-                                        @endforeach
-                                    </select></td>
-                                    <td class="text-center" style="padding-top:.55rem;">
-                                        <input type="hidden" name="members[0][active]" value="0">
-                                        <input type="checkbox" name="members[0][active]" value="1" checked>
-                                    </td>
-                                    <td><button type="button" class="rec-btn ghost-danger js-remove"><i class="fas fa-times"></i></button></td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-
-                    <button type="button" class="rec-btn" id="add-member"><i class="fas fa-plus"></i> Add member</button>
-                </div>
-            </div>
-
-            <div class="rec-sticky">
-                <button type="submit" class="rec-btn primary"><i class="fas fa-save"></i> Save board</button>
-            </div>
-        </form>
-
+        <a href="{{ route('positionDescriptionList') }}" class="inline-flex h-10 items-center gap-2 rounded-xl border border-cream/25 px-4 font-medium transition-colors hover:border-cream hover:bg-cream hover:text-forest-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            <i class="fas fa-arrow-left"></i> Positions &amp; Vacancies
+        </a>
     </div>
-</div>
+@endsection
 
+@section('body')
+<form method="POST" action="{{ route('psbMembersSave') }}" id="boardForm" class="rounded-2xl border border-line bg-surface">
+    @csrf
+
+    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line px-5 py-4">
+        <h2 class="font-display text-lg font-semibold tracking-tight">Board membership</h2>
+        <p class="text-ink/55">Rows print in this order; the chairperson prints first.</p>
+    </div>
+
+    <div class="relative overflow-x-auto">
+        <table class="w-full min-w-[52rem] text-left" id="memberRows">
+            <thead class="border-b border-line text-xs text-ink/55">
+                <tr>
+                    <th scope="col" class="px-2 py-3 pl-5 font-medium">Printed name</th>
+                    <th scope="col" class="w-36 px-2 py-3 font-medium">Credentials</th>
+                    <th scope="col" class="w-48 px-2 py-3 font-medium">Role</th>
+                    <th scope="col" class="w-64 px-2 py-3 font-medium">Employee record</th>
+                    <th scope="col" class="w-20 px-2 py-3 text-center font-medium">Active</th>
+                    <th scope="col" class="w-14 px-2 py-3 pr-5"><span class="sr-only">Remove</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($rows as $i => $m)
+                    @include('psb.partials.member-row', ['i' => $i, 'm' => $m])
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-4">
+        <button type="button" id="addMember" class="h-10 cursor-pointer rounded-xl border border-line px-4 font-medium transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            <i class="fas fa-plus mr-1"></i> Add member
+        </button>
+        <button type="submit" class="h-10 cursor-pointer rounded-xl bg-forest-900 px-5 font-medium text-cream transition-colors hover:bg-forest-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500 dark:bg-forest-600 dark:hover:bg-forest-500">
+            <i class="fas fa-save mr-1"></i> Save board
+        </button>
+    </div>
+</form>
+
+{{-- A blank row for the Add member button to copy, its place written __i__. --}}
+<template id="memberRowPattern">@include('psb.partials.member-row', ['i' => '__i__', 'm' => null])</template>
+@endsection
+
+@push('scripts')
 <script>
 (function () {
-    var form = document.getElementById('board-form');
-    var body = document.querySelector('#member-rows tbody');
+    var body = document.querySelector('#memberRows tbody');
+    var pattern = document.getElementById('memberRowPattern').innerHTML;
+    // Places are never reused, so two rows cannot post under the same one.
+    var next = body.rows.length;
 
-    document.getElementById('add-member').addEventListener('click', function () {
-        var row = body.rows[body.rows.length - 1].cloneNode(true);
-        var index = body.rows.length;
-
-        row.querySelectorAll('input, select').forEach(function (el) {
-            if (el.name) { el.name = el.name.replace(/\[\d+\]/, '[' + index + ']'); }
-            if (el.type === 'checkbox') { el.checked = true; }
-            else if (el.tagName === 'SELECT') { el.selectedIndex = 0; }
-            else { el.value = ''; }   // clears the hidden id too, so this saves as a new member
-        });
-
+    function addRow() {
+        var holder = document.createElement('tbody');
+        holder.innerHTML = pattern.replace(/__i__/g, next++);
+        var row = holder.rows[0];
         body.appendChild(row);
+        row.querySelectorAll('select').forEach(window.hrisSelect);
+        return row;
+    }
+
+    document.getElementById('addMember').addEventListener('click', function () {
+        addRow().querySelector('input[type="text"]').focus();
     });
 
-    form.addEventListener('click', function (e) {
-        var remove = e.target.closest('.js-remove');
+    // Removing a row and saving deletes that member. The table always keeps
+    // one row, so the last one is emptied instead of taken away.
+    body.addEventListener('click', function (event) {
+        var remove = event.target.closest('[data-remove-member]');
         if (!remove) return;
 
-        // Removing a row and saving deletes that member; keep one row present.
-        if (body.rows.length > 1) {
-            remove.closest('tr').remove();
-        } else {
-            body.querySelectorAll('input[type="text"], input[type="hidden"]').forEach(function (el) { el.value = ''; });
-        }
+        remove.closest('tr').remove();
+        if (!body.rows.length) { addRow(); }
     });
 })();
 </script>
-@endsection
+@endpush

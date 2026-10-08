@@ -45,6 +45,8 @@ use App\Http\Controllers\SpmsController;
 Route::get('/hr-admin',[LoginAuthController::class,'getLoginAdmin'])->name('getLoginAdmin');
 Route::get('/',[LoginAuthController::class,'getLogin'])->name('getLogin')->middleware([NoCacheMiddleware::class]);
 Route::post('/post-login',[LoginAuthController::class,'postLogin'])->name('postLogin');
+// Demo quick access (APP_DEMO=true only; the controller 404s otherwise).
+Route::post('/demo-login',[LoginAuthController::class,'demoLogin'])->name('demoLogin');
 // Route::get('/update-pass', [EmployeeController::class, 'updateEmployeePasswords']);
 
 Route::get('/auth/google', [GoogleAuthController::class, 'redirectToGoogle'])->name('google.login');
