@@ -22,7 +22,8 @@
     $day = fn ($when) => filled($when) ? \Carbon\Carbon::parse($when)->format('M j, Y') : null;
 @endphp
 
-<section class="rounded-2xl border border-line bg-surface" id="{{ $table['id'] }}" data-list>
+{{-- A list only when there is something to list: data-list expects rows. --}}
+<section class="rounded-2xl border border-line bg-surface" id="{{ $table['id'] }}" @if(count($table['rows'])) data-list @endif>
     @if(count($table['rows']))
         <div class="flex flex-wrap items-center gap-3 border-b border-line p-4">
             <label class="relative w-full sm:w-auto sm:max-w-xs sm:flex-1">
@@ -91,11 +92,11 @@
                             class="transition-colors hover:bg-paper/70">
                             <td class="px-4 py-3 pl-5 align-top">
                                 @if($withFiler)
-                                    <p class="font-semibold">{{ $filer ?: 'No longer on record' }}</p>
-                                    <p class="mt-0.5 text-xs text-ink/55">{{ $type }}</p>
+                                    <p class="font-semibold whitespace-nowrap">{{ $filer ?: 'No longer on record' }}</p>
+                                    <p class="mt-0.5 text-xs whitespace-nowrap text-ink/55">{{ $type }}</p>
                                 @else
-                                    <p class="font-semibold">{{ $type }}</p>
-                                    <p class="mt-0.5 text-xs text-ink/55 tabular-nums">#{{ $leave->transnum }}</p>
+                                    <p class="font-semibold whitespace-nowrap">{{ $type }}</p>
+                                    <p class="mt-0.5 text-xs whitespace-nowrap text-ink/55 tabular-nums">#{{ $leave->transnum }}</p>
                                 @endif
                             </td>
                             <td class="px-4 py-3 align-top whitespace-nowrap">{{ $inclusive }}</td>
@@ -105,7 +106,7 @@
                             <td class="px-4 py-3 align-top">
                                 <span class="{{ $chip }} {{ $outcome === 'Approved' ? 'bg-forest-100 text-forest-800' : ($outcome === 'Cancelled' ? 'bg-ink/8 text-ink/70' : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300') }}">{{ $outcome }}</span>
                                 @if(filled($reason))
-                                    <p class="mt-1.5 max-w-64 text-xs text-ink/65">{{ $reason }}</p>
+                                    <p class="mt-1.5 w-56 max-w-full text-xs text-ink/65">{{ $reason }}</p>
                                 @endif
                             </td>
                             <td class="px-4 py-3 pr-5 align-top">

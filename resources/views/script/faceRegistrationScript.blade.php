@@ -597,6 +597,7 @@
             modelsPromise = FaceEngine.init({
                 modelsUrl: CONFIG.modelsUrl,
                 ortPath:   CONFIG.ortPath,
+                requireAntispoof: CONFIG.antispoof.enabled,
             }).then(function () {
                 state.modelsReady = true;
                 console.info('FaceEngine ready on ' + FaceEngine.provider);

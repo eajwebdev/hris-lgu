@@ -368,14 +368,17 @@
         state.detInput = state.det.inputNames[0];
         state.recInput = state.rec.inputNames[0];
 
-        // Anti-spoof is optional: if the model is absent or fails to load, the
-        // rest of the engine still works and antispoof() simply reports "unknown"
-        // rather than taking the whole kiosk down.
+        // The registration and kiosk UIs require this whenever their anti-spoof
+        // policy is enabled. A missing upload then fails at initialization with
+        // an actionable error. Callers with that policy off may omit the model.
         try {
             state.spoof = await createSession(cfg.modelsUrl + '/antispoof.onnx');
             state.spoofInput = state.spoof.inputNames[0];
         } catch (e) {
             state.spoof = null;
+            if (cfg.requireAntispoof) {
+                throw new Error('Could not load the face security model. Check that models/arcface/antispoof.onnx was uploaded and reload.');
+            }
             console.warn('anti-spoof model unavailable', e);
         }
 

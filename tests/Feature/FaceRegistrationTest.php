@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\FaceEmbeddingService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
+use Illuminate\Support\Facades\Http;
 
 /**
  * DatabaseTransactions, not RefreshDatabase: this suite is configured to run
@@ -122,6 +123,8 @@ class FaceRegistrationTest extends TestCase
 
     public function test_it_registers_four_captures_and_derives_a_master_embedding(): void
     {
+        config(['face.scoring.enabled' => false]);
+        Http::fake();
         $this->actingAs($this->admin(), 'web')
             ->postJson(route('faceRegister', $this->employee->id), ['captures' => $this->captures(11)])
             ->assertOk()
@@ -157,6 +160,7 @@ class FaceRegistrationTest extends TestCase
             'action'       => FaceAuditLog::REGISTERED,
             'performed_by' => $this->admin()->id,
         ]);
+        Http::assertNothingSent();
     }
 
     public function test_it_rejects_a_face_already_registered_to_another_employee(): void

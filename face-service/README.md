@@ -1,6 +1,8 @@
 # face-service
 
-Server-side face scoring for the attendance portal and face registration.
+Optional server-side face scoring for VPS deployments. Hostinger Web/Cloud
+hosting uses `FACE_RUNTIME=browser` with ONNX Runtime Web and PHP GD instead;
+see the [shared-hosting setup](../README.md#face-recognition-on-hostinger-web-or-cloud-hosting).
 
 ## Why
 
@@ -23,6 +25,7 @@ This service takes the raw frame instead and derives its own answer:
 
 Then in `.env`:
 
+    FACE_RUNTIME=server
     FACE_SCORING_ENABLED=true
     FACE_SCORING_REQUIRED=true
     FACE_SCORING_URL=http://127.0.0.1:8078

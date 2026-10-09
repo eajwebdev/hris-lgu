@@ -1,0 +1,9 @@
+# These model weights are static assets; they never need a PHP/Python handler.
+<IfModule mod_mime.c>
+    AddType application/octet-stream .onnx
+</IfModule>
+<IfModule mod_headers.c>
+    <FilesMatch "\.onnx$">
+        Header set Cache-Control "public, max-age=86400"
+    </FilesMatch>
+</IfModule>

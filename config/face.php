@@ -1,6 +1,17 @@
 <?php
 
+// An explicit browser profile never calls a Python/ONNX sidecar. With no
+// profile set, retain the existing per-path scoring flags for VPS installs.
+$runtime = env('FACE_RUNTIME');
+if ($runtime !== null && !in_array($runtime, ['browser', 'server'], true)) {
+    throw new \InvalidArgumentException('FACE_RUNTIME must be browser or server.');
+}
+$serverScoring = $runtime === 'server' || ($runtime === null && env('FACE_SCORING_ENABLED', false));
+$punchScoring = $runtime === 'server' || ($runtime === null && env('FACE_PUNCH_SCORING_ENABLED', false));
+
 return [
+
+    'runtime' => $runtime ?? ($serverScoring || $punchScoring ? 'server' : 'browser'),
 
     /*
     |--------------------------------------------------------------------------
@@ -675,7 +686,7 @@ return [
     */
 
     'scoring' => [
-        'enabled'  => env('FACE_SCORING_ENABLED', false),
+        'enabled'  => $serverScoring,
         'required' => env('FACE_SCORING_REQUIRED', true),
         'url'      => env('FACE_SCORING_URL', 'http://127.0.0.1:8078'),
         'token'    => env('FACE_SERVICE_TOKEN', ''),
@@ -715,7 +726,7 @@ return [
         | punch, in one batched call. face.scoring.timeout is sized for that.
         */
         'punch' => [
-            'enabled'  => env('FACE_PUNCH_SCORING_ENABLED', false),
+            'enabled'  => $punchScoring,
             'required' => env('FACE_PUNCH_SCORING_REQUIRED', true),
         ],
 

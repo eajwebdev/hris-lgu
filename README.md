@@ -1,7 +1,7 @@
 # HRIS — LGU Mabinay
 
 Human Resource Information System for the Municipality of Mabinay, Negros Oriental.
-Laravel 9 + AdminLTE 3 (Bootstrap 4), MySQL.
+Laravel 11 with Tailwind and AdminLTE 3 screens, MySQL.
 
 ## Modules
 
@@ -14,7 +14,7 @@ Laravel 9 + AdminLTE 3 (Bootstrap 4), MySQL.
 
 ## Requirements
 
-- PHP 8.0+ with `pdo_mysql`, `gd`, `mbstring`
+- PHP 8.2+ with `pdo_mysql`, `gd`, `mbstring`
 - MySQL 5.7+ / MariaDB
 - Composer
 
@@ -69,6 +69,61 @@ does not match the host you are browsing, the page loads with no styling at all.
 
 - XAMPP/Apache on port 80 → `APP_URL=http://localhost`
 - `php artisan serve` → `APP_URL=http://localhost:8000`
+
+## Face recognition on Hostinger Web or Cloud hosting
+
+Use the bundled **ONNX Runtime Web** library. SCRFD detection, ArcFace 512-float
+descriptors and the anti-spoof model run in JavaScript/WebAssembly on the camera
+device. Laravel stores and compares descriptors, issues single-use challenges,
+and verifies flash-image responses with PHP GD. Python, Node.js, a VPS and a
+background inference process are not required for this mode.
+
+Set these values in the hosted `.env`:
+
+```dotenv
+APP_URL=https://your-domain.example
+FACE_RUNTIME=browser
+FACE_REQUIRE_QR=true
+FACE_FLASH_IMAGES_REQUIRED=true
+```
+
+`browser` overrides old `FACE_SCORING_ENABLED` and `FACE_PUNCH_SCORING_ENABLED`
+flags, so an old sidecar setting cannot accidentally block registration or
+attendance. Existing ArcFace enrolments stay compatible. Older 128-float
+face-api.js enrolments still need registration again.
+
+Deploy the Laravel application with PHP 8.2+ and GD enabled. Point the web root
+at `public/`, and upload the **complete** `public/js/onnx/`,
+`public/js/face-engine/`, and `public/models/arcface/` directories, including
+their hidden `.htaccess` files. The runtime and model files total about 29 MB.
+Keep the matching vendored JavaScript, loader and WASM files together. The
+included MIME rules serve the loader as JavaScript and the binary as
+`application/wasm`; the single-threaded runtime needs no cross-origin isolation
+headers. Face security initialization refuses a missing anti-spoof model.
+
+After updating the hosted environment, run:
+
+```bash
+php artisan config:clear
+php artisan face:check
+php artisan config:cache
+```
+
+Open Face Recognition and the attendance kiosk on the HTTPS domain, allow the
+camera, register a face, then test the QR badge and face check. Camera access
+requires HTTPS outside localhost. The check command verifies files and PHP
+configuration; it does not replace testing the actual hosting domain and camera.
+
+In browser mode, identity descriptors and anti-spoof probabilities are supplied
+by the client. PHP independently checks the flash images, but it cannot recompute
+face identity from the pixels. Keep the QR requirement and use controlled kiosk
+devices. A VPS can opt into independent inference with `FACE_RUNTIME=server`
+and the [optional scoring service](face-service/README.md); this profile enables
+server scoring for both registration and attendance and retains fail-closed
+behavior when that service is unavailable.
+
+References: [ONNX Runtime Web deployment](https://onnxruntime.ai/docs/tutorials/web/deploy.html)
+and [Hostinger supported frameworks](https://www.hostinger.com/support/which-programming-languages-and-frameworks-are-supported-at-hostinger/).
 
 ## Demo data for Time & Leave reports
 
