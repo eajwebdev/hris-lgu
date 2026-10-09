@@ -9,6 +9,18 @@ class Notification extends Model
 {
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::created(function (self $notification) {
+            \App\Events\NotificationsChanged::forRecipients(collect([$notification]));
+        });
+    }
+
+    public function newEloquentBuilder($query)
+    {
+        return new \App\Models\Builders\NotificationBuilder($query);
+    }
+
     protected $fillable = [
         'empid',
         'lapp_id',

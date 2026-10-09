@@ -468,5 +468,6 @@ document.addEventListener('DOMContentLoaded', function () {
 @endif
 @stack('scripts')
 @yield('scripts')
+@include('partials.notification_realtime')
 </body>
 </html>

@@ -47,7 +47,7 @@
                     @endphp
                 @break
             @endswitch
-            <a href="{{ route('leaveStatus') }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
+            <a data-notification-id="{{ $notif->id }}" href="{{ route('leaveStatus') }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
                 <div class="mr-3 shrink-0">
                     <span class="notification-initials grid size-10 place-items-center rounded-full bg-forest-100 text-[13px] font-semibold text-forest-800 ring-1 ring-forest-600/20">HR</span>
                 </div>
@@ -103,7 +103,7 @@
                 @break
             @endswitch
 
-            <a href="{{ $route }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
+            <a data-notification-id="{{ $notif->id }}" href="{{ $route }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
                 <div class="mr-3 shrink-0">
                     <span class="notification-initials grid size-10 place-items-center rounded-full bg-forest-100 text-[13px] font-semibold text-forest-800 ring-1 ring-forest-600/20">HR</span>
                 </div>

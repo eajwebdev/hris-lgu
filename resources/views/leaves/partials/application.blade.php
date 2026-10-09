@@ -163,14 +163,14 @@
     $chip = 'inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium whitespace-nowrap';
 @endphp
 
-<article class="rounded-2xl border border-line bg-surface" data-leave="{{ $leave->id }}"
+<article class="@container rounded-2xl border border-line bg-surface" data-leave="{{ $leave->id }}"
          data-leave-label="{{ $type }}, {{ $inclusive }}" data-leave-days="{{ $shown($leave->days) }}">
     <header class="flex flex-wrap items-start gap-x-4 gap-y-3 p-5">
         {{-- The days asked for, as the block the eye lands on. --}}
-        <p class="grid size-14 shrink-0 place-items-center rounded-xl bg-forest-100 text-center text-forest-900">
+        <p class="grid size-14 shrink-0 place-items-center rounded-xl bg-forest-100 text-center">
             <span>
                 <span class="block font-display text-xl leading-none font-semibold tracking-tight tabular-nums">{{ $shown($applied) }}</span>
-                <span class="mt-0.5 block text-[11px] leading-none">{{ $applied == 1 ? 'day' : 'days' }}</span>
+                <span class="mt-0.5 block text-[11px] leading-none text-forest-800">{{ $applied == 1 ? 'day' : 'days' }}</span>
             </span>
         </p>
 
@@ -205,8 +205,8 @@
         </div>
     </header>
 
-    <dl class="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line px-5 py-4 sm:grid-cols-4">
-        <div class="col-span-2">
+    <dl class="grid grid-cols-3 gap-x-6 gap-y-3 border-t border-line px-5 py-4 @2xl:grid-cols-[minmax(0,2fr)_minmax(0,1.6fr)_repeat(3,minmax(0,0.8fr))]">
+        <div class="col-span-3 @2xl:col-span-1">
             <dt class="text-xs text-ink/55">Details of leave</dt>
             <dd class="mt-0.5">
                 {{ $leavePurposes[$leave->leave_purpose] ?? '' }}
@@ -217,9 +217,9 @@
                 @endif
             </dd>
         </div>
-        <div class="col-span-2">
+        <div class="col-span-3 @2xl:col-span-1">
             <dt class="text-xs text-ink/55">Application</dt>
-            <dd class="mt-0.5 tabular-nums">#{{ $leave->transnum }}</dd>
+            <dd class="mt-0.5 break-words tabular-nums">#{{ $leave->transnum }}</dd>
         </div>
         <div>
             <dt class="text-xs text-ink/55">With pay</dt>
@@ -230,7 +230,7 @@
             <dd class="mt-0.5 tabular-nums">{!! $reviewed ? e($shown($leave->day_wpay)) : '<span class="text-ink/45">Not set yet</span>' !!}</dd>
         </div>
         <div>
-            <dt class="text-xs text-ink/55">Holidays in the dates</dt>
+            <dt class="text-xs text-ink/55">Holidays</dt>
             <dd class="mt-0.5 tabular-nums">{{ $reviewed ? $shown($leave->holiday) : 0 }}</dd>
         </div>
     </dl>

@@ -2295,6 +2295,7 @@
         FaceEngine.init({
             modelsUrl: CONFIG.modelsUrl,
             ortPath:   CONFIG.ortPath,
+            requireAntispoof: {{ config('face.antispoof.enabled', true) ? 'true' : 'false' }},
         }).then(function () {
             state.modelsReady = true;
             console.info('FaceEngine ready on ' + FaceEngine.provider);

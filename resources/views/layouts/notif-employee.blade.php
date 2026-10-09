@@ -55,58 +55,12 @@
     </div>
 </li>
 @endif
-@php
-    $initials = function ($name) {
-        $words = preg_split('/\s+/', trim((string) $name));
-        $letters = collect($words)->filter()->take(2)->map(fn ($word) => strtoupper(substr($word, 0, 1)))->implode('');
-        return $letters ?: 'HR';
-    };
-
-    $notifications1 = unread_employee_notifications($notifications1, $guard);
-    $notificationsCount1 = $notifications1->count();
-@endphp
-
-<li class="nav-item dropdown">
-    <style>
-        .notification-initials {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: #eaf7f0;
-            color: #187744;
-            font-weight: 700;
-            border: 1px solid #cfe8d9;
-        }
-        .notification-mark-all {
-            border: 0;
-            background: transparent;
-            color: #187744;
-            font-size: 12px;
-            padding: 0;
-        }
-    </style>
+<li class="nav-item dropdown" data-notification-bell>
     <a class="nav-link" data-toggle="dropdown" href="#" aria-expanded="false">
         <i class="fas fa-bell text-success1"></i>
-        <span class="badge badge-warning navbar-badge">{{ ($notificationsCount1 != 0) ? $notificationsCount1 : '' }}</span>
+        <span class="badge badge-warning navbar-badge" data-notification-count @if($notificationsCount1 == 0) hidden @endif>{{ $notificationsCount1 }}</span>
     </a>
-    <div class="dropdown-menu notifications dropdown-notification dropdown-menu-lg dropdown-menu-right" style="left: inherit; right: 0; max-height: 400px; overflow-y: auto;">
-        <div class="dropdown-item dropdown-header d-flex justify-content-between align-items-center">
-            <span>{{ ($notificationsCount1 != 0) ? $notificationsCount1 : 'No' }} Notifications</span>
-            @if($notificationsCount1 > 0)
-                <form method="POST" action="{{ route('notifications.markAllRead') }}">
-                    @csrf
-                    <button type="submit" class="notification-mark-all">Mark all as read</button>
-                </form>
-            @endif
-        </div>
-        <div class="dropdown-divider"></div>
-        <div id="notifications-container">
-            @include('partials.notification_items_employee', ['notifications' => $notifications1])
-    
-        </div>
-        {{-- <a href="#" class="dropdown-item dropdown-footer">See All Notifications</a> --}}
+    <div class="dropdown-menu notifications dropdown-notification dropdown-menu-lg dropdown-menu-right" data-notification-panel style="left: inherit; right: 0;">
+        @include('partials.notification_feed', ['legacy' => true])
     </div>
 </li>

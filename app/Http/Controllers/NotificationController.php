@@ -21,6 +21,19 @@ class NotificationController extends Controller
         }
     }  
 
+    public function refresh(Request $request)
+    {
+        $this->shareLayoutData(true);
+        $guard = $this->getGuard();
+        $shared = \Illuminate\Support\Facades\View::getShared();
+        $count = $guard === 'web' ? $shared['notificationsCount'] : $shared['notificationsCount1'];
+
+        return response()->json([
+            'count' => $count,
+            'html' => view('partials.notification_feed', ['guard' => $guard, 'legacy' => $request->boolean('legacy')])->render(),
+        ]);
+    }
+
     // public function loadMore(Request $request, $page)
     // {
     //     $guard = $this->getGuard();
@@ -118,6 +131,7 @@ class NotificationController extends Controller
 
     public function loadMore(Request $request)
     {
+        abort_unless($this->getGuard() === 'web', 403);
         if (!$request->ajax()) {
             return response()->json(['html' => '']);
         }
@@ -250,6 +264,7 @@ class NotificationController extends Controller
             )
 
             ->orderBy('notifications.created_at', 'desc')
+            ->orderByDesc('notifications.id')
             ->skip($offset)
             ->take($limit)
             ->get();
@@ -287,7 +302,7 @@ class NotificationController extends Controller
         return redirect()->route($menu, $menid);
     }
 
-    public function markAllRead()
+    public function markAllRead(Request $request)
     {
         $guard = $this->getGuard();
 
@@ -303,6 +318,10 @@ class NotificationController extends Controller
                 ->whereNotIn('module', ['leavecredit', 'leavecreditadd'])
                 ->where('status', 0)
                 ->update(['status' => 1]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true]);
         }
 
         return redirect()->back()->with('success', 'Notifications marked as read');

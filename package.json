@@ -13,5 +13,8 @@
         "postcss": "^8.4.38",
         "tailwindcss": "^4.3.3",
         "vite": "^5.4.0"
+    },
+    "dependencies": {
+        "pusher-js": "^8.6.0"
     }
 }
