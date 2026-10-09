@@ -3,8 +3,11 @@
     municipal seal: pines on a ridge, green hills, the river at the bottom, and
     the seal's orange as the sun. Sits behind the panel's text; the parent is
     expected to be `relative isolate overflow-hidden`.
+
+    Placed for the sign-in panel unless $sceneClass says where else it goes
+    (the careers portal puts it down the right of a wide banner).
 --}}
-<svg class="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-32 w-full lg:h-[44%] lg:max-h-[26rem]"
+<svg class="pointer-events-none absolute -z-10 {{ $sceneClass ?? 'inset-x-0 bottom-0 h-32 w-full lg:h-[44%] lg:max-h-[26rem]' }}"
      viewBox="0 0 800 360" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
     <defs>
         <symbol id="sc-pine" viewBox="0 0 48 84">

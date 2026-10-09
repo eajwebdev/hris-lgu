@@ -1,812 +1,768 @@
+{{--
+    Public careers portal: the positions open at the Municipal Government,
+    the application form, and the application tracker. No account is needed
+    for any of it.
+
+    A page of its own (no app shell: nobody is signed in), drawn to match the
+    sign-in page it is reached from: the green banner, the landscape from the
+    municipal seal, the same two typefaces.
+
+    Everything it sends goes to the public API, unchanged:
+      POST /api/application/store            the application, with its PDFs
+      GET  /api/application/status/{number}  where an application stands
+    Submitting emails the applicant their application number.
+--}}
+@php
+    $openings = $jobs->count();
+    $types = $jobs->pluck('type')->filter()->unique()->values();
+
+    // What an applicant must have ready, as the form will ask for it.
+    $documents = [
+        ['pds', 'Personal Data Sheet (PDS)', true],
+        ['wes', 'Work Experience Sheet', true],
+        ['intent', 'Letter of intent', true],
+        ['resume', 'Resume or CV', true],
+        ['tor', 'Transcript of records', true],
+        ['coe', 'Certificate of employment', false],
+    ];
+
+    $input = 'block h-11 w-full min-w-0 rounded-xl border border-line bg-white px-3.5 text-ink outline-none transition-shadow placeholder:text-ink/40 focus:border-forest-600 focus:ring-4 focus:ring-forest-600/15';
+    $label = 'block text-sm font-medium';
+    $primary = 'inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-forest-900 px-5 font-medium text-cream transition-colors hover:bg-forest-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500 disabled:cursor-wait disabled:opacity-60';
+    $secondary = 'inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-white px-5 font-medium transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500';
+    $onGreen = 'inline-flex h-10 items-center gap-2 rounded-xl border border-cream/25 px-4 text-sm font-medium transition-colors hover:border-cream hover:bg-cream hover:text-forest-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500';
+    $card = 'rounded-2xl border border-line bg-white p-5 sm:p-6';
+    $dialog = 'm-auto flex-col overflow-hidden rounded-3xl border border-line bg-paper p-0 text-ink shadow-2xl shadow-forest-950/30 backdrop:bg-forest-950/60 open:flex';
+    $close = '-mt-1 -mr-2 grid size-10 shrink-0 cursor-pointer place-items-center rounded-xl text-ink/50 transition-colors hover:bg-white hover:text-ink focus-visible:outline-2 focus-visible:outline-sun-500';
+    $section = 'font-display text-lg font-semibold tracking-tight';
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Careers — LGU Mabinay</title>
-    <link rel="shortcut icon" href="{{ asset('Uploads/logo.png') }}">
+    <title>Careers | Municipality of Mabinay</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="{{ asset('template/plugins/fontawesome-free/css/all.min.css') }}">
-    <style>
-        :root {
-            --green: #187744;
-            --green-600: #136038;
-            --green-050: #f0fdf4;
-            --ink: #1f2937;
-            --muted: #6b7280;
-            --line: #e5e7eb;
-            --bg: #f6f8f7;
-            --amber: #b45309;
-            --red: #b91c1c;
-            --radius: 14px;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html { scroll-behavior: smooth; }
-        body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background: var(--bg);
-            color: var(--ink);
-            line-height: 1.55;
-            -webkit-font-smoothing: antialiased;
-        }
-        a { color: var(--green); }
-
-        /* ------------------------------------------------------------ header */
-        .topbar {
-            position: sticky; top: 0; z-index: 40;
-            background: rgba(255,255,255,.92);
-            backdrop-filter: blur(8px);
-            border-bottom: 1px solid var(--line);
-        }
-        .topbar__inner {
-            max-width: 1080px; margin: 0 auto; padding: 10px 20px;
-            display: flex; align-items: center; gap: 12px;
-        }
-        .topbar__seal { width: 42px; height: 42px; object-fit: contain; }
-        .topbar__name { line-height: 1.15; }
-        .topbar__name strong { display: block; font-size: .95rem; }
-        .topbar__name small { color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; }
-        .topbar__actions { margin-left: auto; display: flex; gap: 8px; }
-
-        .btn {
-            display: inline-flex; align-items: center; gap: 7px;
-            border: 1px solid transparent; border-radius: 10px; cursor: pointer;
-            font: 600 .84rem 'Inter', sans-serif; padding: 9px 16px;
-            text-decoration: none; transition: background .15s, color .15s, border-color .15s;
-            white-space: nowrap;
-        }
-        .btn--solid  { background: var(--green); color: #fff; }
-        .btn--solid:hover { background: var(--green-600); }
-        .btn--ghost  { background: #fff; color: var(--ink); border-color: var(--line); }
-        .btn--ghost:hover { border-color: var(--green); color: var(--green); }
-        .btn--lg { padding: 12px 22px; font-size: .92rem; border-radius: 12px; }
-        .btn[disabled] { opacity: .55; cursor: not-allowed; }
-
-        /* -------------------------------------------------------------- hero */
-        .hero {
-            background:
-                radial-gradient(900px 380px at 85% -10%, rgba(24,119,68,.14), transparent 60%),
-                radial-gradient(700px 300px at 8% 110%, rgba(24,119,68,.10), transparent 55%),
-                #fff;
-            border-bottom: 1px solid var(--line);
-        }
-        .hero__inner { max-width: 1080px; margin: 0 auto; padding: 54px 20px 44px; }
-        .hero__badge {
-            display: inline-flex; align-items: center; gap: 7px;
-            background: var(--green-050); color: var(--green);
-            border: 1px solid #bbe7cd; border-radius: 999px;
-            font-size: .74rem; font-weight: 700; letter-spacing: .05em;
-            padding: 5px 13px; text-transform: uppercase;
-        }
-        .hero h1 { font-size: clamp(1.7rem, 4vw, 2.5rem); font-weight: 800; letter-spacing: -.02em; margin: 14px 0 8px; }
-        .hero h1 em { color: var(--green); font-style: normal; }
-        .hero p  { color: var(--muted); max-width: 560px; }
-        .hero__search { margin-top: 24px; display: flex; gap: 10px; max-width: 560px; }
-        .hero__search input {
-            flex: 1; border: 1px solid var(--line); border-radius: 12px;
-            font: 500 .92rem 'Inter', sans-serif; padding: 12px 16px; outline: none;
-            background: #fff;
-        }
-        .hero__search input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(24,119,68,.15); }
-
-        /* -------------------------------------------------------------- jobs */
-        .jobs { max-width: 1080px; margin: 0 auto; padding: 34px 20px 70px; }
-        .jobs__head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 18px; }
-        .jobs__head h2 { font-size: 1.15rem; font-weight: 700; }
-        .jobs__count { color: var(--muted); font-size: .85rem; }
-
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-
-        .card {
-            background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
-            padding: 20px; display: flex; flex-direction: column; gap: 10px;
-            transition: box-shadow .15s, border-color .15s, transform .15s;
-        }
-        .card:hover { border-color: #bbe7cd; box-shadow: 0 10px 28px rgba(16,64,40,.09); transform: translateY(-2px); }
-        .card__type {
-            align-self: flex-start; background: var(--green-050); color: var(--green);
-            border-radius: 7px; font-size: .7rem; font-weight: 700; letter-spacing: .05em;
-            padding: 3px 9px; text-transform: uppercase;
-        }
-        .card__title { font-size: 1.02rem; font-weight: 700; letter-spacing: -.01em; }
-        .card__meta { color: var(--muted); font-size: .8rem; display: grid; gap: 4px; }
-        .card__meta i { width: 15px; color: var(--green); margin-right: 5px; }
-        .card__salary { font-weight: 700; color: var(--ink); font-size: .95rem; }
-        .card__foot { margin-top: auto; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px dashed var(--line); }
-        .card__due { font-size: .74rem; color: var(--muted); }
-        .card__due.is-soon { color: var(--amber); font-weight: 600; }
-
-        .empty {
-            border: 1px dashed #cbd5d1; border-radius: var(--radius); background: #fff;
-            padding: 60px 24px; text-align: center; color: var(--muted);
-        }
-        .empty i { font-size: 2rem; color: #9ca3af; margin-bottom: 10px; }
-
-        /* ------------------------------------------------------------ footer */
-        .foot { border-top: 1px solid var(--line); background: #fff; }
-        .foot__inner { max-width: 1080px; margin: 0 auto; padding: 22px 20px; display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .78rem; flex-wrap: wrap; }
-        .foot__inner img { width: 26px; height: 26px; object-fit: contain; }
-        .foot__inner a { margin-left: auto; }
-
-        /* ------------------------------------------------------------- modal */
-        .modal {
-            position: fixed; inset: 0; z-index: 60; display: none;
-            align-items: flex-start; justify-content: center;
-            background: rgba(15,23,42,.55); padding: 4vh 14px;
-            overflow-y: auto;
-        }
-        .modal.is-open { display: flex; }
-        .sheet {
-            background: #fff; border-radius: 16px; width: 100%; max-width: 680px;
-            box-shadow: 0 30px 80px rgba(2,20,10,.35); overflow: hidden;
-            margin-bottom: 6vh;
-        }
-        .sheet--wide { max-width: 760px; }
-        .sheet__head {
-            display: flex; align-items: flex-start; gap: 12px;
-            padding: 20px 24px 14px; border-bottom: 1px solid var(--line);
-        }
-        .sheet__head h3 { font-size: 1.08rem; font-weight: 700; letter-spacing: -.01em; }
-        .sheet__head p  { color: var(--muted); font-size: .8rem; margin-top: 2px; }
-        .sheet__x {
-            margin-left: auto; border: none; background: #f3f4f6; color: var(--muted);
-            border-radius: 9px; width: 32px; height: 32px; cursor: pointer; font-size: .9rem; flex: none;
-        }
-        .sheet__x:hover { background: #e5e7eb; color: var(--ink); }
-        .sheet__body { padding: 20px 24px 26px; }
-
-        /* job detail rows */
-        .spec { display: grid; gap: 0; }
-        .spec__row { display: grid; grid-template-columns: 160px 1fr; gap: 14px; padding: 10px 0; border-bottom: 1px dashed var(--line); }
-        .spec__row:last-child { border-bottom: none; }
-        .spec__key { color: var(--muted); font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding-top: 2px; }
-        .spec__val { font-size: .9rem; white-space: pre-line; }
-        @media (max-width: 560px) { .spec__row { grid-template-columns: 1fr; gap: 2px; } }
-
-        /* form */
-        .f-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
-        .f-grid .f--full { grid-column: 1 / -1; }
-        @media (max-width: 560px) { .f-grid { grid-template-columns: 1fr; } }
-        .f label { display: block; font-size: .74rem; font-weight: 700; color: #374151; margin-bottom: 5px; letter-spacing: .02em; }
-        .f label small { color: var(--muted); font-weight: 500; }
-        .f input, .f select, .f textarea {
-            width: 100%; border: 1px solid var(--line); border-radius: 10px;
-            font: 500 .88rem 'Inter', sans-serif; padding: 10px 12px; outline: none; background: #fff;
-        }
-        .f input:focus, .f select:focus, .f textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(24,119,68,.13); }
-        /* Internal / external applicant choice */
-        .radio-row { display: flex; flex-wrap: wrap; gap: 10px; }
-        .radio-opt {
-            display: flex; align-items: center; gap: 8px;
-            flex: 1 1 260px; min-width: 0; margin: 0;
-            padding: 11px 13px; cursor: pointer;
-            border: 1px solid #d9dfe4; border-radius: 10px; background: #fff;
-            font-weight: 500; transition: border-color .15s, background .15s, box-shadow .15s;
-        }
-        .radio-opt:hover { border-color: var(--green); background: #f6fbf8; }
-        .radio-opt input { accent-color: var(--green); width: 16px; height: 16px; flex: 0 0 auto; }
-        .radio-opt:has(input:checked) {
-            border-color: var(--green); background: #f0f8f3;
-            box-shadow: 0 0 0 3px rgba(30,122,69,.12);
-        }
-        .hint { display: block; margin-top: 5px; font-size: .76rem; color: #6b7a86; line-height: 1.45; }
-
-        .f-section { margin: 22px 0 10px; display: flex; align-items: center; gap: 10px; }
-        .f-section h4 { font-size: .82rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--green); }
-        .f-section::after { content: ''; flex: 1; height: 1px; background: var(--line); }
-        .f-section .mini {
-            border: 1px solid var(--line); background: #fff; color: var(--green);
-            border-radius: 8px; font: 700 .72rem 'Inter', sans-serif; padding: 4px 10px; cursor: pointer;
-        }
-        .f-section .mini:hover { border-color: var(--green); }
-        .row-line { display: grid; grid-template-columns: 1fr 150px 92px 34px; gap: 8px; margin-bottom: 8px; }
-        .row-line--elig { grid-template-columns: 1fr 34px; }
-        .row-line .rm {
-            border: none; background: #fef2f2; color: var(--red); border-radius: 8px; cursor: pointer;
-        }
-        .row-line .rm:hover { background: #fee2e2; }
-
-        .file-tile { position: relative; border: 1.5px dashed #cfd8d3; border-radius: 10px; padding: 10px 12px; background: #fbfdfc; }
-        .file-tile input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-        .file-tile .ft-name { font-size: .78rem; color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .file-tile.has-file { border-color: var(--green); background: var(--green-050); }
-        .file-tile.has-file .ft-name { color: var(--green); font-weight: 600; }
-
-        .alert {
-            border-radius: 10px; padding: 11px 14px; font-size: .84rem; margin-bottom: 14px; display: none;
-        }
-        .alert--err { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
-        .alert--ok  { background: var(--green-050); color: var(--green); border: 1px solid #bbe7cd; }
-
-        /* success + tracking */
-        .done { text-align: center; padding: 18px 6px 8px; }
-        .done i { font-size: 2.4rem; color: var(--green); }
-        .done h4 { margin: 12px 0 4px; font-size: 1.05rem; }
-        .done p { color: var(--muted); font-size: .86rem; }
-        .done .appno {
-            margin: 16px auto 6px; display: inline-block; background: var(--green-050);
-            border: 1px solid #bbe7cd; color: var(--green); border-radius: 12px;
-            font: 800 1.3rem 'Inter', sans-serif; letter-spacing: .04em; padding: 12px 26px;
-        }
-
-        .track-form { display: flex; gap: 10px; margin-bottom: 6px; }
-        .track-form input {
-            flex: 1; border: 1px solid var(--line); border-radius: 10px;
-            font: 600 .95rem 'Inter', sans-serif; padding: 11px 14px; outline: none;
-            text-transform: uppercase;
-        }
-        .track-form input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(24,119,68,.13); }
-
-        .t-result { margin-top: 18px; display: none; }
-        .t-card { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
-        .t-card h4 { font-size: .98rem; }
-        .t-card .t-sub { color: var(--muted); font-size: .8rem; margin-top: 2px; }
-        .t-status {
-            display: inline-block; margin-top: 10px; border-radius: 999px; padding: 5px 14px;
-            font-size: .78rem; font-weight: 700;
-        }
-        .t-status--ok   { background: var(--green-050); color: var(--green); border: 1px solid #bbe7cd; }
-        .t-status--warn { background: #fffbeb; color: var(--amber); border: 1px solid #fde68a; }
-        .t-status--bad  { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
-        .t-note { background: #f9fafb; border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; font-size: .82rem; margin-top: 10px; }
-        .t-note i { color: var(--green); margin-right: 6px; }
-    </style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Instrument+Sans:wght@400..600&display=swap">
+    <link rel="stylesheet" href="{{ asset('template/plugins/fontawesome-free-v6/css/all.min.css') }}">
+    @vite('resources/css/app.css')
+    <link rel="shortcut icon" href="{{ asset('Uploads/logo.png') }}">
 </head>
-<body>
+<body class="min-h-screen scroll-smooth bg-paper font-sans text-[15px] text-ink antialiased">
 
-    <header class="topbar">
-        <div class="topbar__inner">
-            <img class="topbar__seal" src="{{ asset('Uploads/logo.png') }}" alt="LGU Mabinay Official Seal">
-            <div class="topbar__name">
-                <strong>Municipality of Mabinay</strong>
-                <small>Human Resource Information System</small>
+    {{-- Banner. The landscape runs down its right side on a wide screen and
+         along its foot on a narrow one. --}}
+    <header class="relative isolate m-2.5 overflow-hidden rounded-3xl bg-forest-900 px-6 pt-5 pb-36 text-cream sm:m-3 sm:px-10 sm:pt-8 lg:pb-16">
+        <div class="mx-auto max-w-6xl">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                @include('partials.auth-brand')
+
+                <nav aria-label="Careers" class="flex gap-2">
+                    <a href="#track" data-focus="trackInput" class="{{ $onGreen }}">Track an application</a>
+                    <a href="{{ route('getLogin') }}" class="{{ $onGreen }} max-sm:hidden">Employee sign in</a>
+                </nav>
             </div>
-            <div class="topbar__actions">
-                <button type="button" class="btn btn--ghost" data-open="#trackModal"><i class="fas fa-magnifying-glass-location"></i> Track application</button>
+
+            <div class="mt-10 max-w-xl motion-safe:animate-settle lg:mt-16">
+                <p class="text-sm font-medium text-cream/70">Careers at the Municipal Government</p>
+
+                <h1 class="mt-3 font-display text-[2.6rem]/[.95] font-semibold tracking-tight sm:text-6xl/[.95]">
+                    Serve the people of Mabinay<span class="text-sun-500">.</span>
+                </h1>
+
+                <p class="mt-5 max-w-md text-lg/relaxed text-cream/80">
+                    See which positions are open, send your application online and follow its progress.
+                    No account needed.
+                </p>
+
+                @if($openings)
+                    <label class="relative mt-7 block max-w-md">
+                        <span class="sr-only">Search the open positions</span>
+                        <span class="pointer-events-none absolute inset-y-0 left-4 grid place-items-center text-ink/45"><i class="fas fa-magnifying-glass text-sm"></i></span>
+                        <input type="search" id="jobSearch" placeholder="Search positions: nurse, engineer, clerk" autocomplete="off"
+                               class="h-13 w-full rounded-2xl border border-transparent bg-cream pr-4 pl-11 text-base text-ink outline-none placeholder:text-ink/45 focus:ring-4 focus:ring-sun-500/50">
+                    </label>
+                @endif
             </div>
         </div>
+
+        @include('partials.auth-scene', ['sceneClass' => 'right-0 bottom-0 h-32 w-full lg:h-full lg:w-[46%] lg:[mask-image:linear-gradient(to_right,transparent,black_38%)]'])
     </header>
 
-    <section class="hero">
-        <div class="hero__inner">
-            <span class="hero__badge"><i class="fas fa-briefcase"></i> Careers Portal</span>
-            <h1>Serve the people of <em>Mabinay</em>.</h1>
-            <p>Browse current job openings at the Municipal Government, submit your application online, and track its progress — no account needed.</p>
-            <div class="hero__search">
-                <input type="search" id="jobSearch" placeholder="Search positions — e.g. nurse, engineer, clerk…" autocomplete="off">
-            </div>
-        </div>
-    </section>
+    {{-- Lined up with the banner's own text: the banner is inset by its
+         margin and then its padding, so what follows takes the two together. --}}
+    <div class="px-[2.125rem] sm:px-[3.25rem]">
+    <main class="mx-auto grid max-w-6xl items-start gap-x-10 gap-y-12 py-10 lg:grid-cols-[minmax(0,1fr)_21rem] lg:py-14">
 
-    <main class="jobs">
-        <div class="jobs__head">
-            <h2>Open positions</h2>
-            <span class="jobs__count" id="jobCount">{{ $jobs->count() }} {{ Str::plural('opening', $jobs->count()) }}</span>
-        </div>
+        {{-- The openings, soonest to close first --}}
+        <section aria-labelledby="openingsTitle">
+            <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
+                <h2 class="font-display text-3xl font-semibold tracking-tight" id="openingsTitle">Open positions</h2>
+                <p class="text-ink/60" id="jobCount" aria-live="polite">{{ $openings }} {{ Str::plural('opening', $openings) }}</p>
+            </div>
 
-        @if($jobs->isEmpty())
-            <div class="empty">
-                <i class="fas fa-folder-open"></i>
-                <p><strong>No openings right now.</strong></p>
-                <p>Please check back — new positions are posted here as soon as they open.</p>
-            </div>
-        @else
-            <div class="grid" id="jobGrid">
-                @foreach($jobs as $job)
-                    @php
-                        $daysLeft = (int) now()->startOfDay()->diffInDays(\Carbon\Carbon::parse($job->expiration_at)->startOfDay(), false);
-                        $jobPayload = [
-                            'id'          => $job->id,
-                            'type'        => $job->type,
-                            'title'       => $job->title,
-                            'item'        => $job->plantilla_item_no,
-                            'salary'      => number_format((float) $job->salary, 2),
-                            'assignment'  => $job->assignment,
-                            'education'   => $job->education,
-                            'eligibility' => $job->eligibility,
-                            'training'    => $job->training,
-                            'experience'  => $job->experience,
-                            'competency'  => $job->competency,
-                            'deadline'    => \Carbon\Carbon::parse($job->expiration_at)->format('F d, Y'),
-                        ];
-                    @endphp
-                    <article class="card" data-haystack="{{ Str::lower($job->title . ' ' . $job->type . ' ' . $job->assignment . ' ' . $job->plantilla_item_no) }}">
-                        <span class="card__type">{{ $job->type }}</span>
-                        <h3 class="card__title">{{ $job->title }}</h3>
-                        <div class="card__meta">
-                            <span class="card__salary"><i class="fas fa-peso-sign"></i>{{ number_format((float) $job->salary, 2) }} <small style="color:var(--muted); font-weight:500;">/ month</small></span>
-                            @if($job->assignment)
-                                <span><i class="fas fa-location-dot"></i>{{ $job->assignment }}</span>
-                            @endif
-                            @if($job->plantilla_item_no)
-                                <span><i class="fas fa-hashtag"></i>Item No. {{ $job->plantilla_item_no }}</span>
-                            @endif
-                        </div>
-                        <div class="card__foot">
-                            <span class="card__due {{ $daysLeft <= 7 ? 'is-soon' : '' }}">
-                                <i class="far fa-clock"></i>
-                                Apply before {{ \Carbon\Carbon::parse($job->expiration_at)->format('M d, Y') }}
-                                @if($daysLeft <= 7) · {{ $daysLeft <= 0 ? 'last day' : $daysLeft . ' day' . ($daysLeft == 1 ? '' : 's') . ' left' }} @endif
-                            </span>
-                            <button type="button" class="btn btn--solid view-job" data-job='@json($jobPayload)'>View details</button>
-                        </div>
-                    </article>
-                @endforeach
-            </div>
-            <div class="empty" id="noResults" style="display:none;">
-                <i class="fas fa-magnifying-glass"></i>
-                <p><strong>Nothing matches that search.</strong></p>
-            </div>
-        @endif
+            {{-- Only worth offering when there is more than one kind. --}}
+            @if($types->count() > 1)
+                <div class="mt-4 flex flex-wrap gap-1.5" role="group" aria-label="Nature of appointment">
+                    @foreach($types->prepend('') as $type)
+                        <button type="button" data-type-filter="{{ $type }}" aria-pressed="{{ $type === '' ? 'true' : 'false' }}"
+                                class="h-9 cursor-pointer rounded-full border border-line bg-white px-4 text-sm font-medium text-ink/70 transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500 aria-pressed:border-forest-900 aria-pressed:bg-forest-900 aria-pressed:text-cream">
+                            {{ $type === '' ? 'All' : $type }}
+                        </button>
+                    @endforeach
+                </div>
+            @endif
+
+            @if($jobs->isEmpty())
+                <div class="mt-6 rounded-2xl border border-dashed border-ink/20 px-6 py-16 text-center">
+                    <img src="{{ asset('Uploads/logo.png') }}" alt="" class="mx-auto size-16 opacity-40 grayscale">
+                    <p class="mt-5 font-display text-xl font-semibold tracking-tight">No openings right now</p>
+                    <p class="mx-auto mt-1 max-w-sm text-ink/60">New positions are posted here as soon as they open. If you have already applied, you can still track your application.</p>
+                </div>
+            @else
+                <ol class="mt-6 space-y-3" id="jobList">
+                    @foreach($jobs as $job)
+                        @php
+                            $closes = \Carbon\Carbon::parse($job->expiration_at);
+                            $daysLeft = (int) now()->startOfDay()->diffInDays($closes->copy()->startOfDay(), false);
+                            $soon = $daysLeft <= 7;
+                            $salary = number_format((float) $job->salary, 2);
+
+                            // What the details dialog shows; read by the script.
+                            $payload = [
+                                'id' => $job->id, 'type' => $job->type, 'title' => $job->title, 'item' => $job->plantilla_item_no,
+                                'salary' => $salary, 'assignment' => $job->assignment, 'education' => $job->education,
+                                'eligibility' => $job->eligibility, 'training' => $job->training, 'experience' => $job->experience,
+                                'competency' => $job->competency, 'deadline' => $closes->format('F j, Y'),
+                            ];
+                        @endphp
+                        <li data-job="{{ json_encode($payload) }}" data-type="{{ $job->type }}"
+                            data-haystack="{{ Str::lower($job->title . ' ' . $job->type . ' ' . $job->assignment . ' ' . $job->plantilla_item_no) }}"
+                            class="grid gap-x-5 gap-y-4 rounded-2xl border border-line bg-white p-5 transition-shadow hover:shadow-lg hover:shadow-forest-950/5 sm:grid-cols-[4.25rem_minmax(0,1fr)_auto] sm:items-center sm:p-6">
+
+                            {{-- The closing date, as the leaf of a desk calendar.
+                                 It turns orange in the last week. --}}
+                            <div class="w-[4.25rem] overflow-hidden rounded-xl border text-center max-sm:hidden {{ $soon ? 'border-sun-500/50' : 'border-line' }}" aria-hidden="true">
+                                <p class="py-1 text-xs font-medium {{ $soon ? 'bg-sun-500 text-forest-950' : 'bg-forest-900 text-cream' }}">{{ $closes->format('M') }}</p>
+                                <p class="py-1.5 font-display text-2xl leading-none font-semibold tabular-nums">{{ $closes->format('j') }}</p>
+                            </div>
+
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-forest-700">{{ $job->type }}</p>
+                                <h3 class="mt-0.5 font-display text-xl leading-snug font-semibold tracking-tight">{{ $job->title }}</h3>
+
+                                <p class="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-ink/60">
+                                    @if($job->assignment)
+                                        <span><i class="fas fa-location-dot mr-1 text-xs text-ink/40"></i>{{ $job->assignment }}</span>
+                                    @endif
+                                    @if($job->plantilla_item_no)
+                                        <span>Item no. {{ $job->plantilla_item_no }}</span>
+                                    @endif
+                                </p>
+
+                                <p class="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                                    <span><strong class="font-semibold tabular-nums">&#8369;{{ $salary }}</strong> <span class="text-sm text-ink/55">a month</span></span>
+                                    <span class="text-sm {{ $soon ? 'font-medium text-sun-700' : 'text-ink/60' }}">
+                                        Apply by {{ $closes->format('F j, Y') }}@if($soon), {{ $daysLeft <= 0 ? 'last day today' : $daysLeft . ' ' . Str::plural('day', $daysLeft) . ' left' }}@endif
+                                    </span>
+                                </p>
+                            </div>
+
+                            <button type="button" data-view-job class="{{ $primary }} group">
+                                View and apply
+                                <svg class="size-3.5 fill-current transition-transform group-hover:translate-x-0.5" viewBox="0 0 16 16" aria-hidden="true"><path d="M8.5 2.5 14 8l-5.5 5.5-1.1-1.1 3.6-3.6H2V7.2h9L7.4 3.6z"/></svg>
+                            </button>
+                        </li>
+                    @endforeach
+                </ol>
+
+                <p class="mt-6 rounded-2xl border border-dashed border-ink/20 px-6 py-12 text-center text-ink/60" id="noResults" hidden>No open position matches that.</p>
+            @endif
+        </section>
+
+        <aside class="space-y-5 lg:sticky lg:top-6">
+            {{-- Tracking, in the page: it is the other thing people come for. --}}
+            <section class="{{ $card }} scroll-mt-6" id="track" aria-labelledby="trackTitle">
+                <h2 class="{{ $section }}" id="trackTitle">Track an application</h2>
+                <p class="mt-1 text-sm text-ink/60">Enter the application number from your confirmation email.</p>
+
+                <form id="trackForm" class="mt-4 flex gap-2">
+                    <label for="trackInput" class="sr-only">Application number</label>
+                    <input id="trackInput" placeholder="APP-{{ date('Y') }}-0000A" autocomplete="off" required class="{{ $input }} font-medium uppercase tabular-nums placeholder:normal-case">
+                    <button type="submit" id="trackButton" class="{{ $primary }} px-4">Track</button>
+                </form>
+
+                <p class="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800" id="trackError" role="alert" hidden></p>
+
+                <div class="mt-4 border-t border-line pt-4" id="trackResult" hidden>
+                    <p class="font-display text-lg leading-snug font-semibold tracking-tight" data-track="name"></p>
+                    <p class="mt-0.5 text-sm text-ink/60" data-track="position"></p>
+                    <p class="text-sm text-ink/60" data-track="date"></p>
+                    <p class="mt-3 inline-block rounded-full px-3.5 py-1.5 text-sm font-medium data-[tone=bad]:bg-red-50 data-[tone=bad]:text-red-800 data-[tone=ok]:bg-forest-100 data-[tone=ok]:text-forest-800 data-[tone=warn]:bg-sun-100 data-[tone=warn]:text-sun-700" data-track="status"></p>
+                    <p class="mt-3 rounded-xl bg-paper px-4 py-3 text-sm leading-relaxed" data-track="note" hidden></p>
+                </div>
+            </section>
+
+            <section class="{{ $card }}" aria-labelledby="prepareTitle">
+                <h2 class="{{ $section }}" id="prepareTitle">What to prepare</h2>
+                <p class="mt-1 text-sm text-ink/60">Each as a PDF of 20 MB or less.</p>
+
+                <ul class="mt-4 space-y-2.5 text-sm">
+                    @foreach($documents as [, $document, $needed])
+                        <li class="flex gap-3">
+                            <span class="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[10px] {{ $needed ? 'bg-forest-100 text-forest-700' : 'border border-line text-ink/35' }}"><i class="fas fa-check"></i></span>
+                            <span>{{ $document }}@unless($needed) <span class="text-ink/50">(if you have one)</span>@endunless</span>
+                        </li>
+                    @endforeach
+                    <li class="flex gap-3">
+                        <span class="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border border-line text-[10px] text-ink/35"><i class="fas fa-check"></i></span>
+                        <span>Training certificates <span class="text-ink/50">(if you have any)</span></span>
+                    </li>
+                </ul>
+
+                <p class="mt-4 border-t border-line pt-4 text-sm leading-relaxed text-ink/60">
+                    Already working at the LGU? Have your employee ID number ready; your present position is read from your 201 file.
+                </p>
+            </section>
+        </aside>
     </main>
 
-    <footer class="foot">
-        <div class="foot__inner">
-            <img src="{{ asset('Uploads/logo.png') }}" alt="Seal">
-            <span>© {{ date('Y') }} Municipality of Mabinay · Human Resource Management Office</span>
-        </div>
+    <footer class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line py-6 text-sm text-ink/55">
+        <p>&copy; {{ date('Y') }} Municipality of Mabinay, Negros Oriental. Human Resource Management Office.</p>
+        <a href="{{ route('getLogin') }}" class="font-medium text-forest-700 underline-offset-2 hover:underline">Employee sign in</a>
     </footer>
-
-    {{-- ------------------------------------------------ job detail modal --}}
-    <div class="modal" id="jobModal">
-        <div class="sheet">
-            <div class="sheet__head">
-                <div>
-                    <h3 id="jm-title">Position</h3>
-                    <p id="jm-sub">—</p>
-                </div>
-                <button type="button" class="sheet__x" data-close><i class="fas fa-xmark"></i></button>
-            </div>
-            <div class="sheet__body">
-                <div class="spec" id="jm-spec"></div>
-                <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
-                    <button type="button" class="btn btn--ghost" data-close>Close</button>
-                    <button type="button" class="btn btn--solid btn--lg" id="jm-apply"><i class="fas fa-paper-plane"></i> Apply for this position</button>
-                </div>
-            </div>
-        </div>
     </div>
 
-    {{-- ------------------------------------------------ application modal --}}
-    <div class="modal" id="applyModal">
-        <div class="sheet sheet--wide">
-            <div class="sheet__head">
-                <div>
-                    <h3>Application — <span id="ap-title" style="color:var(--green);">Position</span></h3>
-                    <p>All documents must be PDF files, 20&nbsp;MB max each. Fields marked * are required.</p>
-                </div>
-                <button type="button" class="sheet__x" data-close><i class="fas fa-xmark"></i></button>
+    {{-- ---------------------------------------------------- one position --}}
+    <dialog id="jobDialog" aria-labelledby="jobTitle" class="{{ $dialog }} max-h-[calc(100dvh-1.5rem)] w-[min(42rem,calc(100vw-1.5rem))]">
+        <div class="flex items-start justify-between gap-4 bg-forest-900 px-6 py-5 text-cream sm:px-8">
+            <div class="min-w-0">
+                <p class="text-sm text-cream/70" data-job-field="type"></p>
+                <h2 class="mt-0.5 font-display text-2xl leading-tight font-semibold tracking-tight" id="jobTitle"></h2>
+                <p class="mt-1 text-sm text-cream/70" data-job-field="sub"></p>
             </div>
-            <div class="sheet__body">
-                <div class="alert alert--err" id="ap-error"></div>
+            <button type="button" data-close aria-label="Close" class="-mt-1 -mr-2 grid size-10 shrink-0 cursor-pointer place-items-center rounded-xl text-cream/70 transition-colors hover:bg-cream/12 hover:text-cream focus-visible:outline-2 focus-visible:outline-sun-500"><i class="fas fa-xmark"></i></button>
+        </div>
 
-                <form id="applyForm" novalidate>
-                    <input type="hidden" name="jid" id="ap-jid">
+        {{-- Filled by the script, as text, from the position's data. --}}
+        <dl class="min-h-0 flex-1 divide-y divide-line overflow-y-auto px-6 sm:px-8" id="jobSpec"></dl>
 
-                    {{-- Employment status with the LGU.
+        <div class="flex flex-wrap justify-end gap-2 border-t border-line bg-white px-6 py-4 sm:px-8">
+            <button type="button" data-close class="{{ $secondary }}">Close</button>
+            <button type="button" id="jobApply" class="{{ $primary }}">Apply for this position</button>
+        </div>
+    </dialog>
 
-                         The Comparative Assessment the selection board signs asks for each
-                         candidate's present position, salary grade and status, and gives a
-                         performance rating 35 of its 100 points. Those apply only to someone
-                         already in the service. Rather than ask an applicant to type facts
-                         about their own appointment, an internal applicant gives their
-                         Employee ID and HR reads the rest from the 201 file. --}}
-                    <div class="f-section"><h4>Employment status</h4></div>
-                    <div class="f-grid">
-                        <div class="f" style="grid-column:1/-1;">
-                            <label>Are you currently employed at LGU Mabinay? *</label>
-                            <div class="radio-row">
-                                <label class="radio-opt">
-                                    <input type="radio" name="is_internal" value="0" checked
-                                           onchange="document.getElementById('internal-fields').hidden = true">
-                                    <span>No &mdash; I am applying from outside the LGU</span>
-                                </label>
-                                <label class="radio-opt">
-                                    <input type="radio" name="is_internal" value="1"
-                                           onchange="document.getElementById('internal-fields').hidden = false">
-                                    <span>Yes &mdash; I am a current employee</span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="f-grid" id="internal-fields" hidden>
-                        <div class="f">
-                            <label>Employee ID number *</label>
-                            <input name="emp_ID" placeholder="e.g. 1051-02" autocomplete="off">
-                            <small class="hint">As printed on your employee card. Your present position,
-                                salary grade and appointment status are taken from your 201 file.</small>
-                        </div>
-                    </div>
+    {{-- ------------------------------------------------------ application --}}
+    <dialog id="applyDialog" aria-labelledby="applyTitle" class="{{ $dialog }} h-[calc(100dvh-1.5rem)] w-[min(50rem,calc(100vw-1.5rem))]">
+        <div class="flex items-start justify-between gap-4 border-b border-line bg-white px-6 py-5 sm:px-8">
+            <div class="min-w-0">
+                <p class="text-sm text-ink/60">Application for</p>
+                <h2 class="font-display text-2xl leading-tight font-semibold tracking-tight" id="applyTitle"></h2>
+            </div>
+            <button type="button" data-apply-leave aria-label="Close" class="{{ $close }}"><i class="fas fa-xmark"></i></button>
+        </div>
 
-                    <div class="f-section"><h4>Personal information</h4></div>
-                    <div class="f-grid">
-                        <div class="f"><label>First name *</label><input name="first_name" required></div>
-                        <div class="f"><label>Last name *</label><input name="last_name" required></div>
-                        <div class="f"><label>Middle name <small>(optional)</small></label><input name="middle_name"></div>
-                        <div class="f"><label>Age *</label><input name="age" type="number" min="18" max="65" required></div>
-                        <div class="f"><label>Sex *</label>
-                            <select name="sex" required>
-                                <option value="" disabled selected>Select…</option>
+        <form id="applyForm" novalidate class="min-h-0 flex-1 space-y-8 overflow-y-auto px-6 py-6 sm:px-8">
+            <input type="hidden" name="jid">
+
+            <p class="rounded-xl bg-red-50 px-4 py-3 text-red-800" id="applyError" role="alert" hidden></p>
+
+            {{-- Employment status with the LGU.
+
+                 The Comparative Assessment the selection board signs asks for each
+                 candidate's present position, salary grade and status, and gives a
+                 performance rating 35 of its 100 points. Those apply only to someone
+                 already in the service. Rather than ask an applicant to type facts
+                 about their own appointment, an internal applicant gives their
+                 Employee ID and HR reads the rest from the 201 file. --}}
+            <fieldset>
+                <legend class="{{ $section }}">Are you currently employed at LGU Mabinay?</legend>
+
+                <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                    @foreach(['0' => 'No, I am applying from outside the LGU', '1' => 'Yes, I am a current employee'] as $value => $answer)
+                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-white p-3.5 transition-colors has-checked:border-forest-600 has-checked:bg-forest-100/60">
+                            <input type="radio" name="is_internal" value="{{ $value }}" class="size-4 shrink-0 accent-forest-600" @checked((string) $value === '0')>
+                            <span class="font-medium">{{ $answer }}</span>
+                        </label>
+                    @endforeach
+                </div>
+
+                <div class="mt-3 max-w-sm" id="internalFields" hidden>
+                    <label for="apEmpId" class="{{ $label }}">Employee ID number</label>
+                    <input id="apEmpId" name="emp_ID" placeholder="1051-02" autocomplete="off" class="{{ $input }} mt-1.5">
+                    <p class="mt-1.5 text-sm text-ink/60">As printed on your employee card. Your present position, salary grade and appointment status are taken from your 201 file.</p>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend class="{{ $section }}">About you</legend>
+
+                <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                    <div><label for="apFirst" class="{{ $label }}">First name</label><input id="apFirst" name="first_name" required autocomplete="given-name" class="{{ $input }} mt-1.5"></div>
+                    <div><label for="apLast" class="{{ $label }}">Last name</label><input id="apLast" name="last_name" required autocomplete="family-name" class="{{ $input }} mt-1.5"></div>
+                    <div><label for="apMiddle" class="{{ $label }}">Middle name <span class="font-normal text-ink/50">(optional)</span></label><input id="apMiddle" name="middle_name" autocomplete="additional-name" class="{{ $input }} mt-1.5"></div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label for="apAge" class="{{ $label }}">Age</label><input id="apAge" name="age" type="number" min="18" max="65" required inputmode="numeric" class="{{ $input }} mt-1.5"></div>
+                        <div><label for="apSex" class="{{ $label }}">Sex</label>
+                            <select id="apSex" name="sex" required class="{{ $input }} mt-1.5 pr-8">
+                                <option value="" disabled selected>Select</option>
                                 <option>Male</option>
                                 <option>Female</option>
                             </select>
                         </div>
-                        <div class="f"><label>Mobile number *</label><input name="mobile" type="tel" placeholder="09XX XXX XXXX" required></div>
-                        <div class="f"><label>Email address *</label><input name="email" type="email" required></div>
-                        <div class="f f--full"><label>Complete address *</label><input name="address" required></div>
                     </div>
-
-                    <div class="f-section"><h4>Education *</h4><button type="button" class="mini" id="addEdu"><i class="fas fa-plus"></i> Add</button></div>
-                    <div id="eduRows"></div>
-
-                    <div class="f-section"><h4>Eligibility <small style="text-transform:none; letter-spacing:0; color:var(--muted); font-weight:500;">(if any)</small></h4><button type="button" class="mini" id="addElig"><i class="fas fa-plus"></i> Add</button></div>
-                    <div id="eligRows"></div>
-
-                    <div class="f-section"><h4>Documents</h4></div>
-                    <div class="f-grid">
-                        <div class="f"><label>Personal Data Sheet (PDS) *</label>
-                            <div class="file-tile"><input type="file" name="pds" accept="application/pdf" required><span class="ft-name">Choose PDF…</span></div>
-                        </div>
-                        <div class="f"><label>Work Experience Sheet *</label>
-                            <div class="file-tile"><input type="file" name="wes" accept="application/pdf" required><span class="ft-name">Choose PDF…</span></div>
-                        </div>
-                        <div class="f"><label>Letter of Intent *</label>
-                            <div class="file-tile"><input type="file" name="intent" accept="application/pdf" required><span class="ft-name">Choose PDF…</span></div>
-                        </div>
-                        <div class="f"><label>Resume / CV *</label>
-                            <div class="file-tile"><input type="file" name="resume" accept="application/pdf" required><span class="ft-name">Choose PDF…</span></div>
-                        </div>
-                        <div class="f"><label>Transcript of Records *</label>
-                            <div class="file-tile"><input type="file" name="tor" accept="application/pdf" required><span class="ft-name">Choose PDF…</span></div>
-                        </div>
-                        <div class="f"><label>Certificate of Employment <small>(optional)</small></label>
-                            <div class="file-tile"><input type="file" name="coe" accept="application/pdf"><span class="ft-name">Choose PDF…</span></div>
-                        </div>
-                        <div class="f f--full"><label>Training certificates <small>(optional, multiple allowed)</small></label>
-                            <div class="file-tile"><input type="file" name="cert_training[]" accept="application/pdf" multiple><span class="ft-name">Choose PDF file(s)…</span></div>
-                        </div>
-                    </div>
-
-                    <div style="margin-top:24px; display:flex; gap:10px; justify-content:flex-end; align-items:center;">
-                        <button type="button" class="btn btn--ghost" data-close>Cancel</button>
-                        <button type="submit" class="btn btn--solid btn--lg" id="ap-submit"><i class="fas fa-paper-plane"></i> Submit application</button>
-                    </div>
-                </form>
-
-                <div class="done" id="ap-done" style="display:none;">
-                    <i class="fas fa-circle-check"></i>
-                    <h4>Application submitted!</h4>
-                    <p>Save your application number — you will need it to track your status.<br>A confirmation was also sent to your email.</p>
-                    <div class="appno" id="ap-appno">APP-0000-0000X</div>
-                    <div style="margin-top:18px;">
-                        <button type="button" class="btn btn--solid" data-close>Done</button>
-                    </div>
+                    <div><label for="apMobile" class="{{ $label }}">Mobile number</label><input id="apMobile" name="mobile" type="tel" placeholder="09XX XXX XXXX" required autocomplete="tel" class="{{ $input }} mt-1.5"></div>
+                    <div><label for="apEmail" class="{{ $label }}">Email address</label><input id="apEmail" name="email" type="email" required autocomplete="email" class="{{ $input }} mt-1.5">
+                        <p class="mt-1.5 text-sm text-ink/60">Your application number is sent here.</p></div>
+                    <div class="sm:col-span-2"><label for="apAddress" class="{{ $label }}">Complete address</label><input id="apAddress" name="address" required autocomplete="street-address" class="{{ $input }} mt-1.5"></div>
                 </div>
+            </fieldset>
+
+            <div role="group" aria-labelledby="educationTitle">
+                <div class="flex items-center justify-between gap-4">
+                    <h3 class="{{ $section }}" id="educationTitle">Education</h3>
+                    <button type="button" id="addEducation" class="{{ $secondary }} h-9 px-3.5 text-sm"><i class="fas fa-plus text-xs"></i> Add another</button>
+                </div>
+                <div class="mt-3 space-y-3" id="educationRows"></div>
+            </div>
+
+            <div role="group" aria-labelledby="eligibilityTitle">
+                <div class="flex items-center justify-between gap-4">
+                    <h3 class="{{ $section }}" id="eligibilityTitle">Eligibility <span class="font-sans text-sm font-normal text-ink/50">(if any)</span></h3>
+                    <button type="button" id="addEligibility" class="{{ $secondary }} h-9 px-3.5 text-sm"><i class="fas fa-plus text-xs"></i> Add</button>
+                </div>
+                <div class="mt-3 space-y-3 empty:hidden" id="eligibilityRows"></div>
+            </div>
+
+            <fieldset>
+                <legend class="{{ $section }}">Documents</legend>
+                <p class="mt-1 text-sm text-ink/60">PDF files, 20 MB each at most.</p>
+
+                {{-- The real file input covers its tile, so the whole tile is
+                     the thing to press; the script writes the chosen name in. --}}
+                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                    @foreach(array_merge($documents, [['cert_training[]', 'Training certificates', false]]) as [$name, $document, $needed])
+                        <div class="{{ $name === 'cert_training[]' ? 'sm:col-span-2' : '' }}">
+                            <div data-file-tile class="relative flex items-center gap-3 rounded-xl border border-dashed border-ink/25 bg-white p-3.5 transition-colors focus-within:border-forest-600 focus-within:ring-4 focus-within:ring-forest-600/15 hover:border-ink/45 data-[chosen]:border-solid data-[chosen]:border-forest-600 data-[chosen]:bg-forest-100/60 data-[refused]:border-red-400 data-[refused]:bg-red-50">
+                                <span class="grid size-10 shrink-0 place-items-center rounded-lg bg-paper text-ink/45"><i class="fas fa-file-pdf"></i></span>
+                                <span class="min-w-0">
+                                    <span class="block font-medium">{{ $document }}@unless($needed) <span class="font-normal text-ink/50">(optional)</span>@endunless</span>
+                                    <span class="block truncate text-sm text-ink/55" data-file-name data-idle="{{ $name === 'cert_training[]' ? 'Choose one or more PDFs' : 'Choose a PDF' }}"></span>
+                                </span>
+                                <input type="file" name="{{ $name }}" accept="application/pdf" aria-label="{{ $document }}" class="absolute inset-0 cursor-pointer opacity-0"
+                                       @if($needed) required @endif @if($name === 'cert_training[]') multiple @endif>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </fieldset>
+        </form>
+
+        <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-line bg-white px-6 py-4 sm:px-8" id="applyFooter">
+            <p class="text-sm text-ink/60 max-sm:hidden">Everything except what is marked optional is required.</p>
+            <div class="flex gap-2 max-sm:w-full max-sm:justify-end">
+                <button type="button" data-apply-leave class="{{ $secondary }}">Cancel</button>
+                <button type="submit" form="applyForm" id="applySubmit" class="{{ $primary }}">Submit application</button>
             </div>
         </div>
-    </div>
 
-    {{-- --------------------------------------------------- tracking modal --}}
-    <div class="modal" id="trackModal">
-        <div class="sheet">
-            <div class="sheet__head">
-                <div>
-                    <h3>Track your application</h3>
-                    <p>Enter the application number from your confirmation (e.g. APP-{{ date('Y') }}-1234A).</p>
-                </div>
-                <button type="button" class="sheet__x" data-close><i class="fas fa-xmark"></i></button>
-            </div>
-            <div class="sheet__body">
-                <div class="alert alert--err" id="tr-error"></div>
-                <form class="track-form" id="trackForm">
-                    <input id="tr-input" placeholder="APP-{{ date('Y') }}-0000A" autocomplete="off" required>
-                    <button type="submit" class="btn btn--solid" id="tr-btn"><i class="fas fa-magnifying-glass"></i> Track</button>
-                </form>
+        {{-- Shown in place of the form once the application is in. --}}
+        <div class="m-auto max-w-md px-6 py-10 text-center" id="applyDone" hidden>
+            <span class="mx-auto grid size-16 place-items-center rounded-full bg-forest-100 text-2xl text-forest-700"><i class="fas fa-check"></i></span>
+            <h3 class="mt-5 font-display text-2xl font-semibold tracking-tight">Application submitted</h3>
+            <p class="mt-2 text-ink/65">Keep your application number: it is how you track your status. A confirmation was also sent to your email.</p>
 
-                <div class="t-result" id="tr-result">
-                    <div class="t-card">
-                        <h4 id="tr-name">—</h4>
-                        <div class="t-sub" id="tr-pos">—</div>
-                        <div class="t-sub" id="tr-date">—</div>
-                        <span class="t-status" id="tr-status">—</span>
-                        <div class="t-note" id="tr-note" style="display:none;"></div>
-                    </div>
-                </div>
-            </div>
+            <p class="mt-6 inline-flex items-center gap-3 rounded-2xl border border-forest-600/30 bg-forest-100 py-3 pr-3 pl-6">
+                <span class="font-display text-2xl font-semibold tracking-wide text-forest-800 tabular-nums" id="applyNumber"></span>
+                <button type="button" id="applyCopy" class="{{ $secondary }} h-9 px-3 text-sm">Copy</button>
+            </p>
+
+            <div class="mt-8"><button type="button" data-close class="{{ $primary }}">Done</button></div>
         </div>
-    </div>
+    </dialog>
+
+    {{-- Asked before a half-filled application is thrown away. --}}
+    <dialog id="discardDialog" aria-labelledby="discardTitle" class="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-line bg-white p-6 text-ink shadow-2xl shadow-forest-950/30 backdrop:bg-forest-950/60">
+        <h2 class="font-display text-xl font-semibold tracking-tight" id="discardTitle">Discard this application?</h2>
+        <p class="mt-2 text-ink/65">What you have typed and the files you chose will be lost.</p>
+        <div class="mt-6 flex justify-end gap-2">
+            <button type="button" data-close class="{{ $secondary }}">Keep editing</button>
+            <button type="button" id="discardYes" class="inline-flex h-11 cursor-pointer items-center rounded-xl bg-red-700 px-5 font-medium text-white transition-colors hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">Discard</button>
+        </div>
+    </dialog>
+
+    {{-- One school on the application; the first cannot be removed. --}}
+    <template id="educationRow">
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_11rem_6rem_auto]" data-row>
+            <input name="education[]" placeholder="School and degree: BS Civil Engineering, XYZ University" aria-label="School and degree" required class="{{ $input }} max-sm:col-span-2">
+            <select name="elevel[]" aria-label="Level" required class="{{ $input }} pr-8 max-sm:col-span-2">
+                <option value="" disabled selected>Level</option>
+                <option>Elementary</option><option>Secondary</option><option>Vocational</option>
+                <option>College</option><option>Graduate Studies</option>
+            </select>
+            <input name="eyear[]" placeholder="Year" aria-label="Year" maxlength="9" required class="{{ $input }}">
+            <button type="button" data-row-remove title="Remove" class="grid size-11 cursor-pointer place-items-center rounded-xl text-ink/45 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-sun-500"><i class="fas fa-xmark"></i><span class="sr-only">Remove this school</span></button>
+        </div>
+    </template>
+
+    <template id="eligibilityRow">
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2" data-row>
+            <input name="eligibility[]" placeholder="CSC Professional (2nd level), or RA 1080 licensure" aria-label="Eligibility" class="{{ $input }}">
+            <button type="button" data-row-remove title="Remove" class="grid size-11 cursor-pointer place-items-center rounded-xl text-ink/45 transition-colors hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-sun-500"><i class="fas fa-xmark"></i><span class="sr-only">Remove this eligibility</span></button>
+        </div>
+    </template>
 
 <script>
 (function () {
     'use strict';
 
     var API = {
-        store:  "{{ url('/api/application/store') }}",
-        status: "{{ url('/api/application/status') }}",
+        store: "{{ url('/api/application/store') }}",
+        status: "{{ url('/api/application/status') }}"
     };
 
-    // ------------------------------------------------------------- search
-    var search = document.getElementById('jobSearch');
-    var grid   = document.getElementById('jobGrid');
-    var count  = document.getElementById('jobCount');
-    var none   = document.getElementById('noResults');
+    function byId(id) { return document.getElementById(id); }
 
-    if (search && grid) {
-        search.addEventListener('input', function () {
-            var q = search.value.trim().toLowerCase();
-            var shown = 0;
+    /* ------------------------------------------------------------ dialogs */
+    // data-close shuts the dialog it sits in; so does a press on the dimmed
+    // page behind one, except behind the application, which is too much work
+    // to lose to a stray click.
+    document.addEventListener('click', function (event) {
+        var closer = event.target.closest('[data-close]');
+        if (closer) { closer.closest('dialog').close(); return; }
 
-            grid.querySelectorAll('.card').forEach(function (card) {
-                var hit = !q || card.dataset.haystack.indexOf(q) !== -1;
-                card.style.display = hit ? '' : 'none';
-                if (hit) shown++;
+        if (event.target.tagName === 'DIALOG' && event.target.id !== 'applyDialog') { event.target.close(); }
+    });
+
+    /* ----------------------------------------------------- finding a job */
+    var list = byId('jobList');
+    var search = byId('jobSearch');
+    var count = byId('jobCount');
+    var none = byId('noResults');
+    var chips = Array.prototype.slice.call(document.querySelectorAll('[data-type-filter]'));
+    var type = '';
+
+    function filter() {
+        var query = search.value.trim().toLowerCase();
+        var shown = 0;
+
+        Array.prototype.forEach.call(list.children, function (job) {
+            job.hidden = (!!query && job.dataset.haystack.indexOf(query) === -1) || (!!type && job.dataset.type !== type);
+            if (!job.hidden) { shown++; }
+        });
+
+        count.textContent = shown + (shown === 1 ? ' opening' : ' openings');
+        none.hidden = shown > 0;
+    }
+
+    if (list) {
+        search.addEventListener('input', filter);
+
+        chips.forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                type = chip.dataset.typeFilter;
+                chips.forEach(function (other) { other.setAttribute('aria-pressed', other === chip ? 'true' : 'false'); });
+                filter();
             });
-
-            count.textContent = shown + (shown === 1 ? ' opening' : ' openings');
-            if (none) none.style.display = shown ? 'none' : '';
         });
     }
 
-    // ------------------------------------------------------------- modals
-    function openModal(sel)  { document.querySelector(sel).classList.add('is-open'); document.body.style.overflow = 'hidden'; }
-    function closeModal(el)  { el.classList.remove('is-open'); document.body.style.overflow = ''; }
-
-    document.addEventListener('click', function (e) {
-        var opener = e.target.closest('[data-open]');
-        if (opener) return openModal(opener.dataset.open);
-
-        if (e.target.closest('[data-close]')) {
-            var m = e.target.closest('.modal');
-            if (m) closeModal(m);
-            return;
-        }
-
-        // click on the dim backdrop
-        if (e.target.classList && e.target.classList.contains('modal')) closeModal(e.target);
+    // "Track an application" in the banner lands in the box, ready to type.
+    // Done by hand: following the link to #track would move the focus off
+    // the box again.
+    Array.prototype.forEach.call(document.querySelectorAll('[data-focus]'), function (link) {
+        link.addEventListener('click', function (event) {
+            var target = byId(link.dataset.focus);
+            event.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.focus({ preventScroll: true });
+        });
     });
 
-    document.addEventListener('keydown', function (e) {
-        if (e.key !== 'Escape') return;
-        document.querySelectorAll('.modal.is-open').forEach(closeModal);
-    });
-
-    // -------------------------------------------------------- job details
+    /* ------------------------------------------------------ one position */
+    var jobDialog = byId('jobDialog');
     var current = null;
 
-    document.querySelectorAll('.view-job').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            current = JSON.parse(btn.dataset.job);
+    // Everything is written as text, never as HTML: the fields are typed by
+    // HR, but this page is public and takes no chances.
+    function line(term, answer) {
+        var row = document.createElement('div');
+        row.className = 'grid gap-x-6 gap-y-1 py-4 sm:grid-cols-[10rem_minmax(0,1fr)]';
+        var dt = document.createElement('dt');
+        dt.className = 'text-sm text-ink/60';
+        dt.textContent = term;
+        var dd = document.createElement('dd');
+        dd.className = 'whitespace-pre-line';
+        dd.textContent = answer;
+        row.append(dt, dd);
+        return row;
+    }
 
-            document.getElementById('jm-title').textContent = current.title;
-            document.getElementById('jm-sub').textContent =
-                current.type + (current.item ? ' · Item No. ' + current.item : '') + ' · closes ' + current.deadline;
+    if (list) {
+        list.addEventListener('click', function (event) {
+            var button = event.target.closest('[data-view-job]');
+            if (!button) return;
 
-            var rows = [
-                ['Monthly salary', '₱ ' + current.salary],
+            current = JSON.parse(button.closest('[data-job]').dataset.job);
+
+            byId('jobTitle').textContent = current.title;
+            jobDialog.querySelector('[data-job-field="type"]').textContent = current.type;
+            jobDialog.querySelector('[data-job-field="sub"]').textContent =
+                (current.item ? 'Item no. ' + current.item + ', ' : '') + 'closes ' + current.deadline;
+
+            var spec = byId('jobSpec');
+            spec.textContent = '';
+            [
+                ['Monthly salary', '₱' + current.salary],
                 ['Place of assignment', current.assignment],
                 ['Education', current.education],
                 ['Eligibility', current.eligibility],
                 ['Training', current.training],
                 ['Experience', current.experience],
-                ['Competency', current.competency],
-            ];
-
-            document.getElementById('jm-spec').innerHTML = rows
-                .filter(function (r) { return r[1]; })
-                .map(function (r) {
-                    return '<div class="spec__row"><div class="spec__key">' + r[0] +
-                           '</div><div class="spec__val"></div></div>';
-                }).join('');
-
-            // Set values as text, never HTML — job fields are typed by HR but
-            // this page is public and takes no chances.
-            var vals = rows.filter(function (r) { return r[1]; });
-            document.querySelectorAll('#jm-spec .spec__val').forEach(function (el, i) {
-                el.textContent = vals[i][1];
+                ['Competency', current.competency]
+            ].forEach(function (pair) {
+                if (pair[1]) { spec.appendChild(line(pair[0], pair[1])); }
             });
 
-            openModal('#jobModal');
+            jobDialog.showModal();
+            spec.scrollTop = 0;
         });
-    });
+    }
 
-    document.getElementById('jm-apply').addEventListener('click', function () {
+    byId('jobApply').addEventListener('click', function () {
         if (!current) return;
-        closeModal(document.getElementById('jobModal'));
+        jobDialog.close();
         startApplication(current);
     });
 
-    // -------------------------------------------------- application form
-    var eduRows  = document.getElementById('eduRows');
-    var eligRows = document.getElementById('eligRows');
+    /* ------------------------------------------------------- application */
+    var applyDialog = byId('applyDialog');
+    var form = byId('applyForm');
+    var footer = byId('applyFooter');
+    var done = byId('applyDone');
+    var error = byId('applyError');
+    var submit = byId('applySubmit');
+    var education = byId('educationRows');
+    var eligibility = byId('eligibilityRows');
+    var discard = byId('discardDialog');
 
-    function eduRow() {
-        var div = document.createElement('div');
-        div.className = 'row-line';
-        div.innerHTML =
-            '<div class="f"><input name="education[]" placeholder="School / degree — e.g. BS Civil Engineering, XYZ University" required></div>' +
-            '<div class="f"><select name="elevel[]" required>' +
-                '<option value="" disabled selected>Level…</option>' +
-                '<option>Elementary</option><option>Secondary</option><option>Vocational</option>' +
-                '<option>College</option><option>Graduate Studies</option>' +
-            '</select></div>' +
-            '<div class="f"><input name="eyear[]" placeholder="Year" maxlength="9" required></div>' +
-            '<button type="button" class="rm" title="Remove"><i class="fas fa-xmark"></i></button>';
-        div.querySelector('.rm').addEventListener('click', function () {
-            if (eduRows.children.length > 1) div.remove();
-        });
-        return div;
+    function addRow(rows, templateId) {
+        rows.appendChild(byId(templateId).content.cloneNode(true));
+        return rows.lastElementChild;
     }
 
-    function eligRow() {
-        var div = document.createElement('div');
-        div.className = 'row-line row-line--elig';
-        div.innerHTML =
-            '<div class="f"><input name="eligibility[]" placeholder="e.g. CSC Professional (2nd Level), RA 1080 — Licensure"></div>' +
-            '<button type="button" class="rm" title="Remove"><i class="fas fa-xmark"></i></button>';
-        div.querySelector('.rm').addEventListener('click', function () { div.remove(); });
-        return div;
+    byId('addEducation').addEventListener('click', function () { addRow(education, 'educationRow').querySelector('input').focus(); });
+    byId('addEligibility').addEventListener('click', function () { addRow(eligibility, 'eligibilityRow').querySelector('input').focus(); });
+
+    form.addEventListener('click', function (event) {
+        var remove = event.target.closest('[data-row-remove]');
+        if (!remove) return;
+
+        var row = remove.closest('[data-row]');
+        // An application needs at least one school.
+        if (row.parentElement === education && education.children.length === 1) return;
+        row.remove();
+    });
+
+    // The employee ID is asked for only of somebody already at the LGU.
+    form.addEventListener('change', function (event) {
+        if (event.target.name === 'is_internal') { byId('internalFields').hidden = event.target.value !== '1'; }
+    });
+
+    /* A tile shows what was chosen. A file the server would refuse anyway is
+       turned away here, with the reason, before a long upload is wasted. */
+    function showFile(tile, text, state) {
+        var name = tile.querySelector('[data-file-name]');
+        name.textContent = text || name.dataset.idle;
+        delete tile.dataset.chosen;
+        delete tile.dataset.refused;
+        if (state) { tile.dataset[state] = ''; }
     }
 
-    document.getElementById('addEdu').addEventListener('click', function () { eduRows.appendChild(eduRow()); });
-    document.getElementById('addElig').addEventListener('click', function () { eligRows.appendChild(eligRow()); });
+    Array.prototype.forEach.call(form.querySelectorAll('[data-file-tile]'), function (tile) {
+        var input = tile.querySelector('input');
+        showFile(tile);
 
-    // file tiles show the chosen name
-    document.querySelectorAll('.file-tile input[type=file]').forEach(function (input) {
         input.addEventListener('change', function () {
-            var tile = input.closest('.file-tile');
-            var name = tile.querySelector('.ft-name');
-            if (input.files.length === 1)      name.textContent = input.files[0].name;
-            else if (input.files.length > 1)   name.textContent = input.files.length + ' files selected';
-            else                               name.textContent = 'Choose PDF…';
-            tile.classList.toggle('has-file', input.files.length > 0);
+            var files = Array.prototype.slice.call(input.files);
+            var wrong = files.filter(function (file) { return file.type !== 'application/pdf'; })[0];
+            var large = files.filter(function (file) { return file.size > 20 * 1024 * 1024; })[0];
+
+            if (wrong || large) {
+                input.value = '';
+                showFile(tile, wrong ? wrong.name + ' is not a PDF' : large.name + ' is over 20 MB', 'refused');
+            } else if (files.length) {
+                showFile(tile, files.length === 1 ? files[0].name : files.length + ' files chosen', 'chosen');
+            } else {
+                showFile(tile);
+            }
         });
     });
 
-    var form    = document.getElementById('applyForm');
-    var apError = document.getElementById('ap-error');
-    var apDone  = document.getElementById('ap-done');
-    var submit  = document.getElementById('ap-submit');
-
     function startApplication(job) {
         form.reset();
-        form.style.display = '';
-        apDone.style.display = 'none';
-        apError.style.display = 'none';
+        form.hidden = false;
+        footer.hidden = false;
+        done.hidden = true;
+        error.hidden = true;
+        byId('internalFields').hidden = true;
 
-        document.querySelectorAll('.file-tile').forEach(function (t) {
-            t.classList.remove('has-file');
-            t.querySelector('.ft-name').textContent = 'Choose PDF…';
-        });
+        Array.prototype.forEach.call(form.querySelectorAll('[data-file-tile]'), function (tile) { showFile(tile); });
 
-        eduRows.innerHTML = '';
-        eduRows.appendChild(eduRow());
-        eligRows.innerHTML = '';
+        education.textContent = '';
+        addRow(education, 'educationRow');
+        eligibility.textContent = '';
 
-        document.getElementById('ap-jid').value  = job.id;
-        document.getElementById('ap-title').textContent = job.title;
+        form.elements.jid.value = job.id;
+        byId('applyTitle').textContent = job.title;
 
-        openModal('#applyModal');
+        applyDialog.showModal();
+        form.scrollTop = 0;
     }
 
-    form.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        apError.style.display = 'none';
+    // Whether anything has been typed or chosen yet.
+    function started() {
+        return Array.prototype.some.call(form.elements, function (control) {
+            // form.elements also lists the fieldsets and the buttons.
+            if (!control.name || control.type === 'hidden' || control.type === 'radio') return false;
+            return control.type === 'file' ? control.files.length > 0 : control.value !== '';
+        });
+    }
+
+    function leave() {
+        if (!form.hidden && started()) { discard.showModal(); } else { applyDialog.close(); }
+    }
+
+    Array.prototype.forEach.call(applyDialog.querySelectorAll('[data-apply-leave]'), function (button) {
+        button.addEventListener('click', leave);
+    });
+
+    // Escape asks the same question the Cancel button does.
+    applyDialog.addEventListener('cancel', function (event) {
+        event.preventDefault();
+        leave();
+    });
+
+    byId('discardYes').addEventListener('click', function () {
+        discard.close();
+        applyDialog.close();
+    });
+
+    function fail(message) {
+        error.textContent = message;
+        error.hidden = false;
+        form.scrollTop = 0;
+    }
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        error.hidden = true;
 
         if (!form.reportValidity()) return;
 
         submit.disabled = true;
-        submit.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Submitting…';
+        submit.textContent = 'Submitting…';
 
-        try {
-            var response = await fetch(API.store, {
-                method: 'POST',
-                headers: { 'Accept': 'application/json' },
-                body: new FormData(form),
+        fetch(API.store, { method: 'POST', headers: { 'Accept': 'application/json' }, body: new FormData(form) })
+            .then(function (response) {
+                return response.json().catch(function () { return {}; }).then(function (body) {
+                    if (response.status === 201) {
+                        byId('applyNumber').textContent = body.data && body.data.app_number ? body.data.app_number : '—';
+                        form.hidden = true;
+                        footer.hidden = true;
+                        done.hidden = false;
+                        return;
+                    }
+
+                    // A refusal lists its reasons by field.
+                    fail(response.status === 422 && body.errors
+                        ? Object.keys(body.errors).map(function (field) { return body.errors[field][0]; }).join(' ')
+                        : (body.message || 'Something went wrong. Please try again.'));
+                });
+            })
+            .catch(function () { fail('Could not reach the server. Check your connection and try again.'); })
+            .finally(function () {
+                submit.disabled = false;
+                submit.textContent = 'Submit application';
             });
-
-            var body = await response.json().catch(function () { return {}; });
-
-            if (response.status === 201) {
-                document.getElementById('ap-appno').textContent = body.data && body.data.app_number ? body.data.app_number : '—';
-                form.style.display = 'none';
-                apDone.style.display = '';
-                document.getElementById('applyModal').scrollTop = 0;
-                return;
-            }
-
-            var message = body.message || 'Something went wrong. Please try again.';
-
-            if (response.status === 422 && body.errors) {
-                message = Object.keys(body.errors).map(function (k) { return body.errors[k][0]; }).join(' ');
-            }
-
-            apError.textContent = message;
-            apError.style.display = 'block';
-            apError.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        } catch (err) {
-            apError.textContent = 'Could not reach the server. Check your connection and try again.';
-            apError.style.display = 'block';
-        } finally {
-            submit.disabled = false;
-            submit.innerHTML = '<i class="fas fa-paper-plane"></i> Submit application';
-        }
     });
 
-    // ------------------------------------------------------------ tracking
+    byId('applyCopy').addEventListener('click', function () {
+        var button = this;
+        navigator.clipboard.writeText(byId('applyNumber').textContent).then(function () {
+            button.textContent = 'Copied';
+            setTimeout(function () { button.textContent = 'Copy'; }, 2000);
+        });
+    });
+
+    /* ----------------------------------------------------------- tracking */
     var STATUS = {
-        0: { label: 'Application Submitted',                        tone: 'ok'   },
-        1: { label: 'Under Review',                                 tone: 'ok'   },
-        2: { label: 'Qualified — For Interview',                    tone: 'ok'   },
-        3: { label: 'Disqualified',                                 tone: 'bad'  },
-        4: { label: 'Qualified, not selected',                      tone: 'warn' },
-        5: { label: 'Top 5 — Psychological / Pre-Employment Test',  tone: 'ok'   },
-        6: { label: 'Not Hired',                                    tone: 'bad'  },
-        7: { label: 'Hired — Congratulations!',                     tone: 'ok'   },
+        0: ['Application submitted', 'ok'],
+        1: ['Under review', 'ok'],
+        2: ['Qualified, for interview', 'ok'],
+        3: ['Disqualified', 'bad'],
+        4: ['Qualified, not selected', 'warn'],
+        5: ['Top 5: psychological and pre-employment test', 'ok'],
+        6: ['Not hired', 'bad'],
+        7: ['Hired. Congratulations!', 'ok']
     };
 
-    var trackForm = document.getElementById('trackForm');
-    var trError   = document.getElementById('tr-error');
-    var trResult  = document.getElementById('tr-result');
-    var trBtn     = document.getElementById('tr-btn');
+    var trackError = byId('trackError');
+    var trackResult = byId('trackResult');
+    var trackButton = byId('trackButton');
 
-    trackForm.addEventListener('submit', async function (e) {
-        e.preventDefault();
+    function tracked(part) { return trackResult.querySelector('[data-track="' + part + '"]'); }
 
-        var number = document.getElementById('tr-input').value.trim().toUpperCase();
+    byId('trackForm').addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        var number = byId('trackInput').value.trim().toUpperCase();
         if (!number) return;
 
-        trError.style.display = 'none';
-        trResult.style.display = 'none';
-        trBtn.disabled = true;
+        trackError.hidden = true;
+        trackResult.hidden = true;
+        trackButton.disabled = true;
 
-        try {
-            var response = await fetch(API.status + '/' + encodeURIComponent(number), {
-                headers: { 'Accept': 'application/json' },
-            });
+        fetch(API.status + '/' + encodeURIComponent(number), { headers: { 'Accept': 'application/json' } })
+            .then(function (response) {
+                return response.json().catch(function () { return {}; }).then(function (body) {
+                    if (!response.ok || !body.data) {
+                        trackError.textContent = 'No application was found with that number. Check it and try again.';
+                        trackError.hidden = false;
+                        return;
+                    }
 
-            var body = await response.json().catch(function () { return {}; });
+                    var application = body.data;
+                    var status = STATUS[application.status] || STATUS[0];
 
-            if (!response.ok || !body.data) {
-                trError.textContent = 'No application was found with that number. Double-check it and try again.';
-                trError.style.display = 'block';
-                return;
-            }
+                    tracked('name').textContent = (application.first_name + ' ' + application.last_name).trim();
+                    tracked('position').textContent = application.position || 'Position not recorded';
+                    tracked('date').textContent = 'Applied ' + new Date(application.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+                    tracked('status').textContent = status[0];
+                    tracked('status').dataset.tone = status[1];
 
-            var app  = body.data;
-            var info = STATUS[app.status] || STATUS[0];
+                    // What the applicant needs to know next, where there is something.
+                    var note = '';
+                    if (Number(application.status) === 2 && application.interview_datetime) {
+                        note = 'Interview: ' + new Date(application.interview_datetime).toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' })
+                            + (application.venue ? ', ' + application.venue : '');
+                    } else if (Number(application.status) === 3 && application.dq_reason) {
+                        note = 'Reason: ' + application.dq_reason;
+                    }
+                    tracked('note').textContent = note;
+                    tracked('note').hidden = !note;
 
-            document.getElementById('tr-name').textContent = (app.first_name + ' ' + app.last_name).trim();
-            document.getElementById('tr-pos').textContent  = 'Position: ' + (app.position || '—');
-            document.getElementById('tr-date').textContent = 'Applied: ' + new Date(app.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-
-            var badge = document.getElementById('tr-status');
-            badge.textContent = info.label;
-            badge.className = 't-status t-status--' + info.tone;
-
-            var note = document.getElementById('tr-note');
-            note.style.display = 'none';
-
-            if (Number(app.status) === 2 && app.interview_datetime) {
-                note.innerHTML = '<i class="fas fa-calendar-check"></i>';
-                note.appendChild(document.createTextNode(
-                    'Interview: ' + new Date(app.interview_datetime).toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' })
-                    + (app.venue ? ' · ' + app.venue : '')));
-                note.style.display = '';
-            } else if (Number(app.status) === 3 && app.dq_reason) {
-                note.innerHTML = '<i class="fas fa-circle-info"></i>';
-                note.appendChild(document.createTextNode('Reason: ' + app.dq_reason));
-                note.style.display = '';
-            }
-
-            trResult.style.display = 'block';
-        } catch (err) {
-            trError.textContent = 'Could not reach the server. Check your connection and try again.';
-            trError.style.display = 'block';
-        } finally {
-            trBtn.disabled = false;
-        }
+                    trackResult.hidden = false;
+                });
+            })
+            .catch(function () {
+                trackError.textContent = 'Could not reach the server. Check your connection and try again.';
+                trackError.hidden = false;
+            })
+            .finally(function () { trackButton.disabled = false; });
     });
 })();
 </script>

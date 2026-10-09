@@ -110,63 +110,14 @@
         </footer>
     </div>
 
-    {{-- Privacy consent. Shown on every page until answered; it cannot be
-         dismissed, only accepted or declined (declining signs the employee out). --}}
+    {{-- Privacy notice (layouts/app-privacy). The consent version is shown on
+         every page until answered and cannot be dismissed, only accepted or
+         declined (declining signs the employee out); the other is the same
+         notice to read, opened from the footer. --}}
     @if($needsPrivacyConsent)
-        <dialog id="dpnDialog" data-dialog-autoshow data-dialog-static aria-labelledby="dpnTitle"
-                class="m-auto max-h-[calc(100dvh-2rem)] w-[min(56rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl shadow-forest-950/25 backdrop:bg-forest-950/60 open:flex">
-            <h2 class="border-b border-line px-6 py-4 font-display text-lg font-semibold tracking-tight" id="dpnTitle">
-                <i class="fas fa-user-shield mr-2 text-forest-600"></i>LGU Mabinay Data Privacy Notice &amp; Consent
-            </h2>
-
-            <div class="min-h-0 flex-1 overflow-y-auto">
-                @include('data-privacy')
-            </div>
-
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-paper px-6 py-4">
-                <small class="text-xs font-medium text-ink/55">Municipality of Mabinay &copy; {{ now()->year }}</small>
-
-                <div class="flex gap-2">
-                    <form method="POST" action="{{ route('dataPrivacyNotice') }}">
-                        @csrf
-                        <button type="submit" class="h-10 cursor-pointer rounded-xl bg-forest-900 px-5 font-medium text-cream transition-colors hover:bg-forest-950 dark:bg-forest-600 dark:hover:bg-forest-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
-                            <i class="fas fa-check-circle mr-1"></i> I Accept
-                        </button>
-                    </form>
-
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button type="submit" class="h-10 cursor-pointer rounded-xl border border-red-300 px-5 font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-400/40 dark:text-red-300 dark:hover:bg-red-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
-                            <i class="fas fa-times-circle mr-1"></i> Decline
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </dialog>
+        @include('layouts.app-privacy', ['consent' => true])
     @endif
-
-    <dialog id="privacyDialog" aria-labelledby="privacyTitle"
-            class="m-auto max-h-[calc(100dvh-2rem)] w-[min(56rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl shadow-forest-950/25 backdrop:bg-forest-950/60 open:flex">
-        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-4">
-            <h2 class="font-display text-lg font-semibold tracking-tight" id="privacyTitle">
-                <i class="fas fa-user-shield mr-2 text-forest-600"></i>LGU Mabinay Data Privacy Policy
-            </h2>
-            <button type="button" data-dialog-close aria-label="Close"
-                    class="-mr-2 grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg text-ink/50 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-sun-500">
-                <i class="fas fa-xmark"></i>
-            </button>
-        </div>
-
-        <div class="min-h-0 flex-1 overflow-y-auto">
-            @include('data-privacy')
-        </div>
-
-        <div class="flex items-center justify-between gap-3 border-t border-line bg-paper px-6 py-3">
-            <small class="text-xs font-medium text-ink/55">Municipality of Mabinay &copy; {{ now()->year }}</small>
-            <button type="button" data-dialog-close
-                    class="h-9 cursor-pointer rounded-xl border border-line bg-surface px-4 font-medium transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">Close</button>
-        </div>
-    </dialog>
+    @include('layouts.app-privacy', ['consent' => false])
 
     {{-- Asked before a form marked data-confirm is sent (layouts/app-scripts):
            data-confirm          the question

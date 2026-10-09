@@ -1,280 +1,146 @@
-@extends('layouts.master')
+@extends('layouts.app')
+
+@php
+    // Other Information Questions, a page of an employee's Personal Data
+    // Sheet: the twelve yes/no questions near the end of the form, with the
+    // details a yes asks for.
+    //
+    // The answers are two comma-separated columns, question and qdetails,
+    // matched by position. Each answer is saved into its own position as it
+    // changes (emp/partials/pds-autosave, to InfoQuestionController::update).
+    // Answering no empties that question's details, here and on the server.
+
+    $isStaff = $guard == 'web';
+
+    $answers = explode(',', (string) $infoquestion->question);
+    $details = explode(',', (string) $infoquestion->qdetails);
+
+    // Each question is [position, wording, details]. Details are
+    // [position in qdetails, label, input type]; most sit at the question's
+    // own position, but the date a case was filed was added later, at 12.
+    $say = fn (int $at, string $label = 'If yes, give details', string $type = 'text') => [$at, $label, $type];
+
+    $groups = [
+        [
+            'heading' => 'Relationship to the appointing authority',
+            'lead' => 'Are you related by consanguinity or affinity to the appointing or recommending authority, or to the chief of bureau or office, or to the person who has immediate supervision over you in the office:',
+            'questions' => [
+                [0, 'Within the third degree?', []],
+                [1, 'Within the fourth degree (for Local Government Unit career employees)?', [$say(1)]],
+            ],
+        ],
+        [
+            'heading' => 'Record',
+            'lead' => null,
+            'questions' => [
+                [2, 'Have you ever been found guilty of any administrative offense?', [$say(2)]],
+                [3, 'Have you been criminally charged before any court?', [$say(12, 'Date filed', 'date'), $say(3, 'Status of case/s')]],
+                [4, 'Have you ever been convicted of any crime or violation of any law, decree, ordinance or regulation by any court or tribunal?', [$say(4)]],
+                [5, 'Have you ever been separated from the service in any of the following modes: resignation, retirement, dropped from the rolls, dismissal, termination, end of term, finished contract or phased out (abolition) in the public or private sector?', [$say(5)]],
+                [6, 'Have you ever been a candidate in a national or local election held within the last year (except Barangay election)?', [$say(6)]],
+                [7, 'Have you resigned from the government service during the three (3)-month period before the last election to promote or actively campaign for a national or local candidate?', [$say(7)]],
+                [8, 'Have you acquired the status of an immigrant or permanent resident of another country?', [$say(8, 'If yes, give details (country)')]],
+            ],
+        ],
+        [
+            'heading' => 'Indigenous people, persons with disability, solo parents',
+            'lead' => 'Pursuant to the Indigenous People\'s Act (RA 8371), the Magna Carta for Disabled Persons (RA 7277) and the Solo Parents Welfare Act of 2000 (RA 8972):',
+            'questions' => [
+                [9, 'Are you a member of any indigenous group?', [$say(9, 'If yes, please specify')]],
+                [10, 'Are you a person with disability?', [$say(10, 'If yes, please specify')]],
+                [11, 'Are you a solo parent?', [$say(11, 'If yes, please specify')]],
+            ],
+        ],
+    ];
+
+    $choice = 'cursor-pointer rounded-lg px-4 py-1.5 font-medium text-ink/60 transition-colors has-checked:bg-forest-900 has-checked:text-cream has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-sun-500 dark:has-checked:bg-forest-600';
+@endphp
+
+@section('breadcrumb', $isStaff ? trim(ucwords(strtolower($employee->fname)) . ' ' . ucwords(strtolower($employee->lname))) : 'Other Information Questions')
+
+@section('hero')
+    @include('emp.partials.pds-hero', ['about' => 'Other information questions', 'autosaves' => true])
+@endsection
 
 @section('body')
-@include('emp.style')
-<section class="content">
-<div class="container-fluid">
-    <div class="row">
-        @include('emp.submenu-side')
-        <div class="col-lg-9">
-            <div class="card card-info card-outline">
-                <div class="card-header">
-                    <h2 class="card-title text-success1">
-                        <b>OTHER INFORMATION QUESTION</b>
-                    </h2>
-                </div>
-                @php
-                    $question = explode(',', $infoquestion->question);
-                    $qdetails = explode(',', $infoquestion->qdetails);
-                    $refname = explode(',', $infoquestion->refname);
-                    $refadd = explode(',', $infoquestion->refadd);
-                    $reftelno = explode(',', $infoquestion->reftelno);
-                    $govid = explode(',', $infoquestion->govid);
-                @endphp
-                <div class="card-body">
-                    <div class="form-group mtop">
-                        <div class="form-row lbel">
-                            <div class="col-md-12"><p class="text-success1"><b>A. Are you related by consanguinity or affinity to the appointing or recommending authority, or to the chief of bureau or office or to the person who has immediate supervision over you in the Office,</b></p>
-                                <div class="row">
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>1. Within the third degree?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_0" data-array="0" id="no-0" value="0" {{ ($question[0] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no-0">No</label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_0" data-array="0" id="yes-0" value="1" {{ ($question[0] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes-0">Yes</label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="input-details updated-data" type="hidden" name="qdetails_0" data-array="0" value="{{ $qdetails[0] }}" id="details-0">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>2. Within the fourth degree (for Local Government Unit - Career Employees)?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_1" data-array="1" id="no-1" value="0" {{ ($question[1] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_1" data-array="1" id="yes-1" value="1" {{ ($question[1] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                If Yes, give details: <input class="input-details updated-data" type="text" name="qdetails_1" data-array="1" value="{{ $qdetails[1] }}" id="details-1">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>3. Have you ever been found guilty of any administrative offense?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_2" data-array="2" id="no-2" value="0" {{ ($question[2] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_2" data-array="2" id="yes-2" value="1" {{ ($question[2] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                If Yes, give details: <input class="input-details updated-data" type="text" name="qdetails_2" data-array="2" value="{{ $qdetails[2] }}" id="details-2">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>4. Have you been criminally charged before any court?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_3" data-array="3" id="no-3" value="0" {{ ($question[3] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_3" data-array="3" id="yes-3" value="1" {{ ($question[3] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                Date Filed: <input class="input-details updated-data" type="date" name="qdetails_3" data-array="12" value="{{ $qdetails[12] }}" id="details-3">
-                                            
-                                                Status of Case/s: <input class="input-details updated-data" type="text" name="qdetails_3" data-array="3" value="{{ $qdetails[3] }}" id="details-3">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>5. Have you ever been convicted of any crime or violation of any law, decree, ordinance or regulation by any court or tribunal?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_4" data-array="4" id="no-4" value="0" {{ ($question[4] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_4" data-array="4" id="yes-4" value="1" {{ ($question[4] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                If Yes, give details: <input class="input-details updated-data" type="text" name="qdetails_4" data-array="4" value="{{ $qdetails[4] }}" id="details-4">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>6. Have you ever been separated from the service in any of the following modes: resignation, retirement, dropped from the rolls, dismissal, termination, end of term, finished contract or phased out (abolition) in the public or private sector?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_5" data-array="5" id="no-5" value="0" {{ ($question[5] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_5" data-array="5" id="yes-5" value="1" {{ ($question[5] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                If Yes, give details: <input class="input-details updated-data" type="text" name="qdetails_5" data-array="5" value="{{ $qdetails[5] }}" id="details-5">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>7. Have you ever been a candidate in a national or local election held within the last year (except Barangay election)?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_6" data-array="6" id="no-6" value="0" {{ ($question[6] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_6" data-array="6" id="yes-6" value="1" {{ ($question[6] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                If Yes, give details: <input class="input-details updated-data" type="text" name="qdetails_6" data-array="6" value="{{ $qdetails[6] }}" id="details-6">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>8. Have you resigned from the government service during the three (3)-month period before the last election to promote/actively campaign for a national or local candidate?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_7" data-array="7" id="no-7" value="0" {{ ($question[7] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_7" data-array="7" id="yes-7" value="1" {{ ($question[7] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                If Yes, give details: <input class="input-details updated-data" type="text" name="qdetails_7" data-array="7" value="{{ $qdetails[7] }}" id="details-7">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>9. Have you acquired the status of an immigrant or permanent resident of another country?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_8" data-array="8" id="no-8" value="0" {{ ($question[8] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_8" data-array="8" id="yes-8" value="1" {{ ($question[8] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                If Yes, give details (country):  <input class="input-details updated-data" type="text" name="qdetails_8" data-array="8" value="{{ $qdetails[8] }}" id="details-8">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 mt-2"> 
-                                        <p class="text-success1"><b>B. Pursuant to: (a) Indigenous People's Act (RA 8371); (b) Magna Carta for Disabled Persons (RA 7277); and (c) Solo Parents Welfare Act of 2000 (RA 8972), please answer the following items:</b></p>
-                                    </div>    
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>1. Are you a member of any indigenous group?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_9" data-array="9" id="no-9" value="0" {{ ($question[9] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_9" data-array="9" id="yes-9" value="1" {{ ($question[9] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                If Yes, please specify: <input class="input-details updated-data" type="text" name="qdetails_9" data-array="9" value="{{ $qdetails[9] }}" id="details-9">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>2. Are you a person with disability?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_10" data-array="10" id="no-10" value="0" {{ ($question[10] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_10" data-array="10" id="yes-10" value="1" {{ ($question[10] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                If Yes, please specify: <input class="input-details updated-data" type="text" name="qdetails_10" data-array="10" value="{{ $qdetails[10] }}" id="details-10">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12">
-                                        <p class="text-muted"><b>3. Are you a solo parent?</b></p>
-                                        <div class="d-flex mtop">
-                                            <div class="form-check mr-1">
-                                                <input class="form-check-input updated-data" type="radio" name="question_11" data-array="11" id="no-11" value="0" {{ ($question[11] == 0) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="no">
-                                                    No
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input updated-data" type="radio" name="question_11" data-array="11" id="yes-11" value="1" {{ ($question[11] == 1) ? 'checked' : '' }}>
-                                                <label class="form-check-label" for="yes">
-                                                    Yes
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                If Yes, please specify: <input class="input-details updated-data" type="text" name="qdetails_11" data-array="11" value="{{ $qdetails[11] }}" id="details-11">
-                                            </div>
-                                        </div>
-                                    </div>
+<div class="grid items-start gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)]">
+    @include('emp.partials.pds-side')
+
+    <form id="pdsForm" data-slot-url="{{ route('update.info.question') }}" data-employee="{{ $empid }}" novalidate autocomplete="off" class="@container space-y-5">
+        @foreach($groups as $group)
+            <section class="rounded-2xl border border-line bg-surface p-5 sm:p-6">
+                <h2 class="font-display text-lg font-semibold tracking-tight">{{ $group['heading'] }}</h2>
+                @if($group['lead'])
+                    <p class="mt-1 max-w-3xl leading-relaxed text-ink/70">{{ $group['lead'] }}</p>
+                @endif
+
+                <div class="mt-3 divide-y divide-line">
+                    @foreach($group['questions'] as [$at, $wording, $asks])
+                        @php
+                            $answer = trim($answers[$at] ?? '');
+                        @endphp
+                        <div class="py-4 last:pb-0" role="group" aria-labelledby="question-{{ $at }}" data-question="{{ $at }}">
+                            <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 @2xl:flex-nowrap">
+                                <p class="max-w-3xl leading-relaxed" id="question-{{ $at }}">{{ $wording }}</p>
+
+                                <div class="flex shrink-0 gap-1 rounded-xl border border-line bg-paper p-1">
+                                    @foreach(['0' => 'No', '1' => 'Yes'] as $value => $said)
+                                        <label class="{{ $choice }}">
+                                            <input type="radio" name="question_{{ $at }}" value="{{ $value }}" data-save-slot="{{ $at }}" data-save-name="That answer" class="sr-only" @checked($answer === (string) $value)>
+                                            {{ $said }}
+                                        </label>
+                                    @endforeach
                                 </div>
                             </div>
+
+                            @if($asks)
+                                <div class="mt-3 grid gap-4 @md:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]" data-question-details @if($answer !== '1') hidden @endif>
+                                    @foreach($asks as [$slot, $label, $type])
+                                        <label class="{{ count($asks) == 1 ? 'col-span-full' : '' }}">
+                                            <span class="block text-xs font-medium text-ink/60">{{ $label }}</span>
+                                            <input type="{{ $type }}" name="qdetails_{{ $slot }}" value="{{ trim($details[$slot] ?? '') }}" data-save-slot="{{ $slot }}" data-save-name="{{ $label }}" data-strip=","
+                                                   class="mt-1 block h-10 w-full rounded-xl border border-line bg-paper px-3 text-ink outline-none transition-shadow focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15">
+                                        </label>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
-                    </div>                    
+                    @endforeach
                 </div>
-            </div>                        
-        </div>
-    </div>
+            </section>
+        @endforeach
+    </form>
 </div>
-</section>
+
+@include('emp.partials.pds-autosave')
 @endsection
+
+@push('scripts')
+<script>
+    // A yes opens the question's details and a no shuts and empties them.
+    // The server empties the detail stored at the question's own position
+    // when it saves a no; one kept anywhere else (the date a case was filed)
+    // is emptied from here.
+    document.getElementById('pdsForm').addEventListener('change', function (event) {
+        var radio = event.target;
+        if (radio.type !== 'radio') return;
+
+        var question = radio.closest('[data-question]');
+        var details = question.querySelector('[data-question-details]');
+        if (!details) return;
+
+        details.hidden = radio.value !== '1';
+        if (radio.value === '1') {
+            details.querySelector('input').focus();
+            return;
+        }
+
+        details.querySelectorAll('input').forEach(function (input) {
+            if (input.value && input.dataset.saveSlot !== question.dataset.question) {
+                pdsSave(this.dataset.slotUrl, { empid: this.dataset.employee, column: input.name, index: input.dataset.saveSlot, value: '' }, 'The details');
+            }
+            input.value = '';
+        }, this);
+    });
+</script>
+@endpush

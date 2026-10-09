@@ -145,9 +145,8 @@
    Things Tailwind does not own
    ---------------------------------------------------------------------------
    Deliberately outside any @layer. FullCalendar ships its own unlayered
-   stylesheet and the privacy notice is one long inline-styled document, and
-   unlayered rules beat every layered one whatever their specificity — so
-   these have to be unlayered too to have a say.
+   stylesheet, and unlayered rules beat every layered one whatever their
+   specificity — so these have to be unlayered too to have a say.
    --------------------------------------------------------------------------- */
 
 .fc {
@@ -222,9 +221,3 @@
     white-space: nowrap;
     font-weight: 500;
 }
-
-/* The reset takes the paragraph spacing and the bullets off data-privacy
-   .blade.php, which the old shell got from Bootstrap. */
-.privacy-container p { margin-bottom: .9rem; }
-.privacy-container ul { list-style: disc; padding-left: 1.25rem; }
-.privacy-container li { margin-bottom: .35rem; }

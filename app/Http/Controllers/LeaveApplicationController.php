@@ -143,10 +143,13 @@ class LeaveApplicationController extends Controller
         // dd($oic);
         $isOfficeHead = Office::where('office_head_id', $employee->id)->first();
 
+        // Left joins for the two signatories: an application filed before a
+        // supervisor was assigned or an HR Head chosen has neither, and would
+        // otherwise never show here.
         $leavesapp = LeaveApplication::where('empid', $employee->emp_ID)
-        ->join('employees as sup', 'sup.id', '=', 'leave_applications.supervisor')
+        ->leftJoin('employees as sup', 'sup.id', '=', 'leave_applications.supervisor')
         ->join('employees as emp', 'emp.emp_ID', '=', 'leave_applications.empid')
-        ->join('employees as hr', 'hr.id', '=', 'leave_applications.hr')
+        ->leftJoin('employees as hr', 'hr.id', '=', 'leave_applications.hr')
         ->select(
             'leave_applications.*', 
             'emp.id as employid',
@@ -166,8 +169,12 @@ class LeaveApplicationController extends Controller
 
         // dd($leavesapp);
 
-        $setting = Setting::join('employees as hr', 'hr.id', '=', 'settings.hr')
-        ->join('employees as mayor', 'mayor.id', '=', 'settings.mayor')
+        // Left joins, and a blank row as the last resort: with inner joins this
+        // came back null whenever Settings had no HR Head or no Mayor chosen
+        // yet, and the page died on the check below ("isApprovingOfficial()
+        // on null"). Nobody is an approving official until one is named.
+        $setting = Setting::leftJoin('employees as hr', 'hr.id', '=', 'settings.hr')
+        ->leftJoin('employees as mayor', 'mayor.id', '=', 'settings.mayor')
         ->select(
             'settings.*', 
             'hr.lname as hr_lname', 
@@ -179,11 +186,11 @@ class LeaveApplicationController extends Controller
             'mayor.mname as mayor_mname', 
             'mayor.suffix as mayor_suffix',
         )
-        ->first();
+        ->first() ?? new Setting;
 
         $leavesapphead = LeaveApplication::join('employees as emp', 'emp.emp_ID', '=', 'leave_applications.empid')
-            ->join('employees as sup', 'sup.id', '=', 'leave_applications.supervisor')
-            ->join('employees as hr', 'hr.id', '=', 'leave_applications.hr');
+            ->leftJoin('employees as sup', 'sup.id', '=', 'leave_applications.supervisor')
+            ->leftJoin('employees as hr', 'hr.id', '=', 'leave_applications.hr');
             
         // if ($setting->mayor !== auth()->guard($guard)->user()->id) {
         //     $leavesapphead->where('leave_applications.supervisor', auth()->guard($guard)->user()->id);
@@ -1179,8 +1186,17 @@ class LeaveApplicationController extends Controller
             ->orderBy('leave_applications.date_filing', 'desc')
             ->get();
 
+            // What this employee signed as supervisor, with whose it was.
             $leaveApplication1 = LeaveApplication::where('leave_applications.history', 2)
             ->where('leave_applications.supervisor', $empid)
+            ->leftJoin('employees as emp', 'emp.emp_ID', '=', 'leave_applications.empid')
+            ->select(
+                'leave_applications.*',
+                'emp.lname as employee_lname',
+                'emp.fname as employee_fname',
+                'emp.mname as employee_mname',
+                'emp.suffix as employee_suffix',
+            )
             ->orderBy('leave_applications.date_filing', 'desc')
             ->get();
 
@@ -1225,6 +1241,13 @@ public function leaveReport(Request $request)
             'mayor.suffix as mayor_suffix'
         )
         ->first();
+
+    // The report is signed by the HR Head and the Mayor. With either one not
+    // chosen in Settings there is nobody to print, and the page used to fail
+    // on the missing row instead of saying so.
+    if (! $setting) {
+        return back()->with('error', 'Choose the HR Head and the Mayor in Settings before printing the leave report.');
+    }
 
     // ===============================
     // DATE RANGE (e.g., 2026-02-01 to 2026-02-28)

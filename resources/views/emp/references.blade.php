@@ -1,86 +1,55 @@
-@extends('layouts.master')
+@extends('layouts.app')
+
+@php
+    // References, a page of an employee's Personal Data Sheet: three people,
+    // each a name, an address and a telephone number. The three columns
+    // (refname, refadd, reftelno) each hold the three answers separated by
+    // semicolons, and each answer is saved into its own position as it
+    // changes (emp/partials/pds-autosave, to PdsReferencesController::update).
+
+    $isStaff = $guard == 'web';
+
+    $stored = collect(['refname', 'refadd', 'reftelno'])
+        ->mapWithKeys(fn ($column) => [$column => explode(';', (string) $references->{$column})]);
+
+    // No semicolons in an answer: they are what separates one from the next.
+    $slot = fn (string $column, int $at, string $label) => [
+        'name' => $column . '_' . $at, 'label' => $label, 'slot' => $at,
+        'value' => trim($stored[$column][$at] ?? ''), 'attrs' => ['data-strip' => ';'],
+    ];
+@endphp
+
+@section('breadcrumb', $isStaff ? trim(ucwords(strtolower($employee->fname)) . ' ' . ucwords(strtolower($employee->lname))) : 'References')
+
+@section('hero')
+    @include('emp.partials.pds-hero', ['about' => 'References', 'autosaves' => true])
+@endsection
 
 @section('body')
-@include('emp.style')
-<section class="content">
-<div class="container-fluid">
-    <div class="row">
-        @include('emp.submenu-side')
-        <div class="col-lg-9">
-            <div class="card card-info card-outline">
-                <div class="card-header">
-                    <h2 class="card-title text-success1">
-                        <b>REFERENCES</b>
-                    </h2>
-                </div>
-                @php
-                    $refname = explode(';', $references->refname);
-                    $refadd = explode(';', $references->refadd);
-                    $reftelno = explode(';', $references->reftelno);
-                @endphp
-                <div class="card-body">
-                    <div class="form-group mtop">
-                        <div class="form-row lbel">
-                            <div class="col-md-12"><p class="text-muted"><b>REFERENCES (Person not related by consanguinity or affinity to applicant /appointee)</b></p>
-                                <div class="row">
-                                    <div class="col-4">
-                                        <div class="form-check">
-                                            <label class="badge badge-secondary w-100">NAME</label><input class="input-details updated-data" type="text" name="refname_0" data-array="0" value="{{ $refname[0] }}" id="refname-0">
-                                        </div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="form-check">
-                                            <label class="badge badge-secondary w-100">ADDRESS</label><input class="input-details updated-data" type="text" name="refadd_0" data-array="0" value="{{ $refadd[0] }}" id="refadd-0">
-                                        </div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="form-check">
-                                            <label class="badge badge-secondary w-100">TELEPHONE NO.</label><input class="input-details updated-data" type="text" name="reftelno_0" data-array="0" value="{{ $reftelno[0] }}" id="reftelno-0">
-                                        </div>
-                                    </div>
+<div class="grid items-start gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)]">
+    @include('emp.partials.pds-side')
 
+    <form id="pdsForm" data-slot-url="{{ route('update.references') }}" data-employee="{{ $empid }}" novalidate autocomplete="off" class="@container">
+        <section class="rounded-2xl border border-line bg-surface p-5 sm:p-6">
+            <h2 class="font-display text-lg font-semibold tracking-tight">References</h2>
+            <p class="mt-0.5 text-ink/60">Three people not related to you by consanguinity or affinity.</p>
 
-                                    <div class="col-4">
-                                        <div class="form-check">
-                                            <input class="input-details updated-data" type="text" name="refname_1" data-array="1" value="{{ $refname[1] }}" id="refname-1">
-                                        </div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="form-check">
-                                            <input class="input-details updated-data" type="text" name="refadd_1" data-array="1" value="{{ $refadd[1] }}" id="refadd-1">
-                                        </div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="form-check">
-                                            <input class="input-details updated-data" type="text" name="reftelno_1" data-array="1" value="{{ $reftelno[1] }}" id="reftelno-1">
-                                        </div>
-                                    </div>
+            <div class="mt-2 divide-y divide-line">
+                @foreach(range(0, 2) as $at)
+                    <fieldset class="py-4 last:pb-0">
+                        <legend class="float-left w-full font-medium">Reference {{ $at + 1 }}</legend>
 
-                                    
-                                    <div class="col-4">
-                                        <div class="form-check">
-                                            <input class="input-details updated-data" type="text" name="refname_2" data-array="2" value="{{ $refname[2] }}" id="refname-2">
-                                        </div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="form-check">
-                                            <input class="input-details updated-data" type="text" name="refadd_1" data-array="2" value="{{ $refadd[2] }}" id="refadd-2">
-                                        </div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="form-check">
-                                            <input class="input-details updated-data" type="text" name="reftelno_2" data-array="2" value="{{ $reftelno[2] }}" id="reftelno-2">
-                                        </div>
-                                    </div>
-                                    
-                                </div>
-                            </div>
+                        <div class="mt-3 grid clear-both gap-4 @md:grid-cols-2 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,.8fr)]">
+                            @include('emp.partials.field', ['spec' => $slot('refname', $at, 'Name')])
+                            @include('emp.partials.field', ['spec' => $slot('refadd', $at, 'Address')])
+                            @include('emp.partials.field', ['spec' => $slot('reftelno', $at, 'Telephone no.')])
                         </div>
-                    </div>                    
-                </div>
-            </div>                        
-        </div>
-    </div>
+                    </fieldset>
+                @endforeach
+            </div>
+        </section>
+    </form>
 </div>
-</section>
+
+@include('emp.partials.pds-autosave')
 @endsection

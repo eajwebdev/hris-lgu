@@ -444,6 +444,55 @@
         });
     })();
 
+    /* ------------------------------------------------------ privacy notice */
+    // layouts/app-privacy: the contents list jumps to a section and marks
+    // the one being read, and the bar under the heading fills with the scroll.
+    document.querySelectorAll('[data-privacy]').forEach(function (notice) {
+        var scroller = notice.querySelector('[data-privacy-scroll]');
+        var bar = notice.querySelector('[data-privacy-progress]');
+        var sections = Array.prototype.slice.call(notice.querySelectorAll('[data-privacy-section]'));
+        var jumps = Array.prototype.slice.call(notice.querySelectorAll('[data-privacy-jump]'));
+
+        // A section picked from the contents stays marked until the reader
+        // scrolls by hand. The last few are short, so jumping to one can land
+        // on the end of the notice, where position alone would name the last.
+        var picked = null;
+
+        function follow() {
+            var room = scroller.scrollHeight - scroller.clientHeight;
+            bar.style.width = (room > 0 ? Math.min(100, scroller.scrollTop / room * 100) : 100) + '%';
+
+            // Otherwise the section being read: the last one whose heading
+            // has passed the top of the view (the last of all at the end).
+            var reading = sections[0];
+            sections.forEach(function (section) {
+                if (section.offsetTop - scroller.offsetTop <= scroller.scrollTop + 40) { reading = section; }
+            });
+            if (room > 0 && scroller.scrollTop >= room - 2) { reading = sections[sections.length - 1]; }
+            if (picked) { reading = picked; }
+
+            jumps.forEach(function (jump) {
+                jump.setAttribute('aria-current', reading && jump.dataset.privacyJump === reading.id ? 'true' : 'false');
+            });
+        }
+
+        jumps.forEach(function (jump) {
+            jump.addEventListener('click', function () {
+                var section = document.getElementById(jump.dataset.privacyJump);
+                picked = section;
+                scroller.scrollTo({ top: section.offsetTop - scroller.offsetTop - 12 });
+                follow();
+            });
+        });
+
+        ['wheel', 'touchmove', 'keydown'].forEach(function (kind) {
+            scroller.addEventListener(kind, function () { picked = null; }, { passive: true });
+        });
+
+        scroller.addEventListener('scroll', follow, { passive: true });
+        follow();
+    });
+
     /* -------------------------------------------------------------- toasts */
     var toasts = document.getElementById('toasts');
 

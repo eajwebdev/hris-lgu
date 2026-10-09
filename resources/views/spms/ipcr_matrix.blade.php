@@ -1,908 +1,582 @@
-@extends('layouts.master')
-
-@section('body')
-<style>
-    .btn-teal {
-        background-color: #16a085;
-        color: #ffffff;
-        border: none;
-        border-radius: 6px;
-        font-weight: 600;
-    }
-    .btn-teal:hover {
-        background-color: #13876f;
-        color: #ffffff;
-    }
-    .breadcrumb-drive {
-        font-size: 13px;
-        color: #64748b;
-        font-weight: 500;
-    }
-    .table-light-header th {
-        background-color: #f8fafc !important;
-        color: #334155 !important;
-        font-size: 12px;
-        text-transform: uppercase;
-        font-weight: 700;
-    }
-    .modal-extra-large {
-        max-width: 95vw !important;
-        width: 95vw !important;
-    }
-    .modal-extra-large .modal-content {
-        height: 90vh !important;
-    }
-    .modal-extra-large .modal-body {
-        height: calc(90vh - 60px) !important;
-        overflow-y: auto;
-    }
-    .sortable-ghost {
-        background-color: #e6fffa !important;
-        border: 2px dashed #16a085 !important;
-        opacity: 0.5;
-    }
-    .sortable-chosen {
-        background: #f0fdfa !important;
-        box-shadow: 0 4px 14px rgba(22, 160, 133, 0.25) !important;
-    }
-    .sortable-drag {
-        opacity: 0.9;
-    }
-    .ipcr-sortable-row {
-        cursor: grab;
-        transition: background-color 0.15s ease;
-    }
-    .ipcr-sortable-row:active {
-        cursor: grabbing;
-    }
-    .drag-handle {
-        cursor: grab !important;
-    }
-    .drag-handle:active {
-        cursor: grabbing !important;
-    }
-    @media print {
-        /* Default print: Hide navigation, sidebar, and buttons */
-        .main-header, .main-sidebar, .breadcrumb-drive, .btn, .alert, footer, .no-print {
-            display: none !important;
-        }
-        body:not(.modal-open) .modal {
-            display: none !important;
-        }
-        body, .content-wrapper, .container-fluid {
-            background: #ffffff !important;
-            color: #000000 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-        .card {
-            border: 1px solid #000000 !important;
-            box-shadow: none !important;
-        }
-        .table-bordered, .table-bordered th, .table-bordered td {
-            border: 1px solid #000000 !important;
-            color: #000000 !important;
-        }
-
-        /* Modal active print mode: Print ONLY the active modal & iframe content */
-        body.modal-open .container-fluid > *:not(.modal) {
-            display: none !important;
-        }
-        body.modal-open .modal.show {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            z-index: 99999 !important;
-            background: #ffffff !important;
-            display: block !important;
-        }
-        body.modal-open .modal-dialog {
-            max-width: 100vw !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            margin: 0 !important;
-        }
-        body.modal-open .modal-content {
-            height: 100vh !important;
-            border: none !important;
-            box-shadow: none !important;
-        }
-        body.modal-open .modal-header {
-            background: #ffffff !important;
-            color: #000000 !important;
-        }
-        body.modal-open .modal-header .btn,
-        body.modal-open .modal-header .close {
-            display: none !important;
-        }
-    }
-</style>
+@extends('layouts.app')
 
 @php
-    $currentSysYear = (int)date('Y');
-    $currentSysSemester = (int)date('n') <= 6 ? 1 : 2;
-    $isEditablePeriod = ($year == $currentSysYear && $semester == $currentSysSemester);
+    // One employee's IPCR for one half-year: the objectives set for them (some
+    // cascaded from the office's OPCR, some added by hand or loaded from a
+    // template), what they accomplished against each, the rating given, and
+    // the three people who sign the form.
+    //
+    // SpmsController::ipcrMatrix starts the IPCR for the period if there is
+    // none, so merely opening this page for a new period creates it.
+    //
+    // Only the current half-year can be changed; any other is shown as it
+    // was left. Within it:
+    //   - the employee writes their own accomplishments
+    //   - anyone who can open the page may rate, add objectives, load a
+    //     template and edit the signatories (the controller checks whose
+    //     IPCR it is)
+    //   - an objective cascaded from the OPCR can be removed by the office
+    //     head or HR, not by the employee it was given to
+
+    $isEditablePeriod = $year == (int) date('Y') && $semester == ((int) date('n') <= 6 ? 1 : 2);
+    $isOwn = $guard === 'employee' && $employee->id == $user->id;
+    $fullName = trim($employee->fname . ' ' . $employee->lname);
+    $half = $semester == 1 ? '1st half (Jan to Jun)' : '2nd half (Jul to Dec)';
+    $isJoOrCos = !empty($isJoOrCos);
+
+    // The stored category => how it is headed, and its weight.
+    $categories = [
+        'Core Functions' => ['Core functions', '60%'],
+        'Strategic Functions' => ['Strategic functions', '20%'],
+        'Support Functions' => ['Support functions', '20%'],
+    ];
+
+    // The system began in 2026; the year being viewed is always offered.
+    $years = collect(range(2026, max(2026, (int) date('Y'))))->push((int) $year)->unique()->sort()->values();
+
+    // Who signs, until somebody types otherwise (Edit signatories).
+    $resolvedHead = $officeHead ?: ($ipcr->office?->head ?: $office?->head);
+    $signatories = [
+        ['Discussed with (ratee)', 'ratee_name', 'ratee_position',
+            $ipcr->ratee_name ?? $fullName, $ipcr->ratee_position ?? ($employee->position ?? 'Personnel')],
+        ['Assessed by (supervisor)', 'assessed_by_name', 'assessed_by_position',
+            $ipcr->assessed_by_name ?? ($resolvedHead ? $resolvedHead->fname . ' ' . $resolvedHead->lname : 'OFFICE HEAD NAME'),
+            $ipcr->assessed_by_position ?? ($resolvedHead?->position ?: 'Head, ' . ($office->office_name ?? $ipcr->office?->office_name ?? 'Department'))],
+        ['Final rating by', 'approved_by_name', 'approved_by_position',
+            $ipcr->approved_by_name ?? 'LUCRECIA C. NICOLAS, MAEd', $ipcr->approved_by_position ?? 'MGDH-I (GSO)/HRMO-Designate'],
+    ];
+
+    $field = 'rounded-xl border border-line bg-paper text-ink outline-none transition-shadow placeholder:text-ink/40 focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15';
+    $label = 'block text-xs font-medium text-ink/60';
+    $primary = 'inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-forest-900 px-4 font-medium text-cream transition-colors hover:bg-forest-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500 dark:bg-forest-600 dark:hover:bg-forest-500';
+    $secondary = 'inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-line px-4 font-medium transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500';
+    $small = 'inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-medium transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-sun-500';
+    $rowAction = 'grid size-9 cursor-pointer place-items-center rounded-lg text-ink/55 transition-colors focus-visible:outline-2 focus-visible:outline-sun-500';
+    $chip = 'inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium whitespace-nowrap';
+    $dialog = 'm-auto max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl shadow-forest-950/25 backdrop:bg-forest-950/60';
+    $close = '-mt-1 -mr-2 grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg text-ink/50 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-sun-500';
+    $dialogTitle = 'font-display text-xl font-semibold tracking-tight';
+
+    // Six columns once the page is wide enough to read them side by side;
+    // below that an objective is a stack, numbered down its left edge.
+    $columns = '@5xl:grid-cols-[3.25rem_minmax(0,1.15fr)_minmax(0,1.15fr)_minmax(0,1fr)_6.5rem_5rem]';
+    $caption = 'text-xs text-ink/55 @5xl:hidden';
 @endphp
 
-<div class="container-fluid py-2">
-    {{-- Breadcrumb Bar --}}
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <span class="breadcrumb-drive">
-            <i class="fas fa-info-circle text-info mr-1"></i> Dashboard &nbsp;/&nbsp; Drive &nbsp;/&nbsp; IPCR
-        </span>
-        <a href="{{ route('spms.ipcr') }}" class="btn btn-outline-secondary btn-sm font-weight-bold">
-            <i class="fas fa-arrow-left mr-1"></i> Back to IPCR Documents
-        </a>
+@section('breadcrumb', $isOwn ? 'My IPCR' : 'IPCR of ' . $fullName)
+
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">{{ $fullName }}</h1>
+            <p class="mt-1 text-cream/70">
+                IPCR for {{ $year }}, {{ $half }}
+                <span class="mx-1.5 text-cream/30">|</span>
+                {{ $employee->position ?? 'Personnel' }}, {{ $office->office_name ?? 'LGU' }}
+            </p>
+        </div>
+        @include('spms.partials.tabs')
     </div>
+@endsection
 
-    {{-- Flash Messages --}}
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-3" role="alert">
-            <i class="fas fa-exclamation-triangle mr-2"></i> {{ session('error') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show shadow-sm mb-3" role="alert">
-            <i class="fas fa-check-circle mr-2"></i> {{ session('success') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
-    {{-- Header & Employee Info --}}
-    <div class="card shadow-sm border-0 mb-3 p-3">
-        <div class="d-flex justify-content-between align-items-center">
+@section('body')
+<div class="@container space-y-5" id="ipcrMatrix">
+    {{-- Which period, how it stands, and what can be done to the whole form --}}
+    <section class="flex flex-wrap items-end gap-x-3 gap-y-4 rounded-2xl border border-line bg-surface p-4">
+        <form method="GET" action="{{ route('spms.ipcr.matrix', $employee->id) }}" class="flex items-end gap-3">
             <div>
-                <h6 class="font-weight-bold text-dark mb-1">
-                    <i class="fas fa-id-badge text-teal mr-2"></i>IPCR &bull; {{ $employee->fname }} {{ $employee->lname }}
-                </h6>
-                <small class="text-muted font-weight-bold">
-                    Position: {{ $employee->position ?? 'Personnel' }} &bull; Department: {{ $office->office_name ?? 'LGU' }}
-                </small>
-            </div>
-            <div class="dropdown">
-                <button class="btn btn-outline-secondary btn-sm dropdown-toggle font-weight-bold px-3 py-2 shadow-sm bg-white text-dark" type="button" id="periodDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i class="fas fa-calendar-alt text-teal mr-1"></i> Year {{ $year }} ({{ $semester == 1 ? '1st Half: Jan-Jun' : '2nd Half: Jul-Dec' }})
-                </button>
-                <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="periodDropdown">
-                    <h6 class="dropdown-header text-uppercase font-weight-bold text-muted small">Select Rating Period</h6>
-                    <a class="dropdown-item py-2 {{ $semester == 1 ? 'active font-weight-bold' : '' }}" href="{{ route('spms.ipcr.matrix', ['id' => $employee->id, 'semester' => 1, 'year' => $year]) }}">
-                        <i class="fas fa-calendar-check mr-2 {{ $semester == 1 ? 'text-white' : 'text-teal' }}"></i> 1st Half (Jan - Jun {{ $year }})
-                    </a>
-                    <a class="dropdown-item py-2 {{ $semester == 2 ? 'active font-weight-bold' : '' }}" href="{{ route('spms.ipcr.matrix', ['id' => $employee->id, 'semester' => 2, 'year' => $year]) }}">
-                        <i class="fas fa-calendar-check mr-2 {{ $semester == 2 ? 'text-white' : 'text-teal' }}"></i> 2nd Half (Jul - Dec {{ $year }})
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <h6 class="dropdown-header text-uppercase font-weight-bold text-muted small">Switch Year</h6>
-                    @foreach(range(2026, max(2026, (int)date('Y'))) as $y)
-                        <a class="dropdown-item py-1 small {{ $year == $y ? 'font-weight-bold text-teal' : '' }}" href="{{ route('spms.ipcr.matrix', ['id' => $employee->id, 'semester' => $semester, 'year' => $y]) }}">
-                            <i class="fas fa-history mr-2 text-secondary"></i> Year {{ $y }}
-                        </a>
+                <label for="matrixYear" class="{{ $label }}">Year</label>
+                <select id="matrixYear" name="year" onchange="this.form.submit()" class="{{ $field }} mt-1 block h-10 pr-8 pl-3">
+                    @foreach($years as $y)
+                        <option value="{{ $y }}" @selected($year == $y)>{{ $y }}</option>
                     @endforeach
-                </div>
+                </select>
             </div>
-        </div>
-    </div>
-
-    {{-- FULL-WIDTH IPCR Matrix Table Card (Light Theme) --}}
-    <div class="card shadow-sm border-0 mb-4" style="border-radius: 10px; background: #ffffff;">
-        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-            <h6 class="font-weight-bold text-dark mb-0">
-                <i class="fas fa-list-check text-teal mr-2"></i> My Assigned Objectives &amp; Accomplishments
-            </h6>
-            <div class="ml-auto d-flex align-items-center">
-                <span class="badge badge-success px-3 py-2 font-weight-bold mr-2">Status: {{ $ipcr->status }}</span>
-                <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold shadow-sm mr-2" data-toggle="modal" data-target="#previewCosRatingModal" title="Preview & Print Performance Rating Form (PDF)">
-                    <i class="fas fa-file-pdf mr-1"></i> Print Rating Form (PDF)
-                </button>
-                @if($isEditablePeriod)
-                    <div class="dropdown d-inline mr-2">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle font-weight-bold shadow-sm" type="button" id="ipcrTemplateDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            <i class="fas fa-cog text-info mr-1"></i> Template & Options
-                        </button>
-                        <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="ipcrTemplateDropdown">
-                            @if(!empty($isJoOrCos) && $isJoOrCos)
-                                <button type="button" class="dropdown-item py-2" data-toggle="modal" data-target="#loadCosTemplateModal" title="Load standard Job Order / Contract of Service rating form template">
-                                    <i class="fas fa-file-invoice text-info mr-2"></i> Load COS / JO Rating Template
-                                </button>
-                            @else
-                                <button type="button" class="dropdown-item py-2" data-toggle="modal" data-target="#loadCosTemplateModal" title="Load official LGU Mabinay IPCR form template">
-                                    <i class="fas fa-file-excel text-success mr-2"></i> Load Official IPCR Template
-                                </button>
-                            @endif
-                            @if($ipcr->items->count() > 0)
-                                <div class="dropdown-divider"></div>
-                                <form method="POST" action="{{ route('spms.ipcr.clear', $ipcr->id) }}" class="d-inline">
-                                    @csrf
-                                    <button type="button" class="dropdown-item text-danger py-2 btn-delete-confirm"
-                                            data-title="Clear All IPCR Rows?"
-                                            data-text="Are you sure you want to delete ALL row items from this IPCR? This action cannot be undone."
-                                            title="Remove all IPCR rows">
-                                        <i class="fas fa-trash-alt text-danger mr-2"></i> Clear All IPCR Rows
-                                    </button>
-                                </form>
-                            @endif
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#addCustomIpcrModal">
-                        <i class="fas fa-plus mr-1"></i> Add Custom Objective
-                    </button>
-                @else
-                    <span class="badge badge-secondary px-3 py-2 font-weight-bold shadow-sm" title="Past rating periods are locked for viewing only">
-                        <i class="fas fa-lock mr-1"></i> Read-Only (Past Period)
-                    </span>
-                @endif
+            <div>
+                <label for="matrixHalf" class="{{ $label }}">Half</label>
+                <select id="matrixHalf" name="semester" onchange="this.form.submit()" class="{{ $field }} mt-1 block h-10 pr-8 pl-3">
+                    <option value="1" @selected($semester == 1)>1st half (Jan to Jun)</option>
+                    <option value="2" @selected($semester == 2)>2nd half (Jul to Dec)</option>
+                </select>
             </div>
-        </div>
+            <noscript><button class="{{ $secondary }}">Show</button></noscript>
+        </form>
 
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-bordered table-sm align-middle mb-0" style="font-size: 13px;">
-                    <thead class="table-light-header text-center">
-                        <tr>
-                            <th style="width: 4%">#</th>
-                            <th style="width: 12%">Category</th>
-                            <th style="width: 25%">Major Final Output (MFO / PAPs)</th>
-                            <th style="width: 25%">Success Indicators (Targets + Measures)</th>
-                            <th style="width: 20%">Actual Accomplishment &amp; Evidence</th>
-                            <th style="width: 8%">Rating (Q/E/T/Ave)</th>
-                            <th style="width: 6%">Actions</th>
-                        </tr>
-                    </thead>
-                    @foreach(['Core Functions' => 'CORE FUNCTIONS (60%)', 'Strategic Functions' => 'STRATEGIC FUNCTIONS (20%)', 'Support Functions' => 'SUPPORT FUNCTIONS (20%)'] as $catKey => $catLabel)
-                        <tbody class="bg-light">
-                            <tr class="table-secondary font-weight-bold text-left">
-                                <td colspan="7" class="py-2 px-3">
-                                    <i class="fas fa-folder text-warning mr-2"></i> {{ $catLabel }}
-                                    @if($isEditablePeriod)
-                                        <small class="text-muted font-weight-normal ml-2 font-italic">(Drag rows below to reorder within this function)</small>
-                                    @endif
-                                </td>
-                            </tr>
-                        </tbody>
-
-                        @php
-                            $categoryItems = $ipcr->items->where('category', $catKey);
-                        @endphp
-
-                        <tbody class="{{ $isEditablePeriod ? 'ipcr-sortable-body' : '' }}" data-category="{{ $catKey }}" data-reorderurl="{{ route('spms.ipcr.item.reorder') }}">
-                            @forelse($categoryItems as $index => $item)
-                                <tr class="{{ $isEditablePeriod ? 'ipcr-sortable-row' : '' }}" data-id="{{ $item->id }}">
-                                    <td class="text-center font-weight-bold align-middle">
-                                        @if($isEditablePeriod)
-                                            <i class="fas fa-grip-vertical text-secondary mr-1 drag-handle no-print" style="cursor: grab;" title="Drag to reorder within {{ $catKey }}"></i>
-                                        @endif
-                                        {{ $loop->iteration }}
-                                    </td>
-                                    <td>
-                                        <span class="badge {{ $item->category == 'Core Functions' ? 'badge-success' : 'badge-secondary' }}">
-                                            {{ $item->category }}
-                                        </span>
-                                        @if($item->opcr_item_id)
-                                            <small class="d-block text-teal font-weight-bold mt-1">
-                                                <i class="fas fa-sitemap mr-1"></i> Cascaded from OPCR Row #{{ $item->opcr_item_id }}
-                                            </small>
-                                        @endif
-                                    </td>
-                                    <td class="font-weight-bold text-dark">{!! nl2br(e($item->mfo_pap)) !!}</td>
-                                    <td class="text-muted">{!! nl2br(e($item->success_indicators)) !!}</td>
-                                    <td class="align-middle">
-                                        @if($item->actual_accomplishment)
-                                            <p class="mb-1 text-dark">{!! nl2br(e($item->actual_accomplishment)) !!}</p>
-                                        @else
-                                            <span class="text-muted font-italic small d-block mb-1">No accomplishment entered yet.</span>
-                                        @endif
-
-                                        @if($item->evidence_file)
-                                            @if($item->is_evidence_url)
-                                                <button type="button" class="btn btn-xs btn-outline-teal font-weight-bold shadow-sm mt-1" data-toggle="modal" data-target="#viewEvidenceUrlModal{{ $item->id }}">
-                                                    <i class="fab fa-google-drive mr-1"></i> View Evidence Document
-                                                </button>
-                                            @else
-                                                <a href="{{ asset('storage/' . $item->evidence_file) }}" target="_blank" class="btn btn-xs btn-outline-info font-weight-bold shadow-sm mt-1">
-                                                    <i class="fas fa-paperclip mr-1"></i> View Attachment
-                                                </a>
-                                            @endif
-                                        @elseif($isEditablePeriod && $guard === 'employee' && $item->employee_id == $user->id)
-                                            <button type="button" class="btn btn-xs btn-teal font-weight-bold shadow-sm mt-1" data-toggle="modal" data-target="#editAccomplishmentModal{{ $item->id }}">
-                                                <i class="fas fa-plus-circle mr-1"></i> Add Accomplishment &amp; Link
-                                            </button>
-                                        @endif
-                                    </td>
-
-                                    {{-- Rating Column --}}
-                                    <td class="text-center align-middle">
-                                        @php
-                                            $itemRating = $item->rating_ave ?? $item->rating_average;
-                                        @endphp
-                                        @if($itemRating)
-                                            <span class="badge badge-success font-weight-bold" style="font-size: 13px;">
-                                                {{ number_format($itemRating, 2) }}
-                                            </span>
-                                            <small class="d-block text-muted mt-1" style="font-size: 10px;">
-                                                Q:{{ $item->rating_q ?? '-' }} | E:{{ $item->rating_e ?? '-' }} | T:{{ $item->rating_t ?? '-' }}
-                                            </small>
-                                        @else
-                                            <span class="text-muted font-italic small">Unrated</span>
-                                        @endif
-                                    </td>
-
-                                    {{-- Actions Column --}}
-                                    <td class="text-center align-middle">
-                                        @if($isEditablePeriod)
-                                            @if($guard === 'employee' && $item->employee_id == $user->id)
-                                                <button type="button" class="btn btn-xs btn-teal font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#editAccomplishmentModal{{ $item->id }}" title="Submit or Edit Accomplishment">
-                                                    <i class="fas fa-pen"></i>
-                                                </button>
-                                            @endif
-
-                                            <button type="button" class="btn btn-xs btn-warning font-weight-bold shadow-sm mb-1 mr-1" data-toggle="modal" data-target="#rateIpcrItemModal{{ $item->id }}" title="Rate accomplishment">
-                                                <i class="fas fa-star"></i>
-                                            </button>
-
-                                            @if(($guard === 'employee' && $item->employee_id == $user->id) || $isHead || $guard === 'web')
-                                                @if($item->opcr_item_id && $guard === 'employee' && !$isHead)
-                                                    <button type="button" class="btn btn-xs btn-light text-muted border shadow-sm mb-1" disabled title="Official Cascaded Target: Assigned by Office Head via OPCR (Cannot be deleted by staff)">
-                                                        <i class="fas fa-lock text-secondary"></i>
-                                                    </button>
-                                                @else
-                                                    <form method="POST" action="{{ route('spms.ipcr.item.delete', $item->id) }}" class="d-inline">
-                                                        @csrf
-                                                        <button type="button" class="btn btn-xs btn-outline-danger font-weight-bold shadow-sm mb-1 btn-delete-confirm" data-title="Delete Custom Objective?" data-text="Are you sure you want to delete this custom IPCR objective?" title="Delete objective">
-                                                            <i class="fas fa-trash"></i>
-                                                        </button>
-                                                    </form>
-                                                @endif
-                                            @endif
-                                        @else
-                                            <span class="badge badge-light border text-muted px-2 py-1" title="Past rating periods are read-only">
-                                                <i class="fas fa-lock fa-xs mr-1"></i> Locked
-                                            </span>
-                                        @endif
-                                    </td>
-                                </tr>
-
-                                {{-- Large Evidence Link Preview Modal --}}
-                                @if($item->evidence_file && $item->is_evidence_url)
-                                    @php
-                                        $iframeUrl = $item->evidence_file;
-                                        if (preg_match('/drive\.google\.com\/file\/d\/([^\/]+)/i', $item->evidence_file, $matches)) {
-                                            $iframeUrl = "https://drive.google.com/file/d/" . $matches[1] . "/preview";
-                                        }
-                                    @endphp
-                                    <div class="modal fade" id="viewEvidenceUrlModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                                        <div class="modal-dialog modal-extra-large modal-dialog-centered">
-                                            <div class="modal-content shadow-lg border-0">
-                                                <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
-                                                    <h5 class="modal-title font-weight-bold text-teal" style="font-size: 15px;">
-                                                        <i class="fab fa-google-drive text-teal mr-2"></i> Evidence Document Preview
-                                                    </h5>
-                                                    <div>
-                                                        <button type="button" onclick="window.print()" class="btn btn-xs btn-outline-dark font-weight-bold mr-2">
-                                                            <i class="fas fa-print mr-1"></i> Print Document
-                                                        </button>
-                                                        <a href="{{ $item->evidence_file }}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline-teal font-weight-bold mr-2">
-                                                            <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
-                                                        </a>
-                                                        <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                                                            <span aria-hidden="true">&times;</span>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div class="modal-body p-0 bg-dark text-center" style="overflow: hidden;">
-                                                    <iframe id="evidenceIframe{{ $item->id }}" src="{{ $iframeUrl }}" style="width: 100%; height: 100%; border: none;" allow="autoplay; encrypted-media" loading="lazy"></iframe>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endif
-
-                                {{-- Accomplishment Edit Modal for Ratee --}}
-                                @if($guard === 'employee' && $item->employee_id == $user->id)
-                                    <div class="modal fade" id="editAccomplishmentModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content shadow-lg border-0">
-                                                <div class="modal-header bg-white border-bottom py-2">
-                                                    <h5 class="modal-title font-weight-bold text-teal" style="font-size: 15px;"><i class="fas fa-file-upload mr-2"></i> Submit Accomplishment &amp; Evidence</h5>
-                                                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
-                                                </div>
-                                                <form method="POST" action="{{ route('spms.ipcr.accomplishment.submit') }}" enctype="multipart/form-data">
-                                                    @csrf
-                                                    <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
-
-                                                    <div class="modal-body text-left">
-                                                        <div class="form-group mb-3">
-                                                            <label class="font-weight-bold text-dark">Actual Accomplishment Description:</label>
-                                                            <textarea name="actual_accomplishment" class="form-control" rows="3" placeholder="Describe your actual performance, target output achieved..." required>{{ $item->actual_accomplishment }}</textarea>
-                                                        </div>
-
-                                                        <div class="form-group mb-0">
-                                                            <label class="font-weight-bold text-dark"><i class="fab fa-google-drive text-teal mr-1"></i> Evidence Google Drive / Web Link:</label>
-                                                            <input type="url" name="evidence_file" class="form-control" value="{{ $item->evidence_file }}" placeholder="https://drive.google.com/file/d/.../view?usp=sharing">
-                                                            <small class="form-text text-muted">Paste your Google Drive or web share link here.</small>
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="modal-footer bg-light py-2">
-                                                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                                                        <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">Save Accomplishment &amp; Evidence</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endif
-
-                                {{-- Rating Modal --}}
-                                <div class="modal fade" id="rateIpcrItemModal{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content shadow-lg border-0">
-                                                <div class="modal-header bg-white border-bottom py-2">
-                                                    <h5 class="modal-title font-weight-bold text-dark" style="font-size: 15px;"><i class="fas fa-star text-warning mr-2"></i> Rate Employee Accomplishment</h5>
-                                                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                                                        <span aria-hidden="true">&times;</span>
-                                                    </button>
-                                                </div>
-                                                <form method="POST" action="{{ route('spms.ipcr.item.rate') }}">
-                                                    @csrf
-                                                    <input type="hidden" name="ipcr_item_id" value="{{ $item->id }}">
-
-                                                    <div class="modal-body text-left">
-                                                        <div class="form-group mb-3">
-                                                            <label class="font-weight-bold text-dark">Employee Accomplishment:</label>
-                                                            <p class="text-muted small bg-light p-2 rounded border mb-0">{!! nl2br(e($item->actual_accomplishment ?? 'No accomplishment description provided')) !!}</p>
-                                                        </div>
-
-                                                        <h6 class="font-weight-bold text-dark mb-2">Rating (1 to 5 Scale):</h6>
-                                                        <div class="row">
-                                                            <div class="col-4">
-                                                                <label class="small font-weight-bold">Quality (Q):</label>
-                                                                <input type="number" step="0.1" min="1" max="5" name="rating_q" class="form-control form-control-sm" value="{{ $item->rating_q }}">
-                                                            </div>
-                                                            <div class="col-4">
-                                                                <label class="small font-weight-bold">Efficiency (E):</label>
-                                                                <input type="number" step="0.1" min="1" max="5" name="rating_e" class="form-control form-control-sm" value="{{ $item->rating_e }}">
-                                                            </div>
-                                                            <div class="col-4">
-                                                                <label class="small font-weight-bold">Timeliness (T):</label>
-                                                                <input type="number" step="0.1" min="1" max="5" name="rating_t" class="form-control form-control-sm" value="{{ $item->rating_t }}">
-                                                            </div>
-                                                        </div>
-
-                                                        <div class="form-group mt-3 mb-0">
-                                                            <label class="font-weight-bold text-dark">Remarks:</label>
-                                                            <textarea name="remarks" class="form-control" rows="2">{{ $item->remarks }}</textarea>
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="modal-footer bg-light py-2">
-                                                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                                                        <button type="submit" class="btn btn-warning btn-sm font-weight-bold px-3">Save Rating</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="text-center py-3 text-muted small font-italic">
-                                        No items assigned under {{ $catLabel }} yet.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    @endforeach
-                </table>
-            </div>
-        </div>
-
-        {{-- Sign-off Footer Section (Official CSC IPCR Signatories) --}}
-        @php
-            $rateeDefaultName = $employee->fname . ' ' . $employee->lname;
-            $rateeDefaultPos = $employee->position ?? 'Personnel';
-            $resolvedHead = isset($officeHead) && $officeHead ? $officeHead : ($ipcr->office?->head ?: ($office?->head ?? null));
-            $assessedDefaultName = $resolvedHead ? ($resolvedHead->fname . ' ' . $resolvedHead->lname) : 'OFFICE HEAD NAME';
-            $assessedDefaultPos = $resolvedHead?->position ?: ('Head, ' . ($office->office_name ?? $ipcr->office?->office_name ?? 'Department'));
-            $approvedDefaultName = 'LUCRECIA C. NICOLAS, MAEd';
-            $approvedDefaultPos = 'MGDH-I (GSO)/HRMO-Designate';
-        @endphp
-        <div class="card-footer bg-white pt-4 pb-3 border-top">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="font-weight-bold text-teal" style="font-size: 13px;">
-                    <i class="fas fa-file-signature mr-1"></i> Official IPCR Signatories &amp; Approvals
+        <div class="flex h-10 flex-wrap items-center gap-2">
+            <span class="{{ $chip }} bg-forest-100 text-forest-800">{{ $ipcr->status }}</span>
+            @if($ipcr->final_numerical_rating)
+                <span class="{{ $chip }} bg-sun-100 text-sun-700">
+                    <span class="tabular-nums">{{ number_format($ipcr->final_numerical_rating, 2) }}</span> {{ $ipcr->final_adjectival_rating }}
                 </span>
-                @if($isEditablePeriod)
-                    <button type="button" class="btn btn-xs btn-outline-teal font-weight-bold shadow-sm" data-toggle="modal" data-target="#editIpcrSignatoriesModal">
-                        <i class="fas fa-user-edit mr-1"></i> Edit Signatories
-                    </button>
-                @endif
-            </div>
-
-            <div class="row text-dark" style="font-size: 12px;">
-                {{-- Column 1: Ratee / Employee --}}
-                <div class="col-md-4 mb-3 border-right">
-                    <p class="font-weight-bold text-muted mb-4">Discussed with (Ratee):</p>
-                    <u class="d-block font-weight-bold text-uppercase" style="font-size: 13px;">
-                        {{ $ipcr->ratee_name ?? $rateeDefaultName }}
-                    </u>
-                    <small class="text-muted d-block font-weight-bold">
-                        {{ $ipcr->ratee_position ?? $rateeDefaultPos }}
-                    </small>
-                    <small class="text-muted mt-3 d-block">Date: ________________________</small>
-                </div>
-
-                {{-- Column 2: Assessed by (Supervisor) --}}
-                <div class="col-md-4 mb-3 border-right">
-                    <p class="font-weight-bold text-muted mb-4">Assessed by (Supervisor):</p>
-                    <u class="d-block font-weight-bold text-uppercase" style="font-size: 13px;">
-                        {{ $ipcr->assessed_by_name ?? $assessedDefaultName }}
-                    </u>
-                    <small class="text-muted d-block font-weight-bold">
-                        {{ $ipcr->assessed_by_position ?? $assessedDefaultPos }}
-                    </small>
-                    <small class="text-muted mt-3 d-block">Date: ________________________</small>
-                </div>
-
-                {{-- Column 3: Final Rating by --}}
-                <div class="col-md-4 mb-3">
-                    <p class="font-weight-bold text-muted mb-4">Final Rating by:</p>
-                    <u class="d-block font-weight-bold text-uppercase" style="font-size: 13px;">
-                        {{ $ipcr->approved_by_name ?? $approvedDefaultName }}
-                    </u>
-                    <small class="text-muted d-block font-weight-bold">
-                        {{ $ipcr->approved_by_position ?? $approvedDefaultPos }}
-                    </small>
-                    <small class="text-muted mt-3 d-block">Date: ________________________</small>
-                </div>
-            </div>
+            @endif
+            @unless($isEditablePeriod)
+                <span class="{{ $chip }} border border-line text-ink/60" title="Only the current half-year can be changed"><i class="fas fa-lock text-[10px]"></i> Read-only period</span>
+            @endunless
         </div>
-    </div>
-</div>
 
-{{-- Edit IPCR Signatories Modal --}}
-<div class="modal fade" id="editIpcrSignatoriesModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-white border-bottom py-2">
-                <h5 class="modal-title font-weight-bold text-teal"><i class="fas fa-user-edit mr-2"></i> Edit IPCR Footer Signatories</h5>
-                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+        <div class="flex flex-wrap gap-2 sm:ml-auto">
+            <button type="button" class="{{ $secondary }}"
+                    data-print-url="{{ route('spms.ipcr.print.cos', ['id' => $employee->id, 'semester' => $semester, 'year' => $year]) }}"
+                    data-print-title="Performance rating form, {{ $fullName }}, {{ $year }}">
+                <i class="fas fa-file-pdf text-xs text-ink/50"></i> Rating form
+            </button>
+            @if($isEditablePeriod)
+                <button type="button" data-dialog-open="templateDialog" class="{{ $secondary }}">
+                    <i class="fas fa-file-import text-xs text-ink/50"></i> Load a template
                 </button>
-            </div>
-            <form method="POST" action="{{ route('spms.ipcr.signatories', $ipcr->id) }}">
-                @csrf
-                <div class="modal-body text-left">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group mb-3">
-                                <label class="font-weight-bold text-dark">Ratee / Employee (Name &amp; Title):</label>
-                                <input type="text" name="ratee_name" class="form-control" value="{{ $ipcr->ratee_name ?? $rateeDefaultName }}" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group mb-3">
-                                <label class="font-weight-bold text-dark">Ratee Position:</label>
-                                <input type="text" name="ratee_position" class="form-control" value="{{ $ipcr->ratee_position ?? $rateeDefaultPos }}" required>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group mb-3">
-                                <label class="font-weight-bold text-dark">Assessed By / Supervisor (Name):</label>
-                                <input type="text" name="assessed_by_name" class="form-control" value="{{ $ipcr->assessed_by_name ?? $assessedDefaultName }}" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group mb-3">
-                                <label class="font-weight-bold text-dark">Supervisor Position:</label>
-                                <input type="text" name="assessed_by_position" class="form-control" value="{{ $ipcr->assessed_by_position ?? $assessedDefaultPos }}" required>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group mb-3">
-                                <label class="font-weight-bold text-dark">Final Rating By (Name &amp; Title):</label>
-                                <input type="text" name="approved_by_name" class="form-control" value="{{ $ipcr->approved_by_name ?? $approvedDefaultName }}" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group mb-3">
-                                <label class="font-weight-bold text-dark">Final Rating By (Position/Office):</label>
-                                <input type="text" name="approved_by_position" class="form-control" value="{{ $ipcr->approved_by_position ?? $approvedDefaultPos }}" required>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">
-                        <i class="fas fa-save mr-1"></i> Save Signatories
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-{{-- Add Custom IPCR Objective Modal --}}
-<div class="modal fade" id="addCustomIpcrModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-white border-bottom py-2">
-                <h5 class="modal-title font-weight-bold text-teal"><i class="fas fa-plus-circle mr-2"></i> Add Custom IPCR Objective / Routine Duty</h5>
-                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                <button type="button" data-dialog-open="objectiveDialog" class="{{ $primary }}">
+                    <i class="fas fa-plus text-xs"></i> Add an objective
                 </button>
-            </div>
-            <form method="POST" action="{{ route('spms.ipcr.item.store') }}">
-                @csrf
-                <input type="hidden" name="ipcr_id" value="{{ $ipcr->id }}">
-
-                <div class="modal-body text-left">
-                    <div class="form-group mb-3">
-                        <label class="font-weight-bold text-dark">Category:</label>
-                        <select name="category" class="form-control custom-select" required>
-                            <option value="Core Functions">Core Functions (60%)</option>
-                            <option value="Strategic Functions">Strategic Functions (20%)</option>
-                            <option value="Support Functions" selected>Support Functions (20%) - Routine/Administrative</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group mb-3">
-                        <label class="font-weight-bold text-dark">Major Final Output (MFO / PAPs):</label>
-                        <textarea name="mfo_pap" class="form-control" rows="3" placeholder="Enter custom deliverable description or daily routine duty..." required></textarea>
-                    </div>
-
-                    <div class="form-group mb-3">
-                        <label class="font-weight-bold text-dark">Success Indicators (Targets + Measures):</label>
-                        <textarea name="success_indicators" class="form-control" rows="3" placeholder="Enter target metrics and measures..." required></textarea>
-                    </div>
-                </div>
-
-                <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-teal btn-sm font-weight-bold px-4">Save Custom Objective</button>
-                </div>
-            </form>
+            @endif
         </div>
-    </div>
+    </section>
+
+    {{-- The matrix --}}
+    <section class="overflow-hidden rounded-2xl border border-line bg-surface">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-5 pt-5 pb-4">
+            <h2 class="font-display text-lg font-semibold tracking-tight">Objectives and accomplishments</h2>
+            @if($isEditablePeriod)
+                <p class="text-ink/55">Drag an objective by its handle to reorder it within its function.</p>
+            @endif
+        </div>
+
+        <div class="hidden gap-x-5 border-t border-line px-5 py-2.5 text-xs font-medium text-ink/55 @5xl:grid {{ $columns }}" aria-hidden="true">
+            <span>No.</span>
+            <span>Major final output (MFO / PAPs)</span>
+            <span>Success indicators (targets and measures)</span>
+            <span>Actual accomplishment and evidence</span>
+            <span>Rating</span>
+            <span class="text-right">Actions</span>
+        </div>
+
+        @foreach($categories as $category => [$heading, $weight])
+            @php
+                $items = $ipcr->items->where('category', $category);
+            @endphp
+            <div class="flex items-baseline justify-between gap-4 border-y border-line bg-paper px-5 py-2.5">
+                <h3 class="font-medium">{{ $heading }} <span class="ml-1 font-normal text-ink/55">{{ $weight }}</span></h3>
+                <p class="text-xs text-ink/55">{{ $items->count() }} {{ $items->count() == 1 ? 'objective' : 'objectives' }}</p>
+            </div>
+
+            <ol class="divide-y divide-line" @if($isEditablePeriod) data-sortable @endif>
+                @foreach($items as $item)
+                    @php
+                        $isMine = $guard === 'employee' && $item->employee_id == $user->id;
+                        $mayRemove = $isMine || $isHead || $guard === 'web';
+                        // Cascaded targets are the office head's to take back.
+                        $isHeld = $item->opcr_item_id && $guard === 'employee' && !$isHead;
+                    @endphp
+                    <li class="grid grid-cols-[2rem_minmax(0,1fr)] gap-x-3 gap-y-3 px-5 py-4 @5xl:gap-x-5 {{ $columns }}"
+                        data-item="{{ $item->id }}" data-objective="{{ \Illuminate\Support\Str::limit($item->mfo_pap, 120) }}"
+                        data-accomplishment="{{ $item->actual_accomplishment }}" data-evidence="{{ $item->evidence_file }}"
+                        data-q="{{ $item->rating_q }}" data-e="{{ $item->rating_e }}" data-t="{{ $item->rating_t }}" data-remarks="{{ $item->remarks }}">
+
+                        <div class="row-[1/span_6] flex flex-col items-center gap-1 self-start @5xl:row-auto @5xl:flex-row @5xl:gap-2">
+                            @if($isEditablePeriod)
+                                <span data-drag title="Drag to reorder" class="grid size-7 cursor-grab place-items-center rounded-md text-ink/35 hover:bg-paper hover:text-ink/70 active:cursor-grabbing">
+                                    <i class="fas fa-grip-vertical text-xs"></i>
+                                </span>
+                            @endif
+                            <span class="font-medium tabular-nums" data-item-number>{{ $loop->iteration }}</span>
+                        </div>
+
+                        <div class="col-start-2 min-w-0 @5xl:col-auto">
+                            @if($item->subcategory)
+                                <p class="mb-1 text-xs text-ink/55">{{ ucfirst(strtolower($item->subcategory)) }}</p>
+                            @endif
+                            <p class="font-medium whitespace-pre-line">{{ $item->mfo_pap }}</p>
+                            @if($item->opcr_item_id)
+                                <p class="mt-1.5 text-xs text-forest-700"><i class="fas fa-sitemap mr-1"></i> Cascaded from the OPCR, row {{ $item->opcr_item_id }}</p>
+                            @endif
+                        </div>
+
+                        <div class="col-start-2 min-w-0 @5xl:col-auto">
+                            <p class="{{ $caption }}">Success indicators</p>
+                            <p class="whitespace-pre-line text-ink/75">{{ $item->success_indicators }}</p>
+                        </div>
+
+                        <div class="col-start-2 min-w-0 @5xl:col-auto">
+                            <p class="{{ $caption }}">Actual accomplishment</p>
+                            @if($item->actual_accomplishment)
+                                <p class="whitespace-pre-line">{{ $item->actual_accomplishment }}</p>
+                            @else
+                                <p class="text-ink/45">None entered yet.</p>
+                            @endif
+
+                            <div class="mt-2 flex flex-wrap gap-2 empty:hidden">
+                                @if($item->evidence_file && $item->is_evidence_url)
+                                    <button type="button" data-item-evidence class="{{ $small }}"><i class="fas fa-link text-ink/50"></i> View evidence</button>
+                                @elseif($item->evidence_file)
+                                    <a href="{{ asset('storage/' . $item->evidence_file) }}" target="_blank" class="{{ $small }}"><i class="fas fa-paperclip text-ink/50"></i> View attachment</a>
+                                @endif
+                                @if($isEditablePeriod && $isMine)
+                                    <button type="button" data-item-accomplish class="{{ $small }}">
+                                        <i class="fas fa-pen text-ink/50"></i> {{ $item->actual_accomplishment ? 'Edit' : 'Add accomplishment' }}
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="col-start-2 @5xl:col-auto">
+                            <p class="{{ $caption }}">Rating</p>
+                            @if($item->rating_ave)
+                                <p class="font-display text-xl leading-tight font-semibold tabular-nums">{{ number_format($item->rating_ave, 2) }}</p>
+                                <p class="text-xs text-ink/55 tabular-nums">
+                                    @foreach(['Q' => $item->rating_q, 'E' => $item->rating_e, 'T' => $item->rating_t] as $measure => $given)
+                                        {{ $measure }} {{ $given === null ? '-' : (float) $given }}@if(!$loop->last) / @endif
+                                    @endforeach
+                                </p>
+                            @else
+                                <p class="text-ink/45">Unrated</p>
+                            @endif
+                        </div>
+
+                        <div class="col-start-2 flex gap-1 @5xl:col-auto @5xl:justify-end">
+                            @if($isEditablePeriod)
+                                <button type="button" data-item-rate title="Rate this accomplishment" class="{{ $rowAction }} hover:bg-sun-100 hover:text-sun-700">
+                                    <i class="fas fa-star"></i><span class="sr-only">Rate this accomplishment</span>
+                                </button>
+
+                                @if($mayRemove && $isHeld)
+                                    <span title="Assigned by the office head through the OPCR, so only they can remove it" class="grid size-9 place-items-center text-ink/25">
+                                        <i class="fas fa-lock"></i><span class="sr-only">Assigned by the office head; cannot be removed here</span>
+                                    </span>
+                                @elseif($mayRemove)
+                                    <form method="POST" action="{{ route('spms.ipcr.item.delete', $item->id) }}" data-confirm-danger
+                                          data-confirm="Delete this objective?" data-confirm-detail="{{ \Illuminate\Support\Str::limit($item->mfo_pap, 120) }}" data-confirm-button="Yes, delete">
+                                        @csrf
+                                        <button type="submit" title="Delete this objective" class="{{ $rowAction }} hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/10 dark:hover:text-red-300">
+                                            <i class="fas fa-trash"></i><span class="sr-only">Delete this objective</span>
+                                        </button>
+                                    </form>
+                                @endif
+                            @else
+                                <span title="Only the current half-year can be changed" class="grid size-9 place-items-center text-ink/25"><i class="fas fa-lock"></i></span>
+                            @endif
+                        </div>
+                    </li>
+                @endforeach
+            </ol>
+
+            @if($items->isEmpty())
+                <p class="px-5 py-5 text-ink/45">Nothing under {{ strtolower($heading) }} yet.</p>
+            @endif
+        @endforeach
+
+        @if($isEditablePeriod && $ipcr->items->count())
+            <form method="POST" action="{{ route('spms.ipcr.clear', $ipcr->id) }}" class="border-t border-line px-5 py-3 text-right" data-confirm-danger
+                  data-confirm="Clear all the rows?" data-confirm-button="Yes, clear them"
+                  data-confirm-detail="{{ $guard === 'employee' && !$isHead ? 'This removes the objectives you added yourself. Targets cascaded from the OPCR stay. It cannot be undone.' : 'This removes every objective on this IPCR, with its accomplishment and rating. It cannot be undone.' }}">
+                @csrf
+                <button type="submit" class="cursor-pointer font-medium text-red-700 underline-offset-2 hover:underline dark:text-red-300">Clear all rows</button>
+            </form>
+        @endif
+    </section>
+
+    {{-- Who signs the printed form --}}
+    <section class="rounded-2xl border border-line bg-surface p-5 sm:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="font-display text-lg font-semibold tracking-tight">Signatories</h2>
+            @if($isEditablePeriod)
+                <button type="button" data-dialog-open="signatoriesDialog" class="{{ $small }} h-9 px-3 text-sm"><i class="fas fa-pen text-xs text-ink/50"></i> Edit signatories</button>
+            @endif
+        </div>
+
+        <dl class="mt-4 grid gap-5 @2xl:grid-cols-3">
+            @foreach($signatories as [$role, , , $signer, $signerPosition])
+                <div class="border-l-2 border-sun-500 pl-4">
+                    <dt class="text-xs text-ink/55">{{ $role }}</dt>
+                    <dd class="mt-1 font-semibold uppercase">{{ $signer }}</dd>
+                    <dd class="text-ink/65">{{ $signerPosition }}</dd>
+                </div>
+            @endforeach
+        </dl>
+    </section>
 </div>
 
-{{-- Load Performance Rating Form Template Modal --}}
-<div class="modal fade" id="loadCosTemplateModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-white border-bottom py-2">
-                <h5 class="modal-title font-weight-bold text-info">
-                    @if(!empty($isJoOrCos) && $isJoOrCos)
-                        <i class="fas fa-file-invoice text-info mr-2"></i> Load Contract of Service (COS) / Job Order Performance Rating Form
-                    @else
-                        <i class="fas fa-file-excel text-success mr-2"></i> Load Official LGU Mabinay IPCR Form Template
-                    @endif
-                </h5>
-                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+@include('spms.partials.print-dialog')
+
+{{-- The dialogs below are one each for the whole page, filled from the
+     objective whose button opened them (the script at the end). --}}
+
+@if($isEditablePeriod)
+    {{-- Written by the employee the IPCR belongs to --}}
+    <dialog id="accomplishmentDialog" aria-labelledby="accomplishmentTitle" class="{{ $dialog }} w-[min(34rem,calc(100vw-2rem))]">
+        <form method="POST" action="{{ route('spms.ipcr.accomplishment.submit') }}" class="p-6">
+            @csrf
+            <input type="hidden" name="ipcr_item_id">
+
+            <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                    <h2 class="{{ $dialogTitle }}" id="accomplishmentTitle">Accomplishment and evidence</h2>
+                    <p class="mt-1 line-clamp-2 text-ink/60" data-objective></p>
+                </div>
+                <button type="button" data-dialog-close aria-label="Close" class="{{ $close }}"><i class="fas fa-xmark"></i></button>
             </div>
-            <form method="POST" action="{{ route('spms.ipcr.template.cos') }}">
-                @csrf
-                <input type="hidden" name="ipcr_id" value="{{ $ipcr->id }}">
 
-                <div class="modal-body text-left">
-                    @if(!empty($isJoOrCos) && $isJoOrCos)
-                        <div class="alert alert-info py-2 small mb-3">
-                            <i class="fas fa-info-circle mr-1"></i> <strong>Job Order / COS Rating Form Standard:</strong> Loads default <strong>Task Descriptions</strong>, <strong>Support Functions</strong>, and <strong>Work Ethics</strong> (Punctuality, Integrity, Teamwork, Professionalism, Adaptability) tailored for Contract of Service personnel.
-                        </div>
+            <label for="accomplishmentText" class="{{ $label }} mt-5">Actual accomplishment</label>
+            <textarea id="accomplishmentText" name="actual_accomplishment" rows="5" required placeholder="What was actually done against this target"
+                      class="{{ $field }} mt-1 block w-full px-3 py-2 leading-relaxed"></textarea>
 
-                        <div class="form-group mb-3">
-                            <label class="font-weight-bold text-dark">Select Position Rating Template:</label>
+            <label for="accomplishmentEvidence" class="{{ $label }} mt-4">Link to the evidence</label>
+            <input type="url" id="accomplishmentEvidence" name="evidence_file" placeholder="https://drive.google.com/file/d/.../view" class="{{ $field }} mt-1 block h-10 w-full px-3">
+            <p class="mt-1 text-xs text-ink/55">A Google Drive or other web link the rater can open. Optional.</p>
 
-                            <div class="custom-control custom-radio mb-2">
-                                <input type="radio" id="templateGenServices" name="template_type" value="general_services" class="custom-control-input" checked>
-                                <label class="custom-control-label font-weight-bold text-dark" for="templateGenServices">
-                                    General Services Office / Maintenance &amp; Utility Personnel (COS / JO)
-                                </label>
-                                <small class="d-block text-muted">Includes Hallway cleanliness, Garbage gathering &amp; segregation, Daily routine tasks, Flag ceremony, LCE activities, &amp; Work Ethics evaluation.</small>
-                            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" data-dialog-close class="{{ $secondary }}">Cancel</button>
+                <button type="submit" class="{{ $primary }}"><i class="fas fa-save text-xs"></i> Save</button>
+            </div>
+        </form>
+    </dialog>
 
-                            <div class="custom-control custom-radio">
-                                <input type="radio" id="templateAdminSupport" name="template_type" value="admin_support" class="custom-control-input">
-                                <label class="custom-control-label font-weight-bold text-dark" for="templateAdminSupport">
-                                    Administrative &amp; Clerical Support Personnel (COS / JO)
-                                </label>
-                                <small class="d-block text-muted">Includes Document encoding &amp; filing, Records routing, Client assistance, Departmental support, &amp; Work Ethics evaluation.</small>
-                            </div>
-                        </div>
+    <dialog id="rateDialog" aria-labelledby="rateTitle" class="{{ $dialog }} w-[min(34rem,calc(100vw-2rem))]">
+        <form method="POST" action="{{ route('spms.ipcr.item.rate') }}" class="p-6">
+            @csrf
+            <input type="hidden" name="ipcr_item_id">
 
-                        <div class="card border bg-light p-3 mb-0">
-                            <h6 class="font-weight-bold text-dark mb-2" style="font-size: 13px;">Included Rating Categories &amp; Work Ethics Indicators:</h6>
-                            <ul class="text-muted small mb-0 pl-3">
-                                <li><strong>Core Functions:</strong> Primary daily task descriptions &amp; operational deliverables.</li>
-                                <li><strong>Support Functions:</strong> Department assignments, Flag Ceremony, &amp; LCE sanctioned activities.</li>
-                                <li><strong>Work Ethics Evaluation:</strong> Punctuality &amp; attendance, Responsibility, Integrity, Teamwork, Professionalism, Time Management, Continuous Improvement, Respect, Adaptability, and Customer Service.</li>
-                            </ul>
-                        </div>
-                    @else
-                        <div class="alert alert-success py-2 small mb-3">
-                            <i class="fas fa-file-excel mr-1"></i> <strong>Official LGU Mabinay IPCR Form Standard:</strong> Loads official <strong>MFO/PAPs</strong>, <strong>Subcategories</strong>, and <strong>Success Indicators</strong> from the standard LGU Mabinay IPCR form.
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label class="font-weight-bold text-dark">Select IPCR Template:</label>
-
-                            <div class="custom-control custom-radio mb-2">
-                                <input type="radio" id="templateOfficialRegular" name="template_type" value="official_regular" class="custom-control-input" checked>
-                                <label class="custom-control-label font-weight-bold text-dark text-teal" for="templateOfficialRegular">
-                                    <i class="fas fa-check-circle text-success mr-1"></i> Official LGU Mabinay IPCR Form (Regular &amp; Permanent Employees)
-                                </label>
-                                <small class="d-block text-muted">Loads official MFO/PAPs &amp; success indicators (Policy Implementation, Operations, Public Engagement, ARTA, HR &amp; Financial Management).</small>
-                            </div>
-                        </div>
-
-                        <div class="card border bg-light p-3 mb-0">
-                            <h6 class="font-weight-bold text-dark mb-2" style="font-size: 13px;">Included Functional Deliverables:</h6>
-                            <ul class="text-muted small mb-0 pl-3">
-                                <li><strong>Core Functions (90% Weight):</strong> Policy &amp; Program Implementation, Operational Management, Service Delivery &amp; Public Engagement, Personnel Management, Strategic Planning, Financial Resource Management.</li>
-                                <li><strong>Support Functions (10% Weight):</strong> Compliance &amp; Regulation, Human Resource Management, Department Meetings, Trainings, and Flag Ceremonies.</li>
-                            </ul>
-                        </div>
-                    @endif
+            <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                    <h2 class="{{ $dialogTitle }}" id="rateTitle">Rate the accomplishment</h2>
+                    <p class="mt-1 line-clamp-2 text-ink/60" data-objective></p>
                 </div>
+                <button type="button" data-dialog-close aria-label="Close" class="{{ $close }}"><i class="fas fa-xmark"></i></button>
+            </div>
 
-                <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-info btn-sm font-weight-bold px-4">
-                        <i class="fas fa-download mr-1"></i> Load Rating Template Items
-                    </button>
+            <p class="{{ $label }} mt-5">Accomplishment</p>
+            <p class="mt-1 max-h-40 overflow-y-auto rounded-xl bg-paper px-3 py-2 leading-relaxed whitespace-pre-line text-ink/80" data-accomplishment></p>
+
+            <fieldset class="mt-4">
+                <legend class="{{ $label }}">Rating, from 1 to 5</legend>
+                <div class="mt-1 grid grid-cols-3 gap-3">
+                    @foreach(['rating_q' => 'Quality', 'rating_e' => 'Efficiency', 'rating_t' => 'Timeliness'] as $name => $measure)
+                        <label>
+                            <span class="text-xs text-ink/60">{{ $measure }}</span>
+                            <input type="number" name="{{ $name }}" min="1" max="5" step="0.1" inputmode="decimal" class="{{ $field }} mt-1 block h-10 w-full px-3 tabular-nums">
+                        </label>
+                    @endforeach
                 </div>
-            </form>
+                <p class="mt-1 text-xs text-ink/55">Leave out a measure that does not apply; the average is taken over the ones given.</p>
+            </fieldset>
+
+            <label for="rateRemarks" class="{{ $label }} mt-4">Remarks</label>
+            <textarea id="rateRemarks" name="remarks" rows="2" class="{{ $field }} mt-1 block w-full px-3 py-2 leading-relaxed"></textarea>
+
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" data-dialog-close class="{{ $secondary }}">Cancel</button>
+                <button type="submit" class="{{ $primary }}"><i class="fas fa-star text-xs"></i> Save rating</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="objectiveDialog" aria-labelledby="objectiveTitle" class="{{ $dialog }} w-[min(40rem,calc(100vw-2rem))]">
+        <form method="POST" action="{{ route('spms.ipcr.item.store') }}" class="p-6">
+            @csrf
+            <input type="hidden" name="ipcr_id" value="{{ $ipcr->id }}">
+
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="{{ $dialogTitle }}" id="objectiveTitle">Add an objective</h2>
+                    <p class="mt-1 text-ink/60">A deliverable or routine duty that is not among the targets cascaded from the OPCR.</p>
+                </div>
+                <button type="button" data-dialog-close aria-label="Close" class="{{ $close }}"><i class="fas fa-xmark"></i></button>
+            </div>
+
+            <label for="objectiveCategory" class="{{ $label }} mt-5">Function</label>
+            <select id="objectiveCategory" name="category" required class="{{ $field }} mt-1 block h-10 w-full pr-8 pl-3">
+                <option value="Core Functions">Core functions (60%)</option>
+                <option value="Strategic Functions">Strategic functions (20%)</option>
+                <option value="Support Functions" selected>Support functions (20%): routine and administrative</option>
+            </select>
+
+            <label for="objectiveMfo" class="{{ $label }} mt-4">Major final output (MFO / PAPs)</label>
+            <textarea id="objectiveMfo" name="mfo_pap" rows="3" required placeholder="The deliverable, or the routine duty" class="{{ $field }} mt-1 block w-full px-3 py-2 leading-relaxed"></textarea>
+
+            <label for="objectiveIndicators" class="{{ $label }} mt-4">Success indicators (targets and measures)</label>
+            <textarea id="objectiveIndicators" name="success_indicators" rows="3" required placeholder="How much, how well and by when" class="{{ $field }} mt-1 block w-full px-3 py-2 leading-relaxed"></textarea>
+
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" data-dialog-close class="{{ $secondary }}">Cancel</button>
+                <button type="submit" class="{{ $primary }}"><i class="fas fa-save text-xs"></i> Save objective</button>
+            </div>
+        </form>
+    </dialog>
+
+    {{-- A template adds its rows to whatever is already there. Job order
+         and contract of service staff are rated on a different form from
+         regular employees, so each is offered its own. --}}
+    <dialog id="templateDialog" aria-labelledby="templateTitle" class="{{ $dialog }} w-[min(40rem,calc(100vw-2rem))]">
+        <form method="POST" action="{{ route('spms.ipcr.template.cos') }}" class="p-6">
+            @csrf
+            <input type="hidden" name="ipcr_id" value="{{ $ipcr->id }}">
+
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="{{ $dialogTitle }}" id="templateTitle">Load a template</h2>
+                    <p class="mt-1 text-ink/60">
+                        {{ $isJoOrCos
+                            ? 'The standard rows of the performance rating form for job order and contract of service personnel.'
+                            : 'The standard rows of the official LGU Mabinay IPCR form.' }}
+                        They are added to the rows already here.
+                    </p>
+                </div>
+                <button type="button" data-dialog-close aria-label="Close" class="{{ $close }}"><i class="fas fa-xmark"></i></button>
+            </div>
+
+            @php
+                $templates = $isJoOrCos
+                    ? [
+                        'general_services' => ['General services, maintenance and utility personnel', 'Hallway cleanliness, garbage gathering and segregation, daily routine tasks, flag ceremony, LCE activities, and the work ethics evaluation.'],
+                        'admin_support' => ['Administrative and clerical support personnel', 'Document encoding and filing, records routing, client assistance, departmental support, and the work ethics evaluation.'],
+                    ]
+                    : [
+                        'official_regular' => ['Official LGU Mabinay IPCR form, for regular and permanent employees', 'Core functions: policy and program implementation, operational management, service delivery and public engagement, personnel management, strategic planning, financial resource management. Support functions: compliance and regulation, human resource management, department meetings, trainings and flag ceremonies.'],
+                    ];
+            @endphp
+            <fieldset class="mt-5 space-y-2">
+                <legend class="sr-only">Template</legend>
+                @foreach($templates as $value => [$templateName, $holds])
+                    <label class="flex cursor-pointer gap-3 rounded-xl border border-line p-4 transition-colors has-checked:border-forest-600 has-checked:bg-forest-100/60">
+                        <input type="radio" name="template_type" value="{{ $value }}" class="mt-0.5 size-4 shrink-0 accent-forest-600" @checked($loop->first)>
+                        <span>
+                            <span class="block font-medium">{{ $templateName }}</span>
+                            <span class="mt-0.5 block leading-relaxed text-ink/65">{{ $holds }}</span>
+                        </span>
+                    </label>
+                @endforeach
+            </fieldset>
+
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" data-dialog-close class="{{ $secondary }}">Cancel</button>
+                <button type="submit" class="{{ $primary }}"><i class="fas fa-file-import text-xs"></i> Load the rows</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="signatoriesDialog" aria-labelledby="signatoriesTitle" class="{{ $dialog }} w-[min(44rem,calc(100vw-2rem))]">
+        <form method="POST" action="{{ route('spms.ipcr.signatories', $ipcr->id) }}" class="p-6">
+            @csrf
+
+            <div class="flex items-start justify-between gap-4">
+                <h2 class="{{ $dialogTitle }}" id="signatoriesTitle">Signatories</h2>
+                <button type="button" data-dialog-close aria-label="Close" class="{{ $close }}"><i class="fas fa-xmark"></i></button>
+            </div>
+
+            <div class="mt-4 space-y-4">
+                @foreach($signatories as [$role, $nameField, $positionField, $signer, $signerPosition])
+                    <fieldset class="grid gap-3 sm:grid-cols-2">
+                        <legend class="mb-1 font-medium">{{ $role }}</legend>
+                        <label>
+                            <span class="{{ $label }}">Name</span>
+                            <input type="text" name="{{ $nameField }}" value="{{ $signer }}" required maxlength="255" class="{{ $field }} mt-1 block h-10 w-full px-3">
+                        </label>
+                        <label>
+                            <span class="{{ $label }}">Position</span>
+                            <input type="text" name="{{ $positionField }}" value="{{ $signerPosition }}" required maxlength="255" class="{{ $field }} mt-1 block h-10 w-full px-3">
+                        </label>
+                    </fieldset>
+                @endforeach
+            </div>
+
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" data-dialog-close class="{{ $secondary }}">Cancel</button>
+                <button type="submit" class="{{ $primary }}"><i class="fas fa-save text-xs"></i> Save signatories</button>
+            </div>
+        </form>
+    </dialog>
+@endif
+
+{{-- Evidence given as a link, read without leaving the page. The frame gets
+     its address on opening and is emptied on closing. --}}
+<dialog id="evidenceDialog" aria-labelledby="evidenceTitle"
+        class="m-auto h-[calc(100dvh-2rem)] w-[min(72rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl shadow-forest-950/25 backdrop:bg-forest-950/60 open:flex">
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-3">
+        <h2 class="min-w-0 truncate font-display text-lg font-semibold tracking-tight" id="evidenceTitle">Evidence</h2>
+        <div class="flex items-center gap-2">
+            <a data-evidence-tab href="#" target="_blank" rel="noopener noreferrer" class="{{ $secondary }} h-9">Open in new tab</a>
+            <button type="button" data-dialog-close aria-label="Close" class="{{ $close }} mt-0"><i class="fas fa-xmark"></i></button>
         </div>
     </div>
-</div>
-
+    <iframe title="Evidence document" allow="autoplay; encrypted-media" class="min-h-0 w-full flex-1 border-0 bg-white"></iframe>
+</dialog>
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{{ asset('template/plugins/sortablejs/Sortable.min.js') }}"></script>
 <script>
-    document.addEventListener('click', function (e) {
-        var btn = e.target.closest('.btn-delete-confirm');
-        if (btn) {
-            e.preventDefault();
-            var form = btn.closest('form');
-            var title = btn.getAttribute('data-title') || 'Confirm Deletion';
-            var text = btn.getAttribute('data-text') || 'Are you sure you want to delete this item?';
+(function () {
+    var csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var page = document.getElementById('ipcrMatrix');
 
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    title: title,
-                    text: text,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#dc3545',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: '<i class="fas fa-trash mr-1"></i> Yes, Delete It',
-                    cancelButtonText: 'Cancel',
-                    customClass: {
-                        confirmButton: 'btn btn-danger font-weight-bold px-3 py-2 mr-2',
-                        cancelButton: 'btn btn-secondary font-weight-bold px-3 py-2'
-                    },
-                    buttonsStyling: false
-                }).then(function (result) {
-                    if (result.isConfirmed) {
-                        form.submit();
-                    }
-                });
-            } else {
-                if (confirm(text)) {
-                    form.submit();
-                }
-            }
+    /* ------------------------------------------- the per-objective dialogs */
+    var accomplishment = document.getElementById('accomplishmentDialog');
+    var rate = document.getElementById('rateDialog');
+    var evidence = document.getElementById('evidenceDialog');
+    var evidenceFrame = evidence.querySelector('iframe');
+
+    evidence.addEventListener('close', function () { evidenceFrame.removeAttribute('src'); });
+
+    page.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-item-accomplish], [data-item-rate], [data-item-evidence]');
+        if (!button) return;
+
+        var item = button.closest('[data-item]').dataset;
+
+        if (button.hasAttribute('data-item-accomplish')) {
+            accomplishment.querySelector('[name="ipcr_item_id"]').value = item.item;
+            accomplishment.querySelector('[data-objective]').textContent = item.objective;
+            accomplishment.querySelector('[name="actual_accomplishment"]').value = item.accomplishment;
+            accomplishment.querySelector('[name="evidence_file"]').value = item.evidence;
+            accomplishment.showModal();
+        }
+
+        if (button.hasAttribute('data-item-rate')) {
+            rate.querySelector('[name="ipcr_item_id"]').value = item.item;
+            rate.querySelector('[data-objective]').textContent = item.objective;
+            rate.querySelector('[data-accomplishment]').textContent = item.accomplishment || 'No accomplishment has been entered for this objective.';
+            rate.querySelector('[name="rating_q"]').value = item.q;
+            rate.querySelector('[name="rating_e"]').value = item.e;
+            rate.querySelector('[name="rating_t"]').value = item.t;
+            rate.querySelector('[name="remarks"]').value = item.remarks;
+            rate.showModal();
+        }
+
+        if (button.hasAttribute('data-item-evidence')) {
+            // A Google Drive file link has a page of its own made for framing.
+            var drive = item.evidence.match(/drive\.google\.com\/file\/d\/([^\/]+)/i);
+            evidence.querySelector('[data-evidence-tab]').href = item.evidence;
+            evidenceFrame.src = drive ? 'https://drive.google.com/file/d/' + drive[1] + '/preview' : item.evidence;
+            evidence.showModal();
         }
     });
 
-    function printModalIframe(iframeId) {
-        var iframe = document.getElementById(iframeId);
-        if (iframe) {
-            try {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
-            } catch (e) {
-                window.open(iframe.src, '_blank');
-            }
-        }
-    }
+    /* ------------------------------------------------------------ reorder */
+    // Within one function only. The new order of that function's rows is
+    // sent whole; the numbers down the side follow straight away.
+    if (typeof Sortable === 'undefined') return;
 
-    function printCosIframe(iframeId) {
-        var iframe = document.getElementById(iframeId);
-        if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-        }
-    }
+    Array.prototype.forEach.call(page.querySelectorAll('[data-sortable]'), function (list) {
+        Sortable.create(list, {
+            animation: 150,
+            handle: '[data-drag]',
+            draggable: '[data-item]',
+            ghostClass: 'opacity-40',
+            chosenClass: 'bg-forest-100',
+            onEnd: function (moved) {
+                if (moved.oldIndex === moved.newIndex) return;
 
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.ipcr-sortable-body').forEach(function (tbody) {
-            var reorderUrl = tbody.getAttribute('data-reorderurl');
+                var rows = Array.prototype.slice.call(list.querySelectorAll('[data-item]'));
+                rows.forEach(function (row, index) { row.querySelector('[data-item-number]').textContent = index + 1; });
 
-            if (typeof Sortable !== 'undefined') {
-                Sortable.create(tbody, {
-                    animation: 150,
-                    draggable: 'tr.ipcr-sortable-row',
-                    filter: 'button, a, input, select, textarea, .btn, [data-toggle]',
-                    preventOnFilter: false,
-                    ghostClass: 'sortable-ghost',
-                    chosenClass: 'sortable-chosen',
-                    dragClass: 'sortable-drag',
-                    onEnd: function () {
-                        var itemIds = [];
-                        tbody.querySelectorAll('tr.ipcr-sortable-row').forEach(function (row) {
-                            itemIds.push(row.getAttribute('data-id'));
-                        });
-
-                        if (itemIds.length && reorderUrl) {
-                            fetch(reorderUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Accept': 'application/json',
-                                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                    'X-Requested-With': 'XMLHttpRequest'
-                                },
-                                body: JSON.stringify({ order: itemIds })
-                            })
-                            .then(function (res) { return res.json(); })
-                            .catch(function (err) {
-                                console.error('Reorder failed:', err);
-                            });
-                        }
-                    }
-                });
+                fetch("{{ route('spms.ipcr.item.reorder') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ order: rows.map(function (row) { return row.dataset.item; }) })
+                })
+                    .then(function (response) { return response.ok ? response.json() : Promise.reject(); })
+                    .catch(function () { hrisToast('error', 'The new order could not be saved. Reload the page to see the order that is stored.'); });
             }
         });
     });
+})();
 </script>
-
-{{-- Performance Rating Form Preview Modal --}}
-<div class="modal fade" id="previewCosRatingModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
-                <h5 class="modal-title font-weight-bold text-danger" style="font-size: 15px;">
-                    <i class="fas fa-file-pdf text-danger mr-2"></i> Performance Rating Form Preview &bull; {{ $employee->fname }} {{ $employee->lname }}
-                </h5>
-                <div>
-                    <button type="button" onclick="printCosIframe('matrixCosIframe')" class="btn btn-xs btn-outline-dark font-weight-bold mr-2">
-                        <i class="fas fa-print mr-1"></i> Print Document
-                    </button>
-                    <a href="{{ route('spms.ipcr.print.cos', ['id' => $employee->id, 'semester' => $semester, 'year' => $year]) }}" target="_blank" class="btn btn-xs btn-outline-teal font-weight-bold mr-2">
-                        <i class="fas fa-external-link-alt mr-1"></i> Open in New Tab
-                    </a>
-                    <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-            </div>
-            <div class="modal-body p-0 bg-dark text-center" style="overflow: hidden;">
-                <iframe id="matrixCosIframe" src="{{ route('spms.ipcr.print.cos', ['id' => $employee->id, 'semester' => $semester, 'year' => $year, 'embed' => 1]) }}" style="width: 100%; height: 75vh; border: none;" loading="lazy"></iframe>
-            </div>
-        </div>
-    </div>
-</div>
 @endpush
-

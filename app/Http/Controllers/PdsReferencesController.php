@@ -89,13 +89,11 @@ class PdsReferencesController extends Controller
     
         if ($references) {
             $currentValue = $references->$column;
-            $valuesArray = explode(';', $currentValue); // Use semicolon as separator
-    
-            if (isset($valuesArray[$index])) {
-                $valuesArray[$index] = $value;
-            } else {
-                $valuesArray[$index] = $value;
-            }
+            // Padded first: writing position 5 of a column that so far holds
+            // two answers would otherwise leave gaps, and joining the
+            // array back together closes them, moving the answer.
+            $valuesArray = array_pad(explode(';', (string) $currentValue), $index + 1, '');
+            $valuesArray[$index] = $value;
     
             $newValue = implode(';', $valuesArray); // Use semicolon as separator
     

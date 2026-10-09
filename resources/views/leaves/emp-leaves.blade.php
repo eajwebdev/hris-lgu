@@ -2,23 +2,11 @@
 
 @php
     // HR sees an employee's credit ledger here; an employee sees their own
-    // application form. The Status and History tabs are still on the old
-    // shell (leaves/status, leaves/history) with their own copies of the
-    // panel, menu and dialogs: leaves/side-menu, top-menu and modal.
+    // application form. Status and History are leaves/status and
+    // leaves/history; the three share the tabs, the balances panel and HR's
+    // credit dialogs in leaves/partials.
 
-    // column => [label, id of the figure in the balances panel]
-    $otherBalances = [
-        'special_pl'     => ['Special Privilege Leave', 'special-pl'],
-        'solo_pl'        => ['Solo Parent Leave', 'solo-pl'],
-        'study_leave'    => ['Study Leave', 'study-leave'],
-        'vawc_leave'     => ['10-Day VAWC Leave', 'vawc-leave'],
-        'rehab_leave'    => ['Rehabilitation Privilege', 'rehab-leave'],
-        'benefits_leave' => ['Special Leave Benefits for Women', 'benefits-leave'],
-        'calamity_leave' => ['Special Emergency (Calamity) Leave', 'calamity-leave'],
-        'adopt_leave'    => ['Adoption Leave', 'adopt-leave'],
-        'servcred_leave' => ['Vacation Service Credit', 'servcred-leave'],
-        'well_leave'     => ['Wellness Leave', 'wellness-leave'],
-    ];
+    $otherBalances = leave_other_balances();
 
     $field = 'mt-1 block w-full rounded-xl border border-line bg-paper px-3 text-ink outline-none transition-shadow placeholder:text-ink/40 focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15';
     $label = 'block text-xs font-medium text-ink/60';

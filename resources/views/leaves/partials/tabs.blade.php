@@ -1,8 +1,4 @@
-{{--
-    The three leave screens, for the header banner. Tailwind twin of
-    leaves/top-menu, which the Status and History screens still use until
-    they are converted — keep the routes and labels in step with it.
---}}
+{{-- The three leave screens, for the header banner. --}}
 @php
     $leaveTabs = [
         [$guard == 'web' ? 'Leave credits' : 'Application form',

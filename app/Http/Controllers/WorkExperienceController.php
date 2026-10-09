@@ -115,6 +115,9 @@ class WorkExperienceController extends Controller
             'salary' => $request->input('salary'),
             'stat_app' => $request->input('stat_app'),
             'service' => $request->input('service'),
+            // Was validated but never stored, so the supervisor typed on a
+            // new entry was lost until the entry was edited and saved again.
+            'supervisor' => $request->input('supervisor'),
             'attachment' => $attachmentPath,
             'list_accom' => $listAccomString,
             'actual_summary' => $request->input('actual_summary'),
