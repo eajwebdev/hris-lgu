@@ -91,6 +91,8 @@ return array(
          * @var array
          */
         'allowed_protocols' => [
+            // PDF templates embed local header images through pdf_image().
+            "data://" => ["rules" => []],
             "file://" => ["rules" => []],
             "http://" => ["rules" => []],
             "https://" => ["rules" => []]
