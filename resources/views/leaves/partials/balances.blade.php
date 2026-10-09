@@ -1,11 +1,14 @@
 {{--
-    Whose leave this is, and what they have left. Tailwind twin of
-    leaves/side-menu (still used by Status and History).
+    Whose leave this is, and what they have left: the panel beside each of
+    the three leave screens.
 
     The balance figures keep their ids (b-vl, b-sl, special-pl, ...): the
-    scripts on this screen write new values into them after a change.
+    scripts on these screens write new values into them after a change.
 
-      $otherBalances   column => [label, id of the figure], from the page
+      $otherBalances   leave_other_balances(), from the page
+      $switchRoute     for HR, the route another employee opens on, so the
+                       switch stays on the screen it was made from
+                       (default: leavesRead, their credits)
 --}}
 @php
     $photo = $employee->profile && file_exists(public_path('Profile/Employee/' . $employee->profile))
@@ -18,7 +21,7 @@
     @if($guard == 'web')
         <div class="border-b border-line p-3">
             <label for="leaveEmployee" class="sr-only">Employee</label>
-            <select id="leaveEmployee" data-leave-url="{{ route('leavesRead', ':id') }}"
+            <select id="leaveEmployee" data-leave-url="{{ route($switchRoute ?? 'leavesRead', ':id') }}"
                     class="block h-10 w-full rounded-xl border border-line bg-paper pr-8 pl-3 text-ink outline-none transition-shadow focus:border-forest-600 focus:bg-surface focus:ring-4 focus:ring-forest-600/15">
                 {{-- Surname first and in order, so typing one in the open list jumps to it. --}}
                 @foreach($emplalls->sortBy(fn ($emp) => strtolower($emp->lname . ' ' . $emp->fname)) as $emp)
@@ -75,7 +78,7 @@
 @if($guard == 'web')
     @push('scripts')
     <script>
-        // Choosing another employee opens their leave credits.
+        // Choosing another employee opens the same screen for them.
         document.getElementById('leaveEmployee').addEventListener('change', function () {
             if (this.value) { window.location.href = this.dataset.leaveUrl.replace(':id', this.value); }
         });

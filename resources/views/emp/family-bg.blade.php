@@ -1,147 +1,138 @@
-@extends('layouts.master')
+@extends('layouts.app')
+
+@php
+    // Family Background, the second page of an employee's Personal Data
+    // Sheet: spouse, children, father and mother. Like Personal Information
+    // there is no Save button. Each field goes to
+    // FamilybgController::familyBgUpdate on its own when it changes
+    // (emp/partials/pds-autosave); the children are the exception, kept as
+    // one list and sent whole to FamilybgController::updateChild, which
+    // replaces both of their columns with what it is sent.
+
+    $isStaff = $guard == 'web';
+
+    $spouseFields = [
+        ['name' => 'spouse_sname', 'label' => 'Surname'],
+        ['name' => 'spouse_fname', 'label' => 'First name'],
+        ['name' => 'spouse_mname', 'label' => 'Middle name'],
+        ['name' => 'spouse_ext', 'label' => 'Name extension', 'placeholder' => 'Jr., Sr., N/A'],
+    ];
+
+    $spouseWorkFields = [
+        ['name' => 'occupation', 'label' => 'Occupation'],
+        ['name' => 'bus_name', 'label' => 'Employer / business name'],
+        ['name' => 'bus_address', 'label' => 'Business address'],
+        ['name' => 'telephone', 'label' => 'Telephone'],
+    ];
+
+    $fatherFields = [
+        ['name' => 'father_sname', 'label' => 'Surname'],
+        ['name' => 'father_fname', 'label' => 'First name'],
+        ['name' => 'father_mname', 'label' => 'Middle name'],
+        ['name' => 'father_ext', 'label' => 'Name extension', 'placeholder' => 'Jr., Sr., N/A'],
+    ];
+
+    $motherFields = [
+        ['name' => 'mother_sname', 'label' => 'Surname'],
+        ['name' => 'mother_fname', 'label' => 'First name'],
+        ['name' => 'mother_mname', 'label' => 'Middle name'],
+    ];
+
+    // The children are two comma-separated columns, names and dates of
+    // birth, matched by position. A name with no date beside it is still a
+    // child; the page always shows at least one row to type into.
+    $names = explode(',', (string) $familyBg->name_child);
+    $dates = explode(',', (string) $familyBg->date_birth);
+    $children = collect($names)->map(fn ($name, $index) => [trim($name), trim($dates[$index] ?? '')])
+        ->reject(fn ($child) => $child[0] === '' && $child[1] === '')
+        ->values();
+    if ($children->isEmpty()) {
+        $children->push(['', '']);
+    }
+
+    $card = 'rounded-2xl border border-line bg-surface p-5 sm:p-6';
+    $heading = 'font-display text-lg font-semibold tracking-tight';
+    $subheading = 'mt-6 border-t border-line pt-5 font-medium';
+    $grid = 'mt-4 grid gap-4 @md:grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4';
+@endphp
+
+@section('breadcrumb', $isStaff ? trim(ucwords(strtolower($employee->fname)) . ' ' . ucwords(strtolower($employee->lname))) : 'Family Background')
+
+@section('hero')
+    @include('emp.partials.pds-hero', ['about' => 'Family background', 'autosaves' => true])
+@endsection
 
 @section('body')
-@include('emp.style')
-<section class="content">
-<div class="container-fluid">
-    <div class="row">
-        @include('emp.submenu-side')
-        <div class="col-lg-9">
-            <div class="card card-info card-outline">
-                <div class="card-header">
-                    <h2 class="card-title text-success1">
-                        <b>FAMILY BACKGROUND</b>
-                    </h2>
-                </div>
-                <div class="card-body bg-form">
-                        <div class="form-group mtop">
-                            <div class="form-row lbel">
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Spouse Surname</label>
-                                    <input type="text" value="{{ $familyBg->spouse_sname }}" name="spouse_sname" data-column-id="{{ $empid }}" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                                
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Spouse First Name</label>
-                                    <input type="text" value="{{ $familyBg->spouse_fname }}" name="spouse_fname" data-column-id="{{ $empid }}" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                                
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Spouse Middle Name</label>
-                                    <input type="text" value="{{ $familyBg->spouse_mname }}" name="spouse_mname" data-column-id="{{ $empid }}" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
+<div class="grid items-start gap-5 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)]">
+    @include('emp.partials.pds-side')
 
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Spouse Extension</label>
-                                    <input type="text" value="{{ $familyBg->spouse_ext }}" name="spouse_ext" data-column-id="{{ $empid }}" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                            </div>
-                            
-                            @php
-                                $names = explode(',', $familyBg->name_child);
-                                $dates = explode(',', $familyBg->date_birth);
-                            @endphp
-                            
-                            <div id="form-container">
-                                @foreach($names as $index => $name)
-                                    @if(isset($dates[$index]))
-                                        <div class="form-row mt-3 lbel" data-index="{{ $index }}">
-                                            <div class="col-md-6">
-                                                @if($loop->first)<label class="badge badge-secondary text-wrap lbel w-100">Child's Name</label>@endif
-                                                <input type="text" value="{{ trim($name) }}" name="name_child[]" class="form-control form-control-sm update-child update-field-array" data-index="{{ $index }}" placeholder="N/A">
-                                            </div>
-                                            
-                                            <div class="col-md-5">
-                                                @if($loop->first)<label class="badge badge-secondary text-wrap lbel w-100">Date of Birth</label>@endif
-                                                <input type="date" value="{{ trim($dates[$index]) }}" name="date_birth[]" class="form-control form-control-sm update-child update-field-array" data-index="{{ $index }}" placeholder="N/A">
-                                            </div>
-                                            
-                                            @if($index > 0)
-                                                <div class="col-md-1">
-                                                    <button type="button" class="btn btn-outline-danger btn-sm btn-delete">
-                                                        <i class="fas fa-trash fa-sm"></i>
-                                                    </button>    
-                                                </div>
-                                            @endif
-                                            
-                                            @if($loop->first) 
-                                                <div class="col-md-1">
-                                                    <button id="add-row-familybg" class="btn btn-success btn-sm" style="margin-top: 21px;">
-                                                        <i class="fas fa-plus fa-sm"></i>
-                                                    </button>    
-                                                </div>
-                                            @endif
-                                        </div>
-                                    @endif
-                                @endforeach
-                            </div>                            
-                            
-                            <div class="form-row mt-3 lbel">
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Occupation</label>
-                                    <input type="text" value="{{ $familyBg->occupation }}" name="occupation" data-column-id="{{ $empid }}" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                                
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Business Name</label>
-                                    <input type="text" value="{{ $familyBg->bus_name }}" name="bus_name" data-column-id="{{ $empid }}" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                                
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Business Address</label>
-                                    <input type="text" value="{{ $familyBg->bus_address }}" name="bus_address" data-column-id="{{ $empid }}" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                                
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Telephone</label>
-                                    <input type="text" value="{{ $familyBg->telephone }}" name="telephone" data-column-id="{{ $empid }}" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                            </div>
-                            
-                            <div class="form-row mt-3">
-                                
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Father's Surname</label>
-                                    <input type="text" value="{{ $familyBg->father_sname }}" name="father_sname" data-column-id="{{ $empid }}" data-column-name="father_sname" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                                
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Father's First Name</label>
-                                    <input type="text" value="{{ $familyBg->father_fname }}" name="father_fname" data-column-id="{{ $empid }}" data-column-name="father_fname" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
+    <form id="pdsForm" data-save-url="{{ route('familyBgUpdate') }}" data-employee="{{ $empid }}" novalidate autocomplete="off" class="@container space-y-5">
+        <section class="{{ $card }}">
+            <h2 class="{{ $heading }}">Spouse</h2>
 
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Father's Middle Name</label>
-                                    <input type="text" value="{{ $familyBg->father_mname }}" name="father_mname" data-column-id="{{ $empid }}" data-column-name="father_mname" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                                
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary text-wrap lbel">Father's Extension</label>
-                                    <input type="text" value="{{ $familyBg->father_ext }}" name="father_ext" data-column-id="{{ $empid }}" data-column-name="father_ext" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                            </div>
-                    
-                            <div class="form-row mt-3">
-                                <div class="col-md-3">
-                                    <span class="text-success1">MOTHE'S MAIDEN NAME</span><br>
-                                    <label class="badge badge-secondary text-wrap lbel">Mother's Surname</label>
-                                    <input type="text" value="{{ $familyBg->mother_sname }}" name="mother_sname" data-column-id="{{ $empid }}" data-column-name="mother_sname" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                                <div class="col-md-3"><br>
-                                    <label class="badge badge-secondary text-wrap lbel">Mother's First Name</label>
-                                    <input type="text" value="{{ $familyBg->mother_fname }}" name="mother_fname" data-column-id="{{ $empid }}" data-column-name="mother_fname" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                                
-                                <div class="col-md-3"><br>
-                                    <label class="badge badge-secondary text-wrap lbel">Mother's Middle Name</label>
-                                    <input type="text" value="{{ $familyBg->mother_mname }}" name="mother_mname" data-column-id="{{ $empid }}" data-column-name="mother_mname" class="form-control form-control-sm update-field" placeholder="N/A">
-                                </div>
-                            </div>
-                        </div>
-                </div>
+            <div class="{{ $grid }}">
+                @foreach($spouseFields as $spec)
+                    @include('emp.partials.field', ['spec' => $spec, 'record' => $familyBg])
+                @endforeach
             </div>
-        </div>
-    </div> 
+
+            <h3 class="{{ $subheading }}">Spouse's work</h3>
+            <div class="{{ $grid }}">
+                @foreach($spouseWorkFields as $spec)
+                    @include('emp.partials.field', ['spec' => $spec, 'record' => $familyBg])
+                @endforeach
+            </div>
+        </section>
+
+        <section class="{{ $card }}" id="children" data-rows data-rows-url="{{ route('update-child') }}" data-rows-what="The children" data-rows-item="child">
+            <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+                <div>
+                    <h2 class="{{ $heading }}">Children</h2>
+                    <p class="mt-0.5 text-ink/60">The full name of each child, without commas. List all of them.</p>
+                </div>
+                <button type="button" data-rows-add
+                        class="h-10 cursor-pointer rounded-xl border border-line px-4 font-medium transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+                    <i class="fas fa-plus mr-1 text-xs"></i> Add a child
+                </button>
+            </div>
+
+            <div class="mt-4 hidden grid-cols-[minmax(0,1fr)_11rem_auto] gap-4 text-xs font-medium text-ink/60 @md:grid" aria-hidden="true">
+                <span>Full name</span>
+                <span>Date of birth</span>
+                <span class="w-10"></span>
+            </div>
+
+            <ol class="mt-4 space-y-4 @md:mt-1 @md:space-y-2" data-rows-list>
+                @foreach($children as $child)
+                    @include('emp.partials.child-row', ['child' => $child])
+                @endforeach
+            </ol>
+
+            <template>
+                @include('emp.partials.child-row', ['child' => ['', '']])
+            </template>
+        </section>
+
+        <section class="{{ $card }}">
+            <h2 class="{{ $heading }}">Parents</h2>
+
+            <h3 class="mt-4 font-medium">Father</h3>
+            <div class="{{ $grid }}">
+                @foreach($fatherFields as $spec)
+                    @include('emp.partials.field', ['spec' => $spec, 'record' => $familyBg])
+                @endforeach
+            </div>
+
+            <h3 class="{{ $subheading }}">Mother's maiden name</h3>
+            <div class="{{ $grid }}">
+                @foreach($motherFields as $spec)
+                    @include('emp.partials.field', ['spec' => $spec, 'record' => $familyBg])
+                @endforeach
+            </div>
+        </section>
+    </form>
 </div>
-</section>
+
+@include('emp.partials.pds-autosave')
 @endsection
+

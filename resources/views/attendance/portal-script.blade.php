@@ -77,6 +77,9 @@
     /** Where a fresh attempt begins, and where reset() returns to. */
     var HOME_MODE = REQUIRE_QR ? 'qr' : 'face';
 
+    /** What the status line says while the kiosk waits for a badge. */
+    var QR_PROMPT = 'Show your QR badge to the camera';
+
     var state = {
         mode:    HOME_MODE,   // face | qr | qrface | result
         action:  'in',
@@ -84,6 +87,8 @@
         looping: false,
         busy:    false,    // a capture sequence or network call owns the camera
         qrToken: null,
+        refusedQr: null,   // the last badge the server turned away, and when
+        refusedAt: 0,
         modelsReady: false,
         geo:     null,     // last GPS fix {lat, lng, accuracy, at}
     };
@@ -416,13 +421,20 @@
         drawBox(gate.detection, gate.ok);
         el.guide.classList.toggle('guide--ok', gate.ok);
 
-        setHint(gate.ok ? 'Ready — tap CLOCK IN, CLOCK OUT or OVERTIME' : gate.message, gate.ok ? 'ok' : 'bad');
+        setHint(gate.ok ? 'Ready. Tap Clock in, Clock out or Overtime' : gate.message, gate.ok ? 'ok' : 'bad');
     }
 
     async function idleQr() {
         var raw = await readQr();
 
         if (!raw) return;
+
+        // A badge the server has just refused, still held in front of the
+        // camera. Asking again every scan gets the same answer, and twenty of
+        // those in a minute trips the rate limit and shuts the kiosk to
+        // everybody. The reason stays on screen; the badge is tried again
+        // only after a pause, or straight away if a different one is shown.
+        if (raw === state.refusedQr && Date.now() - state.refusedAt < 10000) return;
 
         state.busy = true;
         setHint('Reading QR…', null);
@@ -437,14 +449,21 @@
             var body = await response.json();
 
             if (!response.ok) {
-                setHint(body.message || 'This QR code is not valid.', 'bad');
-                // Give the operator a moment to read it before the scanner grabs
-                // the same bad code again.
+                setHint(response.status === 429
+                    ? 'Too many tries. Wait a minute, then show the badge again.'
+                    : (body.message || 'This QR code is not valid.'), 'bad');
+
+                state.refusedQr = raw;
+                state.refusedAt = Date.now();
+
+                // Give the operator a moment to read it before the scanner
+                // looks again.
                 await sleep(1600);
                 state.busy = false;
                 return;
             }
 
+            state.refusedQr = null;
             state.qrToken = raw;
 
             showName(body.employee);
@@ -1357,6 +1376,10 @@
         state.mode = mode;
         state.busy = false;
 
+        // Which of the two steps this is, for the stylesheet: it lights the
+        // step list and holds the action buttons back until a badge is read.
+        el.stage.parentElement.dataset.step = mode === 'qr' ? 'badge' : 'face';
+
         setActionsDisabled(false);
         el.guide.classList.remove('guide--ok');
         hideCue();
@@ -1394,7 +1417,7 @@
         await startCamera(qr ? 'environment' : 'user');
 
         setHint(
-            qr ? 'Point the camera at the employee QR code'
+            qr ? QR_PROMPT
                : mode === 'qrface' ? 'Now look at the camera'
                : 'Look at the camera',
             null
@@ -1548,6 +1571,18 @@
             unlockVoice();
 
             state.action = btn.dataset.action;
+
+            // Badge first. Without this a tap here ran the whole capture
+            // against the rear camera, pointed at nobody, only for the server
+            // to refuse it for want of a badge.
+            if (state.mode === 'qr') {
+                setHint('Show your QR badge to the camera first', 'bad');
+
+                setTimeout(function () {
+                    if (state.mode === 'qr' && !state.busy) { setHint(QR_PROMPT, null); }
+                }, 2200);
+                return;
+            }
 
             // Refused before the camera work starts, so state.busy is never
             // taken and the next tap is immediate.
@@ -1870,8 +1905,8 @@
 
         function drawStation(p, rPx, s, isNear, t) {
             rPx = Math.max(12, rPx);
-            var rgb    = isNear ? '34,197,94' : '148,163,184';
-            var accent = isNear ? '#22C55E'   : '#94A3B8';
+            var rgb    = isNear ? '134,211,165' : '246,241,228';
+            var accent = isNear ? '#86D3A5'   : '#AFC0B3';
 
             ctx.save();
 
@@ -1904,11 +1939,11 @@
             ctx.shadowBlur = isNear ? 14 : 6;
             ctx.beginPath(); ctx.arc(p.x, p.y, isNear ? 7 : 5, 0, Math.PI * 2); ctx.fill();
             ctx.shadowBlur = 0;
-            ctx.fillStyle = '#0B1220';
+            ctx.fillStyle = '#0A2A1A';
             ctx.beginPath(); ctx.arc(p.x, p.y, isNear ? 3 : 2, 0, Math.PI * 2); ctx.fill();
 
             // label
-            ctx.fillStyle = isNear ? '#DCFCE7' : 'rgba(226,232,240,.8)';
+            ctx.fillStyle = isNear ? '#E3F1E8' : 'rgba(246,241,228,.8)';
             ctx.font = '600 12px Inter, system-ui, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'alphabetic';
@@ -1922,7 +1957,7 @@
             var within = best.distance <= (best.station.radius_m || 50);
 
             ctx.save();
-            ctx.strokeStyle = within ? 'rgba(34,197,94,.7)' : 'rgba(56,224,255,.7)';
+            ctx.strokeStyle = within ? 'rgba(134,211,165,.7)' : 'rgba(239,144,23,.7)';
             ctx.lineWidth = 2.5;
             ctx.setLineDash([8, 8]);
             ctx.lineDashOffset = -(t * 24) % 16;
@@ -1934,8 +1969,8 @@
                 var tt = (t / 2.2) % 1;
                 var wx = a.x + (b.x - a.x) * tt;
                 var wy = a.y + (b.y - a.y) * tt;
-                ctx.fillStyle = '#38E0FF';
-                ctx.shadowColor = '#38E0FF';
+                ctx.fillStyle = '#EF9017';
+                ctx.shadowColor = '#EF9017';
                 ctx.shadowBlur = 12;
                 ctx.beginPath(); ctx.arc(wx, wy, 5, 0, Math.PI * 2); ctx.fill();
                 ctx.shadowBlur = 0;
@@ -1948,12 +1983,12 @@
             ctx.save();
             ctx.font = '700 11px Inter, system-ui, sans-serif';
             var pw = ctx.measureText(label).width + 16;
-            ctx.fillStyle = 'rgba(7,13,24,.88)';
+            ctx.fillStyle = 'rgba(10,42,26,.88)';
             ctx.strokeStyle = 'rgba(255,255,255,.12)';
             ctx.lineWidth = 1;
             roundRect(mx - pw / 2, my - 11, pw, 22, 11);
             ctx.fill(); ctx.stroke();
-            ctx.fillStyle = within ? '#86EFAC' : '#E2F5FF';
+            ctx.fillStyle = within ? '#86D3A5' : '#F6F1E4';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(label, mx, my + 1);
@@ -1964,22 +1999,22 @@
             var pulse = 0.5 + 0.5 * Math.sin(t * 3);
 
             ctx.save();
-            ctx.fillStyle = 'rgba(56,224,255,' + (0.12 + 0.10 * pulse) + ')';
+            ctx.fillStyle = 'rgba(239,144,23,' + (0.12 + 0.10 * pulse) + ')';
             ctx.beginPath(); ctx.arc(p.x, p.y, 16 + 6 * pulse, 0, Math.PI * 2); ctx.fill();
 
-            ctx.strokeStyle = '#38E0FF';
+            ctx.strokeStyle = '#EF9017';
             ctx.lineWidth = 2;
             ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI * 2); ctx.stroke();
 
-            ctx.fillStyle = '#38E0FF';
-            ctx.shadowColor = '#38E0FF';
+            ctx.fillStyle = '#EF9017';
+            ctx.shadowColor = '#EF9017';
             ctx.shadowBlur = 14;
             ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
             ctx.shadowBlur = 0;
             ctx.fillStyle = '#fff';
             ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2); ctx.fill();
 
-            ctx.fillStyle = '#E2F5FF';
+            ctx.fillStyle = '#F6F1E4';
             ctx.font = '700 11px Inter, system-ui, sans-serif';
             ctx.textAlign = 'center';
             ctx.shadowColor = 'rgba(0,0,0,.8)';
@@ -2036,6 +2071,13 @@
 
         function draw(t) {
             var W = canvas.clientWidth, H = canvas.clientHeight;
+
+            // The canvas changes size without the window doing so: the station
+            // list opening under it takes a third of its height. Left at the old
+            // size, the picture was squashed into the smaller box and its
+            // bottom strip was never cleared, leaving a second "You" behind.
+            if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) { resize(); }
+
             ctx.clearRect(0, 0, W, H);
             drawGrid(W, H, t);
 

@@ -1,120 +1,3 @@
-<style>
-    /* Employee QR card — a municipal ID card carrying the Mabinay seal.
-       Rendered to PNG by html2canvas, so everything here is plain CSS with
-       same-origin images: no external fonts, no remote assets. */
-    .employee-card {
-        width: 300px;
-        border-radius: 16px;
-        overflow: hidden;
-        background: #ffffff;
-        border: 1px solid #E5E7EB;
-        box-shadow: 0 18px 40px -12px rgba(15, 23, 42, .25);
-        font-family: "Inter", Arial, sans-serif;
-        text-align: center;
-        margin: 0 auto;
-    }
-
-    .employee-card__header {
-        background: linear-gradient(135deg, #1E7A45 0%, #10502C 100%);
-        padding: 14px 12px 12px;
-        color: #fff;
-        position: relative;
-    }
-    .employee-card__header::after {
-        content: "";
-        position: absolute;
-        left: 0; right: 0; bottom: 0;
-        height: 4px;
-        background: linear-gradient(90deg, #EF9017, #FBBF24, #EF9017);
-    }
-    .employee-card__seal {
-        width: 54px;
-        height: 54px;
-        object-fit: contain;
-        border-radius: 50%;
-        background: #fff;
-        padding: 3px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, .25);
-    }
-    .employee-card__org {
-        margin: 7px 0 0;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: .09em;
-        text-transform: uppercase;
-        line-height: 1.3;
-    }
-    .employee-card__sub {
-        margin: 2px 0 0;
-        font-size: 8.5px;
-        letter-spacing: .07em;
-        text-transform: uppercase;
-        color: rgba(255, 255, 255, .78);
-    }
-
-    .employee-card__qr {
-        padding: 16px 16px 10px;
-        background: #fff;
-    }
-    .employee-card__qr .qr-code {
-        display: inline-block;
-        padding: 10px;
-        border: 1px solid #E5E7EB;
-        border-radius: 12px;
-        background: #fff;
-        line-height: 0;
-    }
-    .employee-card__qr .qr-code img,
-    .employee-card__qr .qr-code canvas { display: block; }
-
-    .employee-card__scan {
-        margin: 8px 0 0;
-        font-size: 8.5px;
-        letter-spacing: .08em;
-        text-transform: uppercase;
-        color: #94A3B8;
-    }
-
-    .employee-card__body {
-        padding: 4px 16px 16px;
-        background: #fff;
-    }
-    .employee-card__name {
-        margin: 0;
-        font-size: 15px;
-        font-weight: 700;
-        color: #0F172A;
-        line-height: 1.25;
-        letter-spacing: -.01em;
-    }
-    .employee-card__position {
-        margin: 3px 0 10px;
-        font-size: 11px;
-        color: #64748B;
-        line-height: 1.35;
-    }
-    .employee-card__id {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 999px;
-        background: #FEF3E2;
-        color: #B26205;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: .06em;
-    }
-
-    .employee-card__footer {
-        padding: 7px 12px;
-        background: #F1F5F9;
-        border-top: 1px solid #E5E7EB;
-        font-size: 8px;
-        letter-spacing: .06em;
-        text-transform: uppercase;
-        color: #94A3B8;
-    }
-</style>
-
 <div class="col-lg-3">
     <div class="card card-info card-outline">
         <div class="card-body box-profile">
@@ -171,139 +54,21 @@
             <i class="fas fa-id-card"></i><b> PERSONAL DATA SHEET</b> 
         </div>
         <div class="card-footer p-0">
+            {{-- The entries come from pds_sections() in app/Helpers/helpers.php,
+                 which the Tailwind side panel (emp/partials/pds-side) draws
+                 from too. --}}
             <ul class="nav flex-column">
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('PDS', $employee->id) : route('empPDS') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/personal-info/*') ||  request()->is('pds') ? 'text-dark' : 'text-muted' }} pr-2 fas fa-user" style="width: 20px; margin-left: 3px;"></i> 
-                        <span class="{{ request()->is('pds/personal-info/*') || request()->is('pds') ? 'text-dark' : 'text-muted' }} text-bold">Personal Information</span> 
-                        <i class="float-right fas fa-check-circle text-success pt-1"></i>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('familybg', $employee->id) : route('familybg') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/family-bg') || request()->is('pds/family-bg/*') ? 'text-dark' : 'text-muted' }} pr-2 fas fa-users" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/family-bg') || request()->is('pds/family-bg/*') ? 'text-dark' : 'text-muted' }} text-bold">Family Background</span>
-                        <i class="float-right fas {{ (isset($columnstatus) && ($columnstatus['colfamstat'] == 1)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li>                        
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('educbg', $employee->id) : route('educbg') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/educ-bg') || request()->is('pds/educ-bg/*') ? 'text-dark' : 'text-muted' }} pr-2 fas fa-graduation-cap" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/educ-bg') || request()->is('pds/educ-bg/*') ? 'text-dark' : 'text-muted' }} text-bold">Educational Background</span>
-                        <i class="float-right fas {{ (isset($columnstatus) && ($columnstatus['coleducstat'] == 1)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('eligibility', $employee->id) : route('eligibility') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/eligibility') || request()->is('pds/eligibility/*') || isset($eligibilityedit) ? 'text-dark' : 'text-muted' }} pr-2 fas fas fa-certificate" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/eligibility') || request()->is('pds/eligibility/*') || isset($eligibilityedit) ? 'text-dark' : 'text-muted' }} text-bold">Eligibility</span>
-                        <i class="float-right fas {{ (isset($columnstatus['eligibility']) && (count($columnstatus['eligibility']) > 0)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('work-experience', $employee->id) : route('work-experience') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/work-experience') || request()->is('pds/work-experience/*') || isset($workexperienceedit) ? 'text-dark' : 'text-muted' }} pr-2 fas fa-briefcase" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/work-experience') || request()->is('pds/work-experience/*') || isset($workexperienceedit) ? 'text-dark' : 'text-muted' }} text-bold">Work Experience</span>
-                        <i class="float-right fas {{ (isset($columnstatus['workexperience']) && (count($columnstatus['workexperience']) > 0)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('voluntary-work', $employee->id) : route('voluntary-work') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/voluntary-work') || request()->is('pds/voluntary-work/*') || isset($voluntaryworksedit) ? 'text-dark' : 'text-muted' }} pr-2 fas fa-hand-holding-heart" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/voluntary-work') || request()->is('pds/voluntary-work/*') || isset($voluntaryworksedit) ? 'text-dark' : 'text-muted' }} text-bold">Voluntary Work</span>
-                        <i class="float-right fas {{ (isset($columnstatus['voluntaryworks']) && (count($columnstatus['voluntaryworks']) > 0)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li> 
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('learning-dev', $employee->id) : route('learning-dev') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/learning-dev') || request()->is('pds/learning-dev/*') || isset($learningdevedit) ? 'text-dark' : 'text-muted' }} pr-2 fas fas fa-book" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/learning-dev') || request()->is('pds/learning-dev/*') || isset($learningdevedit) ? 'text-dark' : 'text-muted' }} text-bold">Learning and Development</span>
-                        <i class="float-right fas {{ (isset($columnstatus['learningdev']) && (count($columnstatus['learningdev']) > 0)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('otherInfo', $employee->id) : route('otherInfo') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/other-info') || request()->is('pds/other-info/*') ? 'text-dark' : 'text-muted' }} pr-2 fas fa-info-circle" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/other-info') || request()->is('pds/other-info/*') ? 'text-dark' : 'text-muted' }} text-bold">Other Information</span>
-                        <i class="float-right fas {{ (isset($columnstatus) && ($columnstatus['colotherinfo'] == 1)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li>  
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('infoQuestion', $employee->id) : route('infoQuestion') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/info-question') || request()->is('pds/info-question/*') ? 'text-dark' : 'text-muted' }} pr-2 fas fa-question-circle" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/info-question') || request()->is('pds/info-question/*') ? 'text-dark' : 'text-muted' }} text-bold">Other Information Questions</span>
-                        <i class="float-right fas {{ (isset($columnstatus) && ($columnstatus['colinfoquestion'] == 1)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('references', $employee->id) : route('references') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/references') || request()->is('pds/references/*') ? 'text-dark' : 'text-muted' }} pr-2 fas fa-address-book" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/references') || request()->is('pds/references/*') ? 'text-dark' : 'text-muted' }} text-bold">References</span>
-                        <i class="float-right fas {{ (isset($columnstatus) && ($columnstatus['colreferences'] == 1)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('govids', $employee->id) : route('govids') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/government-id') || request()->is('pds/government-id/*') ? 'text-dark' : 'text-muted' }} pr-2 fas fa-id-card" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/government-id') || request()->is('pds/government-id/*') ? 'text-dark' : 'text-muted' }} text-bold">Government Issued ID</span>
-                        <i class="float-right fas {{ (isset($columnstatus) && ($columnstatus['colgovids'] == 1)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li>
-                {{-- <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('signature', $employee->id) : route('signature') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/esign') || request()->is('pds/esign/*') ? 'text-dark' : 'text-muted' }} pr-2 fas fa-id-card" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/esign') || request()->is('pds/esign/*') ? 'text-dark' : 'text-muted' }} text-bold">Signature</span>
-                        <i class="float-right fas {{ (isset($employee) && ($employee->signature !== null)) ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li> --}}
-                {{-- <li class="nav-item">
-                    <a href="#" class="nav-link">
-                        <i class="text-muted pr-2 fas fa-coins" style="width: 20px;"></i>
-                        <span class="text-muted text-bold">Income And Deductions</span>
-                        <i class="float-right fas fa-times-circle text-muted pt-1"></i>
-                    </a>
-                </li> --}}
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('generatepds', $employee->id) : route('generatepds') }}" target="_blank" class="nav-link">
-                        <i class="text-muted pr-2 fas fa-eye" style="width: 20px;"></i>
-                        <span class="text-muted text-bold">Preview Personal Data Sheet</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ ($guard == "web") ? route('genpdsAtthachment', $employee->id) : route('genpdsAtthachment') }}" target="_blank" class="nav-link">
-                        <i class="text-muted pr-2 fas fa-eye" style="width: 20px;"></i>
-                        <span class="text-muted text-bold">Attachment to CS Form No. 212</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="{{ ($guard == 'web') ? route('signature', $employee->id) : route('signature') }}" class="nav-link">
-                        <i class="{{ request()->is('pds/signature') || request()->is('pds/signature/*') ? 'text-dark' : 'text-muted' }} pr-2 fas fa-signature" style="width: 20px;"></i>
-                        <span class="{{ request()->is('pds/signature') || request()->is('pds/signature/*') ? 'text-dark' : 'text-muted' }} text-bold">E-Signature</span>
-                    </a>
-                </li>
-                {{-- Registrars only. The PDS is the HR-facing record — Admin and
-                     HR work through it on anyone's file, so enrolling a face from
-                     here belongs to them. An employee reaches their OWN enrolment
-                     from the dashboard instead (home/dashboard.blade.php), which
-                     is where they actually look, and is prompted for it at login
-                     when they have none.
-
-                     This only hides the link. The route still runs on 'face.self',
-                     so an employee opening their own page directly is allowed and
-                     one naming somebody else's id still gets a 403. --}}
-                @if(\App\Http\Middleware\EnsureFaceRegistrar::allows())
-                @php
-                    $onFacePage = request()->is('pds/face-recognition') || request()->is('pds/face-recognition/*');
-                    $faceRegistered = $employee->faceSummary()['registered'];
-                @endphp
-                <li class="nav-item">
-                    <a href="{{ ($guard == 'web') ? route('faceRecognition', $employee->id) : route('faceRecognition') }}" class="nav-link">
-                        <i class="{{ $onFacePage ? 'text-dark' : 'text-muted' }} pr-2 fas fa-user-shield" style="width: 20px;"></i>
-                        <span class="{{ $onFacePage ? 'text-dark' : 'text-muted' }} text-bold">Face Recognition</span>
-                        <i class="float-right fas {{ $faceRegistered ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
-                    </a>
-                </li>
-                @endif
+                @foreach(pds_sections($employee, $guard, $columnstatus ?? null) as $section)
+                    <li class="nav-item">
+                        <a href="{{ $section['url'] }}" class="nav-link" @if($section['newTab']) target="_blank" @endif>
+                            <i class="{{ $section['active'] ? 'text-dark' : 'text-muted' }} pr-2 {{ $section['icon'] }}" style="width: 20px;"></i>
+                            <span class="{{ $section['active'] ? 'text-dark' : 'text-muted' }} text-bold">{{ $section['label'] }}</span>
+                            @if($section['done'] !== null)
+                                <i class="float-right fas {{ $section['done'] ? 'fa-check-circle text-success' : 'fa-times-circle text-danger' }} pt-1"></i>
+                            @endif
+                        </a>
+                    </li>
+                @endforeach
             </ul>
         </div>
     </div>
@@ -320,40 +85,8 @@
                     <i class="fas fa-download"></i>
                 </a>
 
-                <!-- Employee Card with QR Code -->
-                <div class="employee-card-content">
-                    <div class="employee-card" id="employeeCard">
-
-                        <div class="employee-card__header">
-                            <img src="{{ asset('Uploads/logo.png') }}" alt="Municipality of Mabinay Official Seal" class="employee-card__seal">
-                            <p class="employee-card__org">Municipality of Mabinay</p>
-                            <p class="employee-card__sub">Human Resource Information System</p>
-                        </div>
-
-                        <div class="employee-card__qr">
-                            <div class="qr-code" id="qrcode">
-                                <!-- QR Code is rendered here -->
-                            </div>
-                            <p class="employee-card__scan">Scan to log attendance</p>
-                        </div>
-
-                        <div class="employee-card__body">
-                            <h5 class="employee-card__name">
-                                {{ strtoupper(str_replace('Ñ', 'ñ', $employee->fname)) }}
-                                {{ strtoupper(str_replace('Ñ', 'ñ', $employee->lname)) }}
-                                {{ strtoupper(str_replace('Ñ', 'ñ', $employee->suffix)) }}
-                            </h5>
-                            <p class="employee-card__position">
-                                {{ ($employee->emp_status == 1 && $employee->position) ? $employee->position : 'Office Staff' }}
-                            </p>
-                            <span class="employee-card__id">{{ $employee->emp_ID }}</span>
-                        </div>
-
-                        <div class="employee-card__footer">
-                            Property of LGU Mabinay &middot; Return if found
-                        </div>
-                    </div>
-                </div>
+                {{-- The card itself is shared with the Tailwind shell. --}}
+                @include('emp.partials.qr-card')
             </div>
         </div>
     </div>

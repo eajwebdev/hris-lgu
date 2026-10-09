@@ -2,8 +2,8 @@
 
 @php
     // Position Descriptions (DBM-CSC Form No. 1), one per plantilla item, and
-    // the vacancy last advertised from each. Create and edit are still on the
-    // old shell (positions/form).
+    // the vacancy last advertised from each. Create and edit are
+    // positions/form.
 
     $bannerButton = 'inline-flex h-10 items-center gap-2 rounded-xl border px-4 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500';
     $rowAction = 'grid size-9 cursor-pointer place-items-center rounded-lg text-ink/55 transition-colors focus-visible:outline-2 focus-visible:outline-sun-500';

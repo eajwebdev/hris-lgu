@@ -89,7 +89,9 @@ class PdsController extends Controller
             }
         }
 
-        return view("emp.signature", compact('employee', 'guard', 'empid', 'imageData'));
+        $columnstatus = $this->columnStat($employee->emp_ID);
+
+        return view("emp.signature", compact('employee', 'guard', 'empid', 'imageData', 'columnstatus'));
     }
 
     public function uploadSignature(Request $request, $id = null)

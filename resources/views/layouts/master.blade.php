@@ -391,53 +391,11 @@
 </script>
 
 @include('script.masterScript')
-@if(request()->is('pds/family-bg/*') || request()->is('pds/family-bg'))
-    @include('script.familybgScript')
-@endif
 @if(request()->is('employees') || request()->is('employees/*'))
     @include('script.employeeScript')
 @endif
-@if(request()->is('pds') || request()->is('pds/personal-info') || request()->is('pds/personal-info/*'))
-    @include('script.personInfoScript')
-@endif
 @if(request()->is('pds/face-recognition') || request()->is('pds/face-recognition/*'))
     @include('script.faceRegistrationScript')
-@endif
-@if(request()->is('pds/educ-bg/*') || request()->is('pds/educ-bg'))
-    @include('script.educbgScript')
-@endif
-@if(request()->is('pds/eligibility/*') || request()->is('pds/eligibility') || isset($eligibilityedit))
-    @include('script.eligibilityScript')
-@endif
-@if(request()->is('pds/work-experience/*') || request()->is('pds/work-experience') || isset($workexperienceedit))
-    @include('script.WorkExperienceScript')
-@endif
-@if(request()->is('pds/voluntary-work/*') || request()->is('pds/voluntary-work-edit/*') || request()->is('pds/voluntary-work') || isset($workexperienceedit))
-    @include('script.voluntaryWorksScript')
-@endif
-@if(request()->is('pds/learning-dev/*') || request()->is('pds/learning-dev-edit/*') || request()->is('pds/learning-dev') || isset($learningdevedit))
-    @include('script.learningDevScript')
-@endif
-@if(request()->is('pds/other-info/*') || request()->is('pds/other-info-edit/*') || request()->is('pds/other-info'))
-    @include('script.otherInfoScript')
-@endif
-@if(request()->is('pds/info-question/*') || request()->is('pds/info-question-edit/*') || request()->is('pds/info-question'))
-    @include('script.infoquestionScript')
-@endif
-@if(request()->is('pds/references*'))
-    @include('script.referenceScript')
-@endif
-@if(request()->is('pds/government-id*'))
-    @include('script.govidScript')
-@endif
-@if(request()->is('leaves/*') || request()->is('leaves') || request()->is('leave*') || request()->is('leave/history') || request()->is('leave/history*'))
-    @include('script.leaveCreditScript')
-@endif
-@if(request()->is('pending/*'))
-    @include('script.pendingScript')
-@endif
-@if(request()->is('pds/signature/*') || request()->is('pds/signature'))
-    @include('script.signatureScript')
 @endif
 @if(!empty($guard))
 <script>

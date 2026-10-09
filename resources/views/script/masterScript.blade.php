@@ -79,14 +79,6 @@
                 toastr.error(errorMessage);
         @endif
 
-        $("#leaveHistory").DataTable({
-            "responsive": false,
-            "lengthChange": false, 
-            "autoWidth": true,
-            order: [[1, 'desc']],
-            //"buttons": ["copy", "csv", "excel", "pdf", "print", "colvis"]
-        }).buttons().container().appendTo('.col-md-6:eq(0)');
-
         $("#example1").DataTable({
             "responsive": false,
             "lengthChange": false, 
@@ -260,27 +252,3 @@ $(document).ready(function() {
 
 });
 </script>
-<script>
-$(function () {
-    $('#dateRange').daterangepicker({
-        autoUpdateInput: false,
-        locale: {
-            format: 'YYYY-MM-DD',
-            cancelLabel: 'Clear'
-        }
-    });
-
-    $('#dateRange').on('apply.daterangepicker', function(ev, picker) {
-        $(this).val(
-            picker.startDate.format('YYYY-MM-DD') +
-            ' to ' +
-            picker.endDate.format('YYYY-MM-DD')
-        );
-    });
-
-    $('#dateRange').on('cancel.daterangepicker', function(ev, picker) {
-        $(this).val('');
-    });
-});
-</script>
-

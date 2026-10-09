@@ -284,3 +284,194 @@ if (!function_exists('event_palette')) {
         ];
     }
 }
+
+if (!function_exists('privacy_notice')) {
+    /**
+     * The Data Privacy Notice, as content.
+     *
+     * The notice is drawn in three places that cannot share markup: the
+     * dialogs on layouts/app (Tailwind), the dialogs on layouts/master, and
+     * the PDF (data-privacy.blade.php, inline styles for dompdf). The wording
+     * is kept here once so the three cannot drift; each renderer only decides
+     * how it looks.
+     *
+     * Text may carry <strong> and <a>; it is authored here, never user input.
+     * Each section is a heading, an optional opening paragraph, and optional
+     * bullet points.
+     */
+    function privacy_notice(): array
+    {
+        return [
+            'title' => 'LGU MABINAY HRIS DATA PRIVACY NOTICE',
+            'basis' => 'In Compliance with Republic Act No. 10173 (Data Privacy Act of 2012)',
+            'intro' => 'The <strong>Local Government Unit of Mabinay (Municipality of Mabinay)</strong>, as the Personal Information Controller (PIC), together with <strong>EAJ Web Development Services</strong> as the System Developer and Technical Service Provider, are committed to protecting and respecting your personal data privacy in full compliance with <strong><a href="https://privacy.gov.ph/data-privacy-act/" target="_blank">Republic Act No. 10173</a> (Data Privacy Act of 2012)</strong>, its Implementing Rules and Regulations (IRR), and guidelines issued by the National Privacy Commission (NPC).',
+            'sections' => [
+                [
+                    'heading' => 'Scope &amp; Categories of Data Collected',
+                    'lead' => 'To provide an integrated Human Resource Information System (HRIS), daily timekeeping, and strategic performance evaluation, the system collects and processes the following information:',
+                    'items' => [
+                        '<strong>Personal Identifiers:</strong> Full name, employee ID number, birth date, gender, civil status, contact information, residential address, and department assignment.',
+                        '<strong>Employment &amp; Career Records:</strong> Personal Data Sheet (PDS / CS Form 212), position title, employment status (Regular, Permanent, Casual, JO, COS), appointment details, and service history.',
+                        '<strong>Time &amp; Attendance Logs:</strong> Biometric facial recognition data, digital time logs, Daily Time Records (DTR), leave applications, travel orders, and pass slips.',
+                        '<strong>Strategic Performance Records (SPMS):</strong> Office Performance Commitment &amp; Review (OPCR), Individual Performance Commitment &amp; Review (IPCR), target metrics, actual accomplishments, and evaluation ratings.',
+                    ],
+                ],
+                [
+                    'heading' => 'Purpose of Collection &amp; Processing',
+                    'lead' => 'All personal data collected through the system is processed strictly for legitimate municipal government operations and administration, including:',
+                    'items' => [
+                        'Maintaining accurate digital personnel profiles and Personal Data Sheets (PDS) in the HRIS portal.',
+                        'Tracking daily attendance, processing official leave requests, and generating DTR logs for payroll.',
+                        'Evaluating staff performance under the Civil Service Commission (CSC) Strategic Performance Management System (SPMS).',
+                        'Complying with statutory reporting requirements enforced by the Civil Service Commission (CSC), Commission on Audit (COA), GSIS, and Pag-IBIG.',
+                    ],
+                ],
+                [
+                    'heading' => 'System Developer &amp; Technical Security Controls',
+                    'lead' => 'The software architecture, database design, and technical maintenance of the LGU Mabinay HRIS system are engineered and managed by <strong>EAJ Web Development Services</strong>. Technical security measures enforced include:',
+                    'items' => [
+                        '<strong>Role-Based Access Control:</strong> Strict permissions limiting access to authorized personnel, office heads, and HR administrators.',
+                        '<strong>Data Security &amp; Encryption:</strong> Encrypted password storage, HTTPS encrypted data transmission, and protected database backups.',
+                        '<strong>System Integrity:</strong> Continuous maintenance, software optimization, and privacy-by-design standards implemented by <strong>EAJ Web Development Services</strong>.',
+                    ],
+                ],
+                [
+                    'heading' => 'Data Retention &amp; Custody',
+                    'lead' => 'All physical and electronic records are held under the primary custody of the <strong>Human Resource Management Office (HRMO)</strong> of the Municipality of Mabinay. Data is retained only for as long as necessary to fulfill statutory duties and government audit requirements.',
+                    'items' => [],
+                ],
+                [
+                    'heading' => 'Rights of Data Subjects',
+                    'lead' => 'Under Republic Act No. 10173, employees and data subjects have the right to be informed, to access their personal records, to request correction of inaccuracies, and to lodge inquiries regarding their data processing with the HRMO.',
+                    'items' => [],
+                ],
+                [
+                    'heading' => 'Consent &amp; Acknowledgment',
+                    'lead' => 'By accessing or submitting information through the LGU Mabinay HRIS Portal, you acknowledge that you have read this notice and voluntarily consent to the collection, processing, and storage of your personal data by the Municipality of Mabinay HRMO and technical management by <strong>EAJ Web Development Services</strong>.',
+                    'items' => [],
+                ],
+            ],
+            'issuer' => 'Municipality of Mabinay &bull; Human Resource Management Office (HRMO)',
+            'developer' => 'EAJ Web Development Services',
+        ];
+    }
+}
+
+if (!function_exists('pds_sections')) {
+    /**
+     * The pages of one employee's Personal Data Sheet, as data.
+     *
+     * The list is drawn by two shells while the PDS moves off AdminLTE:
+     * emp/submenu-side (Bootstrap) and emp/partials/pds-side (Tailwind). Where
+     * each entry goes, which one is open and which sections have been filled
+     * in is decided here once; each renderer only chooses the markup.
+     *
+     * HR opens a named employee's record and an employee opens their own, so
+     * the same entry has two addresses.
+     *
+     * `done` is null for an entry that has nothing to fill in. `group` is
+     * 'form' for the sections of CS Form 212, 'print' for the two PDFs and
+     * 'identity' for what the employee is recognised by.
+     *
+     * @param  array|null  $columnstatus  EmployeeController::columnStat(); the
+     *                                    signature and face pages do not load it
+     * @return array<int, array{label: string, url: string, icon: string, active: bool, done: ?bool, group: string, newTab: bool}>
+     */
+    function pds_sections($employee, ?string $guard, ?array $columnstatus = null): array
+    {
+        $url = fn (string $route) => $guard === 'web' ? route($route, $employee->id) : route($route);
+        $on = fn (string ...$patterns) => request()->is(...$patterns);
+
+        $flag = fn (string $key) => ($columnstatus[$key] ?? 0) == 1;
+        $any = fn (string $key) => isset($columnstatus[$key]) && count($columnstatus[$key]) > 0;
+
+        $entry = fn (string $label, string $url, string $icon, bool $active, ?bool $done, string $group = 'form') => [
+            'label' => $label, 'url' => $url, 'icon' => $icon, 'active' => $active,
+            'done' => $done, 'group' => $group, 'newTab' => $group === 'print',
+        ];
+
+        $sections = [
+            // Always counted as filled: the record cannot exist without it.
+            $entry('Personal Information', $guard === 'web' ? route('PDS', $employee->id) : route('empPDS'), 'fas fa-user', $on('pds', 'pds/personal-info/*'), true),
+            $entry('Family Background', $url('familybg'), 'fas fa-users', $on('pds/family-bg*'), $flag('colfamstat')),
+            $entry('Educational Background', $url('educbg'), 'fas fa-graduation-cap', $on('pds/educ-bg*'), $flag('coleducstat')),
+            $entry('Eligibility', $url('eligibility'), 'fas fa-certificate', $on('pds/eligibility*'), $any('eligibility')),
+            $entry('Work Experience', $url('work-experience'), 'fas fa-briefcase', $on('pds/work-experience*'), $any('workexperience')),
+            $entry('Voluntary Work', $url('voluntary-work'), 'fas fa-hand-holding-heart', $on('pds/voluntary-work*'), $any('voluntaryworks')),
+            $entry('Learning and Development', $url('learning-dev'), 'fas fa-book', $on('pds/learning-dev*'), $any('learningdev')),
+            $entry('Other Information', $url('otherInfo'), 'fas fa-info-circle', $on('pds/other-info*'), $flag('colotherinfo')),
+            $entry('Other Information Questions', $url('infoQuestion'), 'fas fa-question-circle', $on('pds/info-question*'), $flag('colinfoquestion')),
+            $entry('References', $url('references'), 'fas fa-address-book', $on('pds/references*'), $flag('colreferences')),
+            $entry('Government Issued ID', $url('govids'), 'fas fa-id-card', $on('pds/government-id*'), $flag('colgovids')),
+
+            $entry('Preview Personal Data Sheet', $url('generatepds'), 'fas fa-eye', false, null, 'print'),
+            $entry('Attachment to CS Form No. 212', $url('genpdsAtthachment'), 'fas fa-eye', false, null, 'print'),
+
+            $entry('E-Signature', $url('signature'), 'fas fa-signature', $on('pds/signature*'), null, 'identity'),
+        ];
+
+        // Registrars only. The PDS is the HR-facing record, so enrolling a
+        // face from here belongs to Admin and HR; an employee reaches their
+        // own enrolment from the dashboard. This only hides the link: the
+        // route runs on 'face.self', so an employee opening their own page
+        // directly is allowed and one naming somebody else's id gets a 403.
+        if (\App\Http\Middleware\EnsureFaceRegistrar::allows()) {
+            $sections[] = $entry('Face Recognition', $url('faceRecognition'), 'fas fa-user-shield', $on('pds/face-recognition*'), (bool) $employee->faceSummary()['registered'], 'identity');
+        }
+
+        return $sections;
+    }
+}
+
+if (!function_exists('leave_type_names')) {
+    /**
+     * The kinds of leave, by the number stored in leave_applications.leave_type.
+     *
+     * @return array<int, string>
+     */
+    function leave_type_names(): array
+    {
+        return [
+            1 => 'Vacation Leave',
+            2 => 'Mandatory/Forced Leave',
+            3 => 'Sick Leave',
+            4 => 'Maternity Leave',
+            5 => 'Paternity Leave',
+            6 => 'Special Privilege Leave',
+            7 => 'Solo Parent Leave',
+            8 => 'Study Leave',
+            9 => '10-Day VAWC Leave',
+            10 => 'Rehabilitation Privilege',
+            11 => 'Special Leave Benefits for Women',
+            12 => 'Special Emergency (Calamity) Leave',
+            13 => 'Adoption Leave',
+            14 => 'Vacation Service Credit',
+            15 => 'Wellness Leave',
+        ];
+    }
+}
+
+if (!function_exists('leave_other_balances')) {
+    /**
+     * The leave balances kept beside Vacation and Sick Leave, for the balances
+     * panel on the three leave screens and HR's dialog that sets them:
+     * employees column => [label, id of the figure in the panel].
+     *
+     * @return array<string, array{0: string, 1: string}>
+     */
+    function leave_other_balances(): array
+    {
+        return [
+            'special_pl'     => ['Special Privilege Leave', 'special-pl'],
+            'solo_pl'        => ['Solo Parent Leave', 'solo-pl'],
+            'study_leave'    => ['Study Leave', 'study-leave'],
+            'vawc_leave'     => ['10-Day VAWC Leave', 'vawc-leave'],
+            'rehab_leave'    => ['Rehabilitation Privilege', 'rehab-leave'],
+            'benefits_leave' => ['Special Leave Benefits for Women', 'benefits-leave'],
+            'calamity_leave' => ['Special Emergency (Calamity) Leave', 'calamity-leave'],
+            'adopt_leave'    => ['Adoption Leave', 'adopt-leave'],
+            'servcred_leave' => ['Vacation Service Credit', 'servcred-leave'],
+            'well_leave'     => ['Wellness Leave', 'wellness-leave'],
+        ];
+    }
+}
