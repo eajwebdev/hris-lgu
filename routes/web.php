@@ -400,6 +400,7 @@ Route::group(['middleware' => ['login_auth', 'password.changed', NoCacheMiddlewa
 
     //Notification
     Route::prefix('notification')->group(function() {
+        Route::get('/refresh', [NotificationController::class, 'refresh'])->name('notifications.refresh');
         // Route::get('/load/{page}', [NotificationController::class, 'loadMore'])->name('notificationload');
         Route::get('/load', [NotificationController::class, 'loadMore'])->name('notificationload');
         Route::get('/update-notif/{menid}/{lappid}/{menu}', [NotificationController::class, 'updateNotif'])->name('updateNotif');

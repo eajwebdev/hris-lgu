@@ -171,5 +171,6 @@
     @include('layouts.app-select')
     @stack('scripts')
     @yield('scripts')
+@include('partials.notification_realtime')
 </body>
 </html>

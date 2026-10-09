@@ -194,6 +194,11 @@ class Controller extends BaseController
 
     public function __construct()
     {
+        $this->shareLayoutData();
+    }
+
+    protected function shareLayoutData(bool $force = false): void
+    {
         // Artisan commands have no view to share into. Tests are the exception:
         // they run through the console SAPI but do render views, and skipping
         // the share left every page built on layouts.master dying on an
@@ -209,7 +214,7 @@ class Controller extends BaseController
         // on every request badly slows down high-frequency AJAX/JSON endpoints such
         // as the interview rating autosave and the 1-second realtime status polls —
         // which caused saves to hang at "Saving...". Skip them for AJAX/JSON.
-        if (request()->ajax() || request()->wantsJson()) {
+        if (!$force && (request()->ajax() || request()->wantsJson())) {
             return;
         }
 
@@ -345,6 +350,7 @@ class Controller extends BaseController
                         });
                     })
                     ->orderBy('notifications.created_at', 'desc')
+                    ->orderByDesc('notifications.id')
                     ->limit(10)
                     ->get();
 
@@ -370,12 +376,15 @@ class Controller extends BaseController
                     )
                     ->where('utype', 'employee')
                     ->when($employeeEmpId, fn ($query) => $query->where('notifications.empid', $employeeEmpId))
+                    ->where('notifications.status', 0)
+                    ->whereNotIn('notifications.module', ['leavecredit', 'leavecreditadd'])
                     ->when(Schema::hasTable('leave_applications'), fn ($q) => $q->leftJoin('leave_applications', fn ($join) => $join->on('notifications.lapp_id', '=', 'leave_applications.id')->where('notifications.module', 'leave')))
                     ->when(Schema::hasTable('eligibilities') && Schema::hasTable('employees'), fn ($q) => $q->leftJoin('eligibilities', 'notifications.lapp_id', '=', 'eligibilities.id')->leftJoin('employees as pds_emp_eligi', 'pds_emp_eligi.emp_ID', '=', 'eligibilities.empid'))
                     ->when(Schema::hasTable('work_experiences') && Schema::hasTable('employees'), fn ($q) => $q->leftJoin('work_experiences', 'notifications.lapp_id', '=', 'work_experiences.id')->leftJoin('employees as pds_emp_workexp', 'pds_emp_workexp.emp_ID', '=', 'work_experiences.empid'))
                     ->when(Schema::hasTable('voluntary_works') && Schema::hasTable('employees'), fn ($q) => $q->leftJoin('voluntary_works', 'notifications.lapp_id', '=', 'voluntary_works.id')->leftJoin('employees as pds_emp_volworks', 'pds_emp_volworks.emp_ID', '=', 'voluntary_works.empid'))
                     ->when(Schema::hasTable('learning_devs') && Schema::hasTable('employees'), fn ($q) => $q->leftJoin('learning_devs', 'notifications.lapp_id', '=', 'learning_devs.id')->leftJoin('employees as pds_emp_learndev', 'pds_emp_learndev.emp_ID', '=', 'learning_devs.empid'))
                     ->orderBy('notifications.created_at', 'desc')
+                    ->orderByDesc('notifications.id')
                     ->limit(10)
                     ->get();
             }

@@ -45,7 +45,7 @@ $leaveTypes = [
             $action = $notif->category == 1 ? "is applying for" : "is awaiting approval for";
             $remarks = "{$action} " . strtolower($leaveTypes[$notif->leave_type] ?? '') . " (Application No: #{$notif->transnum})";
         @endphp
-        <a href="{{ route('leaveStatus', $notif->leave_emp_id) }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
+        <a data-notification-id="{{ $notif->id }}" href="{{ route('leaveStatus', $notif->leave_emp_id) }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
             <div class="mr-3 shrink-0">
                 <span class="notification-initials grid size-10 place-items-center rounded-full bg-forest-100 text-[13px] font-semibold text-forest-800 ring-1 ring-forest-600/20">{{ $initials($notif->leave_emp_fullname) }}</span>
             </div>                            
@@ -105,7 +105,7 @@ $leaveTypes = [
             @break
         @endswitch
 
-        <a href="{{ route('updateNotif', ['menid' => $menid, 'lappid' => $lappid, 'menu' => $menu]) }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
+        <a data-notification-id="{{ $notif->id }}" href="{{ route('updateNotif', ['menid' => $menid, 'lappid' => $lappid, 'menu' => $menu]) }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
             <div class="mr-3 shrink-0">
                 <span class="notification-initials grid size-10 place-items-center rounded-full bg-forest-100 text-[13px] font-semibold text-forest-800 ring-1 ring-forest-600/20">{{ $initials($fullname) }}</span>
             </div>
@@ -130,7 +130,7 @@ $leaveTypes = [
             $attAction = $notif->att_action === 'out' ? 'clocked OUT' : 'clocked IN';
             $remarks = "{$attAction} {$attDistance} from {$notif->att_station_name} — outside station range, for clarification.";
         @endphp
-        <a href="{{ route('attendanceMonitor') }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
+        <a data-notification-id="{{ $notif->id }}" href="{{ route('attendanceMonitor') }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
             <div class="mr-3 shrink-0">
                 <span class="notification-initials grid size-10 place-items-center rounded-full text-[13px] font-semibold" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A;">
                     <i class="fas fa-location-dot"></i>

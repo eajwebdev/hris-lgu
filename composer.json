@@ -14,6 +14,7 @@
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^2.9",
         "picqer/php-barcode-generator": "^2.0",
+        "pusher/pusher-php-server": "^7.2",
         "setasign/fpdf": "^1.8",
         "setasign/fpdi": "^2.6",
         "simplesoftwareio/simple-qrcode": "^4.2",

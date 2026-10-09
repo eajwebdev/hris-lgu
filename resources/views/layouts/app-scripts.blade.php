@@ -92,31 +92,6 @@
         setDrawer(false);
     });
 
-    /* ------------------------------------------------ notifications paging */
-    var feed = document.querySelector('[data-load-more]');
-
-    if (feed) {
-        var offset = 10;          // the first ten are already in the page
-        var loading = false;
-        var finished = false;
-
-        feed.addEventListener('scroll', function () {
-            if (loading || finished) return;
-            if (feed.scrollTop + feed.clientHeight < feed.scrollHeight - 5) return;
-
-            loading = true;
-            fetch(feed.dataset.loadMore + '?offset=' + offset, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(function (response) { return response.json(); })
-                .then(function (data) {
-                    if (data.stop === true || !data.html) { finished = true; return; }
-                    feed.insertAdjacentHTML('beforeend', data.html);
-                    offset = data.nextOffset;
-                })
-                .catch(function () {})
-                .finally(function () { loading = false; });
-        });
-    }
-
     /* --------------------------------------------------- interview ratings */
     var ratingLink = document.getElementById('interviewRatingNavLink');
     var ratingBadge = document.getElementById('interviewRatingBadge');

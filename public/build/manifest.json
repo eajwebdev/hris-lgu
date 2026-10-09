@@ -1,13 +1,29 @@
 {
+  "__commonjsHelpers-Cpj98o6Y.js": {
+    "file": "assets/_commonjsHelpers-Cpj98o6Y.js",
+    "name": "_commonjsHelpers"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-D-cvNAlb.css",
+    "file": "assets/app-B-z4eCcn.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-CBPTnqye.js",
+    "file": "assets/app-BKc5iqjt.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "__commonjsHelpers-Cpj98o6Y.js"
+    ]
+  },
+  "resources/js/notifications.js": {
+    "file": "assets/notifications-GYUUdniI.js",
+    "name": "notifications",
+    "src": "resources/js/notifications.js",
+    "isEntry": true,
+    "imports": [
+      "__commonjsHelpers-Cpj98o6Y.js"
+    ]
   }
 }

@@ -20,9 +20,9 @@
     $crumbs = breadcrumb_trail($menu);
 
     // Administrators get the HR feed, ten at a time. An employee gets their
-    // own unread rows, all of them.
+    // own unread rows and the total unread count.
     $barNotifications = $isEmployeeBar ? unread_employee_notifications($notifications1, $guard) : $notifications;
-    $barNotificationCount = $isEmployeeBar ? $barNotifications->count() : $notificationsCount;
+    $barNotificationCount = $isEmployeeBar ? $notificationsCount1 : $notificationsCount;
 
     $barButton = 'relative grid size-10 cursor-pointer place-items-center rounded-xl text-cream/80 transition-colors hover:bg-cream/12 hover:text-cream focus-visible:outline-2 focus-visible:outline-sun-500 aria-expanded:bg-cream/15 aria-expanded:text-cream';
     $barBadge  = 'absolute -top-0.5 -right-0.5 grid h-4.5 min-w-4.5 place-items-center rounded-full px-1 text-[10px] font-semibold tabular-nums';
@@ -122,35 +122,14 @@
         @endif
 
         {{-- Notifications --}}
-        <div class="sm:relative">
+        <div class="sm:relative" data-notification-bell>
             <button type="button" data-menu-button aria-controls="notificationsMenu" aria-expanded="false" title="Notifications" class="{{ $barButton }}">
                 <i class="fas fa-bell"></i>
-                @if($barNotificationCount != 0)
-                    <span class="{{ $barBadge }} bg-sun-500 text-ink">{{ $barNotificationCount }}</span>
-                @endif
+                <span data-notification-count class="{{ $barBadge }} bg-sun-500 text-ink" @if($barNotificationCount == 0) hidden @endif>{{ $barNotificationCount }}</span>
             </button>
 
             <div id="notificationsMenu" data-menu hidden class="{{ $barPanel }} sm:w-[28rem]">
-                <div class="flex items-center justify-between gap-4 border-b border-line px-4 py-3">
-                    <p class="font-medium">{{ $barNotificationCount != 0 ? $barNotificationCount : 'No' }} Notifications</p>
-                    @if($barNotificationCount > 0)
-                        <form method="POST" action="{{ route('notifications.markAllRead') }}">
-                            @csrf
-                            <button type="submit" class="cursor-pointer text-xs font-medium text-forest-700 underline-offset-2 hover:underline">Mark all as read</button>
-                        </form>
-                    @endif
-                </div>
-
-                {{-- Only the administrators' feed is paged; scrolling to the
-                     end of it asks NotificationController::loadMore for more. --}}
-                <div id="notifications-container" class="max-h-96 overflow-y-auto [scrollbar-width:thin]"
-                     @unless($isEmployeeBar) data-load-more="{{ route('notificationload') }}" @endunless>
-                    @if($isEmployeeBar)
-                        @include('partials.notification_items_employee', ['notifications' => $barNotifications])
-                    @else
-                        @include('partials.notification_items', ['notifications' => $barNotifications])
-                    @endif
-                </div>
+                @include('partials.notification_feed', ['legacy' => false])
             </div>
         </div>
 
