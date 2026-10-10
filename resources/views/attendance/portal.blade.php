@@ -502,6 +502,7 @@
         .geohud--ok  .geohud__row { color: var(--leaf); }
         .geohud--far .geohud__row { color: var(--sun-300); }
         .geohud--far .geohud__note { display: block; }
+        .geohud--demo .geohud__note { display: block; color: var(--leaf); }
 
         /* ---------------------------------------------------------------- hint */
 
@@ -1245,6 +1246,7 @@
         // that saves a wasted camera pass; the server re-derives the same
         // judgement from the same config and station table at punch time.
         'geofence'   => [
+            'demo' => (bool) config('attendance.location_demo', false),
             'enforce' => (bool) config('attendance.geofence.enforce', true),
             // Whether an empty station list closes the kiosk. Mirrored here so
             // the refusal happens before the camera runs; the server enforces

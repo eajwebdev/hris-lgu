@@ -1,6 +1,12 @@
 <?php
 
+$locationDemo = (bool) env('LOC_DEMO', false);
+
 return [
+
+    // Demo attendance can be recorded away from stations or without GPS.
+    // Coordinates, when supplied, are still tagged in the attendance audit.
+    'location_demo' => $locationDemo,
 
     /*
     |--------------------------------------------------------------------------
@@ -68,7 +74,7 @@ return [
     */
 
     'geofence' => [
-        'enforce' => env('ATTENDANCE_GEOFENCE_ENFORCE', true),
+        'enforce' => !$locationDemo && env('ATTENDANCE_GEOFENCE_ENFORCE', true),
 
         /*
         | Refuse a punch when NO active station is configured at all.
@@ -87,7 +93,7 @@ return [
         | deliberately want location-free punching (field staff with no fixed
         | site), and accept that the perimeter then enforces nothing.
         */
-        'require_station' => env('ATTENDANCE_REQUIRE_STATION', true),
+        'require_station' => !$locationDemo && env('ATTENDANCE_REQUIRE_STATION', true),
     ],
 
     /*

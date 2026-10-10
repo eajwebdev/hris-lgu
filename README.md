@@ -114,6 +114,13 @@ camera, register a face, then test the QR badge and face check. Camera access
 requires HTTPS outside localhost. The check command verifies files and PHP
 configuration; it does not replace testing the actual hosting domain and camera.
 
+For a presentation away from the seeded attendance stations, set `LOC_DEMO=true`
+in `.env` and run `php artisan config:clear`. This permits attendance from any
+location, including when GPS is unavailable. Face, QR, liveness and duplicate
+punch checks still apply; supplied coordinates are still recorded. Set
+`LOC_DEMO=false` and clear the config again to restore the usual station rules.
+The example environment defaults to `false`.
+
 In browser mode, identity descriptors and anti-spoof probabilities are supplied
 by the client. PHP independently checks the flash images, but it cannot recompute
 face identity from the pixels. Keep the QR requirement and use controlled kiosk

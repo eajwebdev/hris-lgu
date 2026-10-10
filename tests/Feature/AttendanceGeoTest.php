@@ -11,6 +11,7 @@ use App\Services\FaceEmbeddingService;
 use App\Services\GeoService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Env;
 use Tests\TestCase;
 
 /**
@@ -40,10 +41,17 @@ class AttendanceGeoTest extends TestCase
 
         Cache::flush();
 
+        // Existing seeded sites must not change which station a fixture is
+        // nearest to. DatabaseTransactions restores them after each test.
+        AttendanceStation::query()->update(['active' => false]);
+
         // Geofencing is orthogonal to badge policy and to flash provenance, and
         // these fixtures post mode=face with modelled luma. See
         // AttendancePortalTest and PunchFlashImagesTest for those two.
         config([
+            'attendance.location_demo' => false,
+            'attendance.geofence.enforce' => true,
+            'attendance.geofence.require_station' => true,
             'face.require_qr' => false,
             'face.liveness_flash_frames.require_images' => false,
         ]);
@@ -232,6 +240,48 @@ class AttendanceGeoTest extends TestCase
     }
 
     // ---------------------------------------------------------------- tagging
+
+    private function locationDemo(bool $enabled): void
+    {
+        $repository = Env::getRepository();
+        $previous = $repository->get('LOC_DEMO');
+        $repository->set('LOC_DEMO', $enabled ? 'true' : 'false');
+        try {
+            config(['attendance' => require config_path('attendance.php')]);
+        } finally {
+            $previous === null ? $repository->clear('LOC_DEMO') : $repository->set('LOC_DEMO', $previous);
+        }
+    }
+
+    public function test_location_demo_accepts_remote_attendance_and_keeps_the_real_location_tag(): void
+    {
+        $this->locationDemo(true);
+        $this->enrol($this->alice, 600);
+        $this->station();
+
+        $this->livePunch(600, ['lat' => 14.5995, 'lng' => 120.9842, 'accuracy' => 10])
+            ->assertOk()->assertJsonPath('recorded', true)->assertJsonPath('location.out_of_range', true);
+        $this->assertNotNull($this->todayFor($this->alice));
+    }
+
+    public function test_location_demo_accepts_attendance_without_gps(): void
+    {
+        $this->locationDemo(true);
+        $this->enrol($this->alice, 601);
+        $this->station();
+
+        $this->livePunch(601, null)->assertOk()->assertJsonPath('recorded', true)->assertJsonPath('location.has_location', false);
+    }
+
+    public function test_turning_location_demo_off_restores_the_station_perimeter(): void
+    {
+        $this->locationDemo(false);
+        $this->enrol($this->alice, 602);
+        $this->station();
+
+        $this->livePunch(602, ['lat' => 14.5995, 'lng' => 120.9842, 'accuracy' => 10])->assertStatus(403);
+        $this->assertNull($this->todayFor($this->alice));
+    }
 
     public function test_a_punch_inside_a_station_is_tagged_in_range(): void
     {
