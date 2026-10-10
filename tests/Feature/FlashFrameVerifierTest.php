@@ -260,6 +260,131 @@ class FlashFrameVerifierTest extends TestCase
         $this->assertSame('no_flash_response', $result['reason']);
     }
 
+    /**
+     * A frame as a camera with auto-exposure hands it over: skin and a wall lit
+     * mostly by the room, the screen adding a little to the face and next to
+     * nothing to the wall, and then the whole picture scaled by whatever the
+     * camera did to its exposure for that frame.
+     *
+     * @param  float  $exposure  1.0 = the exposure the dark frame was taken at
+     * @param  bool   $flat      a print: the wall takes the screen's light as
+     *                           fully as the face does
+     */
+    private function exposedFrame(string $segment, int $n, float $exposure, bool $flat = false): string
+    {
+        [$sr, $sg, $sb] = $this->segment($segment);
+
+        $ambient  = 120.0;
+        $faceGain = 16.0;
+        $bgGain   = $flat ? 16.0 : 1.0;
+        $skin     = [1.00, 0.72, 0.62];
+        $bgRefl   = 0.60;
+
+        $im = imagecreatetruecolor(320, 240);
+
+        $bg = imagecolorallocate($im,
+            (int) min(255, ($ambient + $bgGain * $sr) * $bgRefl * $exposure),
+            (int) min(255, ($ambient + $bgGain * $sg) * $bgRefl * $exposure),
+            (int) min(255, ($ambient + $bgGain * $sb) * $bgRefl * $exposure));
+        imagefilledrectangle($im, 0, 0, 320, 240, $bg);
+
+        $face = imagecolorallocate($im,
+            (int) min(255, ($ambient + $faceGain * $sr) * $skin[0] * $exposure),
+            (int) min(255, ($ambient + $faceGain * $sg) * $skin[1] * $exposure),
+            (int) min(255, ($ambient + $faceGain * $sb) * $skin[2] * $exposure));
+        imagefilledellipse($im, 160 + ($n % 3) - 1, 120 + (($n + 1) % 3) - 1, 120, 150, $face);
+
+        for ($i = 0; $i < 40; $i++) {
+            imagesetpixel($im, 110 + ($i * 7 + $n * 3) % 100, 60 + ($i * 11 + $n * 5) % 120,
+                imagecolorallocate($im, 20 + $n, 20 + $n, 20 + $n));
+        }
+
+        ob_start();
+        imagejpeg($im, null, 92);
+        $bin = ob_get_clean();
+        imagedestroy($im);
+
+        return $bin;
+    }
+
+    /** @param array<string, float> $exposures  the camera's exposure per segment */
+    private function exposedAttempt(array $sequence, array $exposures, bool $flat = false): array
+    {
+        $measured = [];
+
+        foreach ($sequence as $i => $s) {
+            $measured[] = $this->v->measure($this->exposedFrame($s, $i, $exposures[$s] ?? 1.0, $flat), $this->box);
+        }
+
+        return $this->v->verify($sequence, $measured);
+    }
+
+    /**
+     * REGRESSION. A living employee was told their face "did not react to the
+     * screen light".
+     *
+     * The camera had turned its exposure down when the screen went white, as
+     * auto-exposure does and as a phone's face-metering front camera does on
+     * purpose, so the face read the same under white as under dark. The wall
+     * behind them shows what happened: the screen cannot make it darker, yet it
+     * was darker in the white frame.
+     */
+    public function test_a_live_face_passes_when_the_camera_turns_its_exposure_down_under_white(): void
+    {
+        // The exposure that holds the face at one brightness: 120 / (120 + 16).
+        $result = $this->exposedAttempt(['dark', 'green', 'white'], ['white' => 120 / 136]);
+
+        $this->assertTrue($result['ok'], 'reason: '.($result['reason'] ?? '').' '.json_encode($result['detail']));
+        // Measured raw, there was nothing to see.
+        $this->assertLessThan(2, $result['detail']['flash_delta_raw']);
+        // With the exposure put back, the screen's light is there.
+        $this->assertGreaterThan(4, $result['detail']['flash_delta']);
+        $this->assertLessThan(1, $result['detail']['exposure_drift']);
+    }
+
+    /** The correction is for the camera, and is not applied when it did nothing. */
+    public function test_a_steady_exposure_is_measured_as_it_is(): void
+    {
+        $result = $this->exposedAttempt(['white', 'green', 'dark'], []);
+
+        $this->assertTrue($result['ok'], 'reason: '.($result['reason'] ?? '').' '.json_encode($result['detail']));
+        $this->assertArrayNotHasKey('exposure_drift', $result['detail']);
+        $this->assertArrayNotHasKey('flash_delta_raw', $result['detail']);
+    }
+
+    /**
+     * A print dims as one piece when the exposure comes down, face and surround
+     * together, so putting the exposure back leaves it exactly where it was:
+     * flat.
+     */
+    public function test_a_print_gains_nothing_from_the_exposure_correction(): void
+    {
+        $result = $this->exposedAttempt(['dark', 'green', 'white'], ['white' => 120 / 136], flat: true);
+
+        $this->assertFalse($result['ok']);
+        $this->assertContains($result['reason'], ['no_flash_response', 'flat_surface']);
+    }
+
+    /**
+     * A background that brightens with the face is the mark of a print or of a
+     * phone held to the lens. It is never explained away as exposure.
+     */
+    public function test_a_background_that_brightens_is_never_treated_as_exposure(): void
+    {
+        $response = FlashFrameVerifier::flashResponse(130.0, 128.0, 110.0, 80.0);
+
+        $this->assertSame(1.0, $response['exposure']);
+        $this->assertSame(2.0, $response['delta']);
+    }
+
+    /** Someone walking out of the background cannot stand in for a response. */
+    public function test_the_exposure_correction_is_capped(): void
+    {
+        $response = FlashFrameVerifier::flashResponse(120.0, 120.0, 20.0, 100.0);
+
+        $this->assertSame(0.7, $response['exposure']);
+    }
+
     public function test_a_short_or_padded_frame_set_is_rejected(): void
     {
         $seq = ['white', 'red', 'dark', 'blue'];

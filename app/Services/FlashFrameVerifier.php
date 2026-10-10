@@ -191,9 +191,22 @@ class FlashFrameVerifier
         if (isset($byName['white'], $byName['dark'])) {
             $lit = $lumaOf($byName['white'][0]['face']);
             $unlit = $lumaOf($byName['dark'][0]['face']);
-            $detail['flash_delta'] = round($lit - $unlit, 2);
 
-            if ($lit - $unlit < (float) ($limits['min_delta'] ?? 6.0)) {
+            // Judged with the camera's own exposure change taken out; see
+            // flashResponse(). The raw figure and the drift are logged beside
+            // it whenever they differ, so a refusal can still be tuned against.
+            $response = self::flashResponse(
+                $lit, $unlit,
+                $lumaOf($byName['white'][0]['bg']), $lumaOf($byName['dark'][0]['bg'])
+            );
+            $detail['flash_delta'] = round($response['delta'], 2);
+
+            if ($response['exposure'] < 1.0) {
+                $detail['flash_delta_raw'] = round($lit - $unlit, 2);
+                $detail['exposure_drift'] = round($response['exposure'], 3);
+            }
+
+            if ($response['delta'] < (float) ($limits['min_delta'] ?? 4.0)) {
                 return $this->fail('no_flash_response', $detail);
             }
 
@@ -280,6 +293,61 @@ class FlashFrameVerifier
     }
 
     /**
+     * How much brighter the face is under the white segment than under the dark
+     * one, with the camera's own exposure change taken out.
+     *
+     * WHY THE RAW DIFFERENCE IS NOT ENOUGH
+     * ------------------------------------
+     * A webcam does not hold still while the screen flashes. Auto-exposure sees
+     * the face get brighter and turns the exposure down, within a few hundred
+     * milliseconds; a phone's front camera goes further and meters on the face
+     * itself, holding it at one brightness whatever lights it. By the time the
+     * frame is taken the face reads nearly the same under white as under dark,
+     * and a living employee was told their face "did not react to the screen
+     * light". How badly depended on the camera and on where in the shuffled
+     * sequence white and dark fell, which is why it came and went.
+     *
+     * The background says what the camera did. The screen cannot make the wall
+     * behind someone DARKER, so when the background is darker in the white
+     * frame than in the dark one, that is the exposure coming down, and by that
+     * same factor on the face. Scaling the dark frame by it puts both frames on
+     * one exposure, and the face's real response is what is left.
+     *
+     * WHAT THIS DOES NOT GIVE AWAY
+     * ----------------------------
+     * Only that one direction is corrected. A background that BRIGHTENS with
+     * the face is left exactly as it was measured, because that is what a print
+     * or a phone held to the lens looks like, and the face-versus-background
+     * check has to see it. A print whose whole frame dims together gains
+     * nothing either: its face scales with its background, so the corrected
+     * difference is still zero.
+     *
+     * The correction is capped, so a frame whose background fell away for some
+     * other reason (someone walking past) cannot stand in for a response.
+     *
+     * Shared with LivenessVerifier::checkFlashBrightness(), which judges the
+     * same quantity again: the two must not measure it differently.
+     *
+     * @return array{delta: float, exposure: float}  exposure is the factor the
+     *                                               dark frame was scaled by;
+     *                                               1.0 when nothing was corrected
+     */
+    public static function flashResponse(float $faceLit, float $faceUnlit, float $bgLit, float $bgUnlit): array
+    {
+        $exposure = 1.0;
+
+        // A background too dark to read carries no information about exposure.
+        if ($bgUnlit >= 12.0 && $bgLit < $bgUnlit) {
+            $exposure = max(0.7, $bgLit / $bgUnlit);
+        }
+
+        return [
+            'delta'    => $faceLit - $faceUnlit * $exposure,
+            'exposure' => $exposure,
+        ];
+    }
+
+    /**
      * The face's natural share of one channel, taken from every segment that is
      * NOT the colour being tested.
      *
@@ -323,7 +391,7 @@ class FlashFrameVerifier
         return [
             'frame_count'        => 'The captured frames did not match the challenge. Please try again.',
             'frame_unreadable'   => 'A captured frame could not be read. Please try again.',
-            'no_flash_response'  => 'The face did not react to the screen light. A photograph or a screen cannot be used.',
+            'no_flash_response'  => 'The screen light did not show on your face. Come closer to the screen, turn its brightness up and try again. A photograph or a screen cannot be used.',
             'flat_surface'       => 'The image looks flat rather than three-dimensional. Please face the camera directly.',
             'no_colour_response' => 'The face did not react to the screen colours. A photograph or a recording cannot be used.',
             'duplicate_frames'   => 'The same image was submitted more than once.',
