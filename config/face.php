@@ -382,7 +382,15 @@ return [
         // than the same one.
         //
         // Kept equal to liveness_flash_frames.min_delta. Change them together.
-        'min_flash_delta' => 6,
+        //
+        // 6 -> 4 (2026-10-10), with liveness_flash_frames.min_delta. 4 is the
+        // value the note above settled on; it became 6 only when the pair was
+        // brought into line with a GD floor that happened to sit there, and a
+        // real employee in a daylit room was then refused for a face that "did
+        // not react to the screen light". Both numbers now also judge the
+        // response with the camera's exposure change taken out
+        // (FlashFrameVerifier::flashResponse()).
+        'min_flash_delta' => 4,
 
         // How much more the FACE must respond than the background does, in the
         // same luma units. The one number worth tuning first if a real screen
@@ -829,7 +837,16 @@ return [
         // These two are confirmed working on real hardware: a live employee
         // cleared both, and only the hue check below refused them. Do not
         // loosen them to chase a hue failure.
-        'min_delta'         => 6.0,
+        //
+        // min_delta 6.0 -> 4.0 (2026-10-10). That confirmation was one room at
+        // one time of day: the same employee was refused on it the next
+        // morning. Beside daylight a laptop or phone screen adds only a few
+        // levels to a face, and 6 sat in the middle of what a real face gives
+        // there. 4 is what liveness.min_flash_delta was deliberately relaxed
+        // to; keep the two equal. It costs little: a print brightens as much
+        // as a face does, so this floor never separated the two. That is
+        // min_face_bg_delta's job, and it is unchanged.
+        'min_delta'         => 4.0,
         'min_face_bg_delta' => 3.0,
 
         // 0.02 -> 0.015, alongside the baseline correction in

@@ -390,7 +390,18 @@ class LivenessVerifier
 
         $faceDelta = $this->mean($faceWhite) - $this->mean($faceDark);
 
-        if ($faceDelta < (float) ($config['min_flash_delta'] ?? 8)) {
+        // The same measurement FlashFrameVerifier has already made, so made the
+        // same way: with the camera's exposure change between the two frames
+        // taken out. Judging the raw difference here would refuse a punch the
+        // authoritative check had just passed.
+        $response = FlashFrameVerifier::flashResponse(
+            $this->mean($faceWhite),
+            $this->mean($faceDark),
+            $bgWhite ? $this->mean($bgWhite) : 0.0,
+            $bgDark ? $this->mean($bgDark) : 0.0,
+        )['delta'];
+
+        if ($response < (float) ($config['min_flash_delta'] ?? 4)) {
             return 'Please use your real face, not a photo or screen.';
         }
 
