@@ -1660,7 +1660,17 @@
      * markup. Courtesy only: the server re-derives all of this at punch time.
      */
     function updateGeoHud() {
-        el.geohud.classList.remove('geohud--ok', 'geohud--far');
+        el.geohud.classList.remove('geohud--ok', 'geohud--far', 'geohud--demo');
+
+        if (CONFIG.geofence.demo) {
+            el.geohud.classList.add('geohud--ok', 'geohud--demo');
+            el.geoDist.textContent = 'Location demo mode';
+            el.geoNote.textContent = 'You can clock in from anywhere.';
+            el.geoCoords.textContent = state.geo
+                ? 'Lat ' + state.geo.lat.toFixed(5) + ', Lng ' + state.geo.lng.toFixed(5)
+                : 'Location is optional for this demo.';
+            return;
+        }
 
         if (!state.geo) {
             el.geoDist.textContent = geofenceEnforced()
@@ -2025,6 +2035,13 @@
 
         function updateFoot(best) {
             el.mapSheet.classList.remove('is-ok', 'is-far');
+
+            if (CONFIG.geofence.demo) {
+                el.mapSheet.classList.add('is-ok');
+                el.mapDist.textContent = focused ? focused.name : 'Location demo mode';
+                el.mapSub.textContent = 'You can clock in from anywhere during this demo.';
+                return;
+            }
 
             // A station picked from the list speaks for itself, fix or no fix.
             if (focused) {
