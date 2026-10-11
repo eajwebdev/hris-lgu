@@ -24,6 +24,9 @@ class PunchFlashImagesTest extends TestCase
         config([
             'face.require_qr' => false,
             'attendance.geofence.require_station' => false,
+            // The flash challenge is opt-in (FACE_FLASH_LIVENESS); this class
+            // is about what happens when it is on.
+            'face.liveness.flash_count' => 3,
         ]);
     }
 

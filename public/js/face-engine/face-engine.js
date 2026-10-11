@@ -11,6 +11,8 @@
  *   FaceEngine.antispoof(src,d) — MiniFASNet: probability the face is a live
  *                               person and not a printed photo or a screen
  *   FaceEngine.yawOf(lm)      — signed head-turn ratio from the 5 landmarks
+ *   FaceEngine.subject(dets)  — the face a capture is about: the largest one,
+ *                               and whether a second person is crowding it
  *
  * Models (vendored under /models/arcface, no CDN — this HRIS must work on the
  * LGU LAN with no internet):
@@ -61,6 +63,11 @@
     // is [live, spoof]; index 0 is the probability the face is a real person.
     var SPOOF_SIZE = 128;
     var SPOOF_INC  = 1.5;
+
+    // A second face counts as sharing the frame once its box covers this much
+    // of the largest one's area — roughly 70% of its width. Someone a step
+    // behind the person at the camera lands well under it.
+    var RIVAL_AREA = 0.5;
 
     // ------------------------------------------------------------- pure math
 
@@ -589,12 +596,37 @@
         return (N.x - midX) / inter;
     }
 
+    /**
+     * The face a capture is about, out of everything detect() returned: the
+     * largest one, which is whoever is standing at the camera.
+     *
+     * detect() sorts by confidence, and a kiosk at an office door has a queue
+     * behind it. Taking [0] could embed somebody waiting in line, and refusing
+     * every frame with more than one face in it meant nobody could punch while
+     * a colleague stood behind them. A face further back is smaller, so it is
+     * simply not the subject. `rival` is true only when a second face is close
+     * to the same size — two people sharing the frame, which is worth asking
+     * them to sort out.
+     */
+    function subject(detections) {
+        if (!detections || !detections.length) return { detection: null, rival: false };
+
+        var area = function (d) { return d.box.width * d.box.height; };
+        var sorted = detections.slice().sort(function (a, b) { return area(b) - area(a); });
+
+        return {
+            detection: sorted[0],
+            rival: sorted.length > 1 && area(sorted[1]) >= area(sorted[0]) * RIVAL_AREA,
+        };
+    }
+
     var api = {
         init: init,
         detect: detect,
         embed: embed,
         antispoof: antispoof,
         yawOf: yawOf,
+        subject: subject,
         get ready() { return state.ready; },
         get provider() { return state.provider; },
         _math: {

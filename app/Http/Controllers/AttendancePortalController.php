@@ -287,6 +287,15 @@ class AttendancePortalController extends Controller
             $distance = $this->faces->verify($employee, $probe);
 
             if ($distance === null) {
+                // Logged with the distance, so face.match.distance is tuned
+                // against real refusals rather than guessed at.
+                Log::warning('Portal face did not match the badge.', [
+                    'emp_ID'   => $employee->emp_ID,
+                    'distance' => ($nearest = $this->faces->nearest($employee, $probe)) !== null ? round($nearest, 4) : null,
+                    'limit'    => (float) config('face.match.distance'),
+                    'ip'       => $request->ip(),
+                ]);
+
                 return $this->fail('Your face does not match this QR code.', 403);
             }
         } else {

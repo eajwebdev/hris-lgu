@@ -245,10 +245,14 @@
      * can be edited by whoever is holding the phone.
      */
     function gateOf(detections) {
-        if (!detections.length)    return { ok: false, message: 'No face detected' };
-        if (detections.length > 1) return { ok: false, message: 'Only one person should be visible' };
+        // The largest face is the employee; people queueing behind are ignored
+        // unless one of them is close enough to be sharing the frame.
+        var seen = FaceEngine.subject(detections);
 
-        var d = detections[0];
+        if (!seen.detection) return { ok: false, message: 'No face detected' };
+        if (seen.rival)      return { ok: false, message: 'Only one person should be visible' };
+
+        var d = seen.detection;
         var box = d.box;
 
         if (box.width / el.video.videoWidth < T.min_face_ratio) {
@@ -279,10 +283,12 @@
      * does not depend on scene brightness, so those checks stay.
      */
     function flashGateOf(detections) {
-        if (!detections.length)    return { ok: false, message: 'No face detected' };
-        if (detections.length > 1) return { ok: false, message: 'Only one person should be visible' };
+        var seen = FaceEngine.subject(detections);
 
-        var d = detections[0];
+        if (!seen.detection) return { ok: false, message: 'No face detected' };
+        if (seen.rival)      return { ok: false, message: 'Only one person should be visible' };
+
+        var d = seen.detection;
 
         if (d.box.width / el.video.videoWidth < T.min_face_ratio) {
             return { ok: false, message: 'Please move closer to the camera', detection: d };
@@ -295,6 +301,16 @@
     }
 
     /**
+     * How far off-centre a "straight ahead" frame may be. front_yaw_max is
+     * tight because it has to stay clear of turn_yaw_min while a gesture
+     * challenge is running; with no gestures in the challenge there is nothing
+     * to keep clear of, and a kiosk mounted a little to one side should not
+     * leave an employee stuck on "look straight at the camera". runSequence()
+     * sets this per attempt.
+     */
+    var frontYawMax = T.front_yaw_max;
+
+    /**
      * Whether the head is currently holding the named pose. Yaw turns are
      * absolute; pitch tilts are relative to `baselinePitch`, the employee's own
      * frontal pitch measured during the straight-ahead frames (null before the
@@ -303,7 +319,7 @@
     function poseHolds(landmarks, pose, baselinePitch) {
         var yaw = yawOf(landmarks);
 
-        if (pose === 'front') return Math.abs(yaw) <= T.front_yaw_max;
+        if (pose === 'front') return Math.abs(yaw) <= frontYawMax;
         if (pose === 'left')  return yaw <= -T.turn_yaw_min;
         if (pose === 'right') return yaw >= T.turn_yaw_min;
 
@@ -509,6 +525,8 @@
         var challenge = await getChallenge();
         var poses     = challenge.poses || [];
 
+        frontYawMax = poses.length ? T.front_yaw_max : (T.punch_yaw_max || T.front_yaw_max);
+
         showCue(null, 'Look at the camera and hold still');
 
         // The frontal pitch baseline for up/down: each face carries its nose at
@@ -642,7 +660,7 @@
                 // Mid-burst, while a colour is still up: proves the face the
                 // light was measured on is the enrolled employee.
                 if (descriptor === null && i === Math.floor(sequence.length / 2)) {
-                    var mid = (await detectFull())[0];
+                    var mid = FaceEngine.subject(await detectFull()).detection;
 
                     if (mid) descriptor = Array.from(await FaceEngine.embed(el.video, mid));
                 }
@@ -678,18 +696,24 @@
         // is what made a failing punch feel like minutes.
         var deadline = performance.now() + 10000;
 
+        // Whatever was last in the way, so a timeout can name it. "Timed out"
+        // alone sends the employee straight back into the same failure.
+        var blocker = instruction;
+
         while (performance.now() < deadline) {
             var gate = gateOf(await detectCheap());
 
             drawBox(gate.detection, gate.ok);
 
             if (!gate.ok) {
+                blocker = gate.message;
                 setHint(gate.message, 'bad');
                 await sleep(90);
                 continue;
             }
 
             if (!poseHolds(gate.detection.landmarks, pose, baselinePitch)) {
+                blocker = instruction;
                 setHint(instruction, 'bad');
                 await sleep(90);
                 continue;
@@ -700,7 +724,7 @@
             // The quality pass, then the embedding — and the pose is re-checked
             // on the fresh detection, because the head may have drifted in the
             // milliseconds between.
-            var full = (await detectFull())[0];
+            var full = FaceEngine.subject(await detectFull()).detection;
 
             if (full && poseHolds(full.landmarks, pose, baselinePitch)) {
                 // Taken FIRST, before the two inference passes below, so the
@@ -719,7 +743,7 @@
             await sleep(90);
         }
 
-        throw new Error('Face check timed out. Please try again.');
+        throw new Error(blocker + ' — please try again.');
     }
 
     /**
@@ -747,7 +771,7 @@
                 continue;
             }
 
-            var full = (await detectFull())[0];
+            var full = FaceEngine.subject(await detectFull()).detection;
 
             if (full) {
                 full.descriptor = await FaceEngine.embed(el.video, full);

@@ -135,7 +135,17 @@ class FlashFrameVerifier
         return [$sum[0] / 16, $sum[1] / 16, $sum[2] / 16];
     }
 
-    /** 8x8 greyscale average hash — enough to spot a re-sent frame. */
+    /**
+     * A fingerprint of the frame's 8x8 greyscale thumbnail — enough to spot the
+     * same picture sent twice.
+     *
+     * The grey levels themselves are hashed, not each cell's relation to the
+     * frame's mean. That average-hash form ignores brightness, which is the one
+     * thing a flash sequence changes: an employee holding still in front of a
+     * plain wall produced the same 64 bits under white as under dark, and was
+     * told "the same image was submitted more than once" on whichever attempts
+     * no bit happened to flip.
+     */
     private function fingerprint($img): string
     {
         $small = imagecreatetruecolor(8, 8);
@@ -145,19 +155,13 @@ class FlashFrameVerifier
         for ($y = 0; $y < 8; $y++) {
             for ($x = 0; $x < 8; $x++) {
                 $rgb = imagecolorat($small, $x, $y);
-                $vals[] = (($rgb >> 16 & 255) * 0.299) + (($rgb >> 8 & 255) * 0.587) + (($rgb & 255) * 0.114);
+                $vals[] = (int) round((($rgb >> 16 & 255) * 0.299) + (($rgb >> 8 & 255) * 0.587) + (($rgb & 255) * 0.114));
             }
         }
 
         imagedestroy($small);
 
-        $mean = array_sum($vals) / count($vals);
-        $bits = '';
-        foreach ($vals as $v) {
-            $bits .= $v >= $mean ? '1' : '0';
-        }
-
-        return $bits;
+        return md5(implode(',', $vals));
     }
 
     /**

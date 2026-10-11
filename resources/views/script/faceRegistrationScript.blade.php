@@ -309,15 +309,19 @@
             return { ok: false, message: 'All captures complete', detection: detections[0] || null };
         }
 
-        if (!detections.length) {
+        // The largest face is the one being enrolled; someone walking past
+        // behind is ignored unless they are close enough to share the frame.
+        var seen = FaceEngine.subject(detections);
+
+        if (!seen.detection) {
             return { ok: false, message: 'No face detected' };
         }
 
-        if (detections.length > 1) {
+        if (seen.rival) {
             return { ok: false, message: 'Only one person should be visible' };
         }
 
-        var d      = detections[0];
+        var d      = seen.detection;
         var box    = d.box;
         var score  = d.score;
         var ratio  = box.width / el.video.videoWidth;
@@ -430,7 +434,7 @@
                     // finished-but-still-complaining bug. Leaving the button
                     // disabled also stops a fifth capture being filed under an
                     // undefined step, which silently broke Finish.
-                    draw(detections.length ? detections[0] : null, true);
+                    draw(FaceEngine.subject(detections).detection, true);
                     el.captureBtn.disabled = true;
                 } else {
                     var result = evaluate(detections, step);
@@ -481,7 +485,9 @@
             // 640 for the enrolment frame itself: a tighter box and cleaner
             // landmarks give the recognition net a better-aligned crop, and
             // this price is paid exactly four times per registration.
-            var result = (await FaceEngine.detect(el.video, { size: 640, scoreThreshold: 0.45 }))[0];
+            var result = FaceEngine.subject(
+                await FaceEngine.detect(el.video, { size: 640, scoreThreshold: 0.45 })
+            ).detection;
 
             if (!result) {
                 setFeedback('No face detected', false);
