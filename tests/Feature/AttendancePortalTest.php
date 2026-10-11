@@ -58,6 +58,12 @@ class AttendancePortalTest extends TestCase
         config([
             'face.require_qr' => false,
             'face.liveness_flash_frames.require_images' => false,
+            // The screen-flash challenge is opt-in (FACE_FLASH_LIVENESS): it
+            // refused real faces in a lit room. Its logic is still live and is
+            // most of what this class exercises, so it is pinned on here.
+            // test_the_shipped_kiosk_punches_with_a_badge_and_a_look() covers
+            // the default the kiosk actually ships with.
+            'face.liveness.flash_count' => 3,
             // This class configures no stations, and an empty station table now
             // closes the kiosk. Geofencing is AttendanceGeoTest's subject, not
             // this one's — here it would only stand between every fixture and
@@ -752,8 +758,7 @@ class AttendancePortalTest extends TestCase
     /**
      * Every attempt must be able to test all three properties, so the draw is
      * seeded rather than uniform. Exercised against the service directly: the
-     * HTTP endpoint is rate-limited to 20/min and this needs more draws than
-     * that to be worth anything.
+     * HTTP endpoint is rate-limited and this should not spend that budget.
      */
     public function test_every_issued_sequence_contains_white_dark_and_a_colour(): void
     {
@@ -975,7 +980,12 @@ class AttendancePortalTest extends TestCase
         $this->enrol($this->alice, 230);
 
         $this->livePunch(230, 'in')->assertOk();
-        $this->livePunch(230, 'in')->assertStatus(429);
+
+        $again = $this->livePunch(230, 'in')->assertStatus(429);
+
+        // Read out on the kiosk, so whole seconds — it used to say
+        // "Please wait 38.294062s."
+        $this->assertMatchesRegularExpression('/Please wait \d+s\.$/', $again->json('message'));
 
         $this->assertCount(1, explode(',', $this->todayFor($this->alice)->time_in));
     }
@@ -1078,6 +1088,86 @@ class AttendancePortalTest extends TestCase
         ])->assertOk()->assertJsonPath('employee.name', $this->employeeName($this->alice));
 
         $this->assertNotNull($this->todayFor($this->alice));
+    }
+
+    /**
+     * The kiosk as it ships: scan the badge, look at the camera. No screen
+     * flash and no gesture, so the payload is the straight-ahead frames and
+     * the anti-spoof scores and nothing else.
+     */
+    public function test_the_shipped_kiosk_punches_with_a_badge_and_a_look(): void
+    {
+        config([
+            'face.require_qr' => true,
+            'face.liveness.flash_count' => 0,
+            'face.liveness.pose_count' => 0,
+            'face.liveness_flash_frames.require_images' => true,
+        ]);
+
+        $this->enrol($this->alice, 340);
+
+        $challenge = $this->challenge();
+
+        $this->assertSame([], $challenge['flash']);
+        $this->assertSame([], $challenge['poses']);
+
+        $this->punch($this->livePayload(340, $challenge, 'in', [
+            'mode' => 'qr',
+            'qr'   => shortEncrypt($this->alice->emp_ID),
+        ]))->assertOk()->assertJsonPath('recorded', true);
+
+        $this->assertNotNull($this->todayFor($this->alice));
+    }
+
+    /** What still stands guard on that path: a held-up photograph is refused. */
+    public function test_the_shipped_kiosk_still_refuses_a_photo(): void
+    {
+        config([
+            'face.require_qr' => true,
+            'face.liveness.flash_count' => 0,
+            'face.liveness.pose_count' => 0,
+        ]);
+
+        $this->enrol($this->alice, 341);
+
+        $challenge = $this->challenge();
+
+        $this->punch([
+            'mode'           => 'qr',
+            'action'         => 'in',
+            'qr'             => shortEncrypt($this->alice->emp_ID),
+            'nonce'          => $challenge['nonce'],
+            'frames'         => $this->photoFrames(341),
+            'liveness_score' => 0.97,
+            'liveness_min'   => 0.90,
+        ])->assertStatus(403)->assertJsonPath('message', 'Please use your face, not a photo.');
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /**
+     * nearest() is verify() without the threshold, so a refusal can be logged
+     * with the distance it was refused at.
+     */
+    public function test_a_mismatch_still_reports_how_far_off_it_was(): void
+    {
+        $this->enrol($this->alice, 342);
+
+        $own      = $this->frame(342, null, 9001, 0.03);
+        $stranger = $this->frame(343, null, 9002, 0.03);
+
+        $this->assertNotNull($this->faces->verify($this->alice, $own));
+        $this->assertEqualsWithDelta(
+            $this->faces->verify($this->alice, $own),
+            $this->faces->nearest($this->alice, $own),
+            1e-9
+        );
+
+        $this->assertNull($this->faces->verify($this->alice, $stranger));
+        $this->assertGreaterThan(
+            (float) config('face.match.distance'),
+            $this->faces->nearest($this->alice, $stranger)
+        );
     }
 
     /** Holding somebody else's badge must not clock them in. */

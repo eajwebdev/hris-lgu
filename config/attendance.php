@@ -103,9 +103,15 @@ return [
     */
 
     'portal' => [
-        // Punch attempts allowed per minute, per IP. A shared phone at a door is
-        // one person every few seconds; anything far above that is a script.
-        'rate_limit' => 20,
+        // Requests allowed per minute, per IP, across the portal's endpoints
+        // TOGETHER — the limiter keys on the address, not the route. One punch
+        // is three of them (read the badge, fetch a challenge, punch), so the
+        // old 20 was six punches a minute for a whole door, and for a whole
+        // office when the phones share one address behind the LGU's router.
+        // A morning queue hit "Too many tries" on its own. 120 is forty
+        // punches a minute; a script grinding the endpoint still stops there,
+        // and it gets nowhere without a valid encrypted badge anyway.
+        'rate_limit' => (int) env('ATTENDANCE_PORTAL_RATE_LIMIT', 120),
 
         // Seconds the result screen shows before the portal resets for the next
         // person.

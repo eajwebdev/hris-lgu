@@ -74,9 +74,9 @@ does not match the host you are browsing, the page loads with no styling at all.
 
 Use the bundled **ONNX Runtime Web** library. SCRFD detection, ArcFace 512-float
 descriptors and the anti-spoof model run in JavaScript/WebAssembly on the camera
-device. Laravel stores and compares descriptors, issues single-use challenges,
-and verifies flash-image responses with PHP GD. Python, Node.js, a VPS and a
-background inference process are not required for this mode.
+device. Laravel stores and compares descriptors and issues single-use
+challenges. Python, Node.js, a VPS and a background inference process are not
+required for this mode.
 
 Set these values in the hosted `.env`:
 
@@ -86,6 +86,14 @@ FACE_RUNTIME=browser
 FACE_REQUIRE_QR=true
 FACE_FLASH_IMAGES_REQUIRED=true
 ```
+
+A punch is badge, then look at the camera: the 1:1 face match, the anti-spoof
+model and a frame-variation check decide it. The screen-flash liveness
+challenge is off unless `FACE_FLASH_LIVENESS=true`. It refuses real faces in a
+lit room, where a phone or laptop screen adds too little light to measure, so
+turn it on only for a kiosk you have punched on in its own lighting. When it is
+on, PHP GD measures the flash response from the submitted frames
+(`FACE_FLASH_IMAGES_REQUIRED`).
 
 `browser` overrides old `FACE_SCORING_ENABLED` and `FACE_PUNCH_SCORING_ENABLED`
 flags, so an old sidecar setting cannot accidentally block registration or
@@ -122,8 +130,8 @@ punch checks still apply; supplied coordinates are still recorded. Set
 The example environment defaults to `false`.
 
 In browser mode, identity descriptors and anti-spoof probabilities are supplied
-by the client. PHP independently checks the flash images, but it cannot recompute
-face identity from the pixels. Keep the QR requirement and use controlled kiosk
+by the client. PHP cannot recompute face identity from the pixels. Keep the QR
+requirement and use controlled kiosk
 devices. A VPS can opt into independent inference with `FACE_RUNTIME=server`
 and the [optional scoring service](face-service/README.md); this profile enables
 server scoring for both registration and attendance and retains fail-closed

@@ -455,6 +455,26 @@ class FaceEmbeddingService
      */
     public function verify(Employee $employee, array $probe): ?float
     {
+        $distance = $this->nearest($employee, $probe);
+
+        if ($distance === null) {
+            return null;
+        }
+
+        return $distance <= (float) config('face.match.distance') ? $distance : null;
+    }
+
+    /**
+     * How far this probe sits from the closest thing enrolled for this
+     * employee, with no threshold applied. Null when there is nothing to
+     * measure — an unusable probe, or an employee with no face on file.
+     *
+     * verify() is this plus the threshold. It is separate so a refusal can be
+     * logged with the distance it was refused at: face.match.distance can only
+     * be tuned against what real cameras actually produce.
+     */
+    public function nearest(Employee $employee, array $probe): ?float
+    {
         if (! $this->isValidVector($probe)) {
             return null;
         }
@@ -475,9 +495,7 @@ class FaceEmbeddingService
             $best = min($best, $this->distanceSquared($probe, $this->normalize($vector)));
         }
 
-        $limit = (float) config('face.match.distance') ** 2;
-
-        return $best <= $limit ? sqrt($best) : null;
+        return sqrt($best);
     }
 
     /**

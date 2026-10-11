@@ -247,6 +247,46 @@ class FlashFrameVerifierTest extends TestCase
         $this->assertGreaterThan(3, $result['detail']['face_bg_delta']);
     }
 
+    /**
+     * Somebody standing still is not a resubmitted picture.
+     *
+     * The scene is one that keeps its light-and-dark layout whatever the
+     * screen does: a dark doorway on the left, and on the right a lit wall
+     * with the employee in front of it. Every coarse cell stays on the same
+     * side of the frame's mean under every segment, so a fingerprint that only
+     * records that relation cannot tell these four frames from one frame sent
+     * four times — and refused a real person for holding still.
+     */
+    public function test_a_subject_holding_still_is_not_taken_for_a_resubmitted_image(): void
+    {
+        $seq = ['white', 'red', 'dark', 'blue'];
+        $box = [180, 40, 300, 200];
+
+        $measured = [];
+
+        foreach ($seq as $segment) {
+            [$sr, $sg, $sb] = $this->segment($segment);
+
+            $im = imagecreatetruecolor(320, 240);
+
+            imagefilledrectangle($im, 0, 0, 159, 239, imagecolorallocate($im,
+                (int) (30 + 14 * $sr), (int) (30 + 14 * $sg), (int) (30 + 14 * $sb)));
+            imagefilledrectangle($im, 160, 0, 319, 239, imagecolorallocate($im,
+                (int) (140 + 14 * $sr), (int) (140 + 14 * $sg), (int) (140 + 14 * $sb)));
+            imagefilledrectangle($im, $box[0], $box[1], $box[2], $box[3], imagecolorallocate($im,
+                (int) (130 + 110 * $sr), (int) (130 + 110 * $sg), (int) (130 + 110 * $sb)));
+
+            ob_start();
+            imagejpeg($im, null, 92);
+            $measured[] = $this->v->measure(ob_get_clean(), $box);
+            imagedestroy($im);
+        }
+
+        $result = $this->v->verify($seq, $measured);
+
+        $this->assertTrue($result['ok'], 'refused as: '.($result['reason'] ?? ''));
+    }
+
     public function test_the_same_still_resubmitted_is_rejected(): void
     {
         $seq = ['white', 'red', 'dark', 'blue'];

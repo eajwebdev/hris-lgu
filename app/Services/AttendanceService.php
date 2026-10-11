@@ -92,7 +92,8 @@ class AttendanceService
                 $cooldown = (int) config('attendance.cooldown_seconds', 60);
 
                 if ($elapsed >= 0 && $elapsed < $cooldown) {
-                    return ['recorded' => false, 'wait' => $cooldown - $elapsed];
+                    // Whole seconds: this number is read out on the kiosk.
+                    return ['recorded' => false, 'wait' => (int) ceil($cooldown - $elapsed)];
                 }
             }
 

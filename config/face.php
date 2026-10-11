@@ -234,20 +234,19 @@ return [
         //
         // 0 = OFF, and that is deliberate policy here, not a tuning slip.
         //
-        // The punch is now QR + look-at-the-camera: the employee scans their
-        // code and simply looks, with no gesture to perform. Everything the
-        // gestures used to prove is now proven by the ACTIVE ILLUMINATION
-        // challenge below, which is fully passive from the employee's side —
-        // the screen does the work while they stand still — and, with
-        // liveness_flash_frames.require_images on, is measured by the SERVER
-        // from the submitted pixels rather than asserted by the browser.
+        // The punch is QR + look-at-the-camera: the employee scans their code
+        // and simply looks, with no gesture to perform. What stands behind it
+        // is the badge, the 1:1 identity match on every frame, the anti-spoof
+        // model and the frame-variation check — all of which work in any
+        // light, on any camera.
         //
-        // That is a straight upgrade against the two attacks that matter here.
-        // A gesture challenge is beaten by a coached live video replay (the
-        // person on the call can be told to turn their head). The flash
-        // challenge is not: a video call cannot make its face brighten more
-        // than the wall behind it, and cannot take on a colour the server chose
-        // after the recording started.
+        // Set this to 1 or 2 for a stronger guarantee. A head turn is the one
+        // active check here that does not depend on the room: a photograph
+        // cannot turn when told to, and the random order means a recording of
+        // the right moves does not exist. It costs each employee a couple of
+        // seconds per punch. (The other active check, the screen-flash
+        // challenge under flash_count below, is off by default for the reason
+        // given there.)
         //
         // checkPoses() and the client's pose loop both no-op on an empty list,
         // so this switches the whole stage off cleanly.
@@ -337,12 +336,30 @@ return [
         | checkPoses() no-ops on an empty pose list.
         */
 
-        // RELAXED 4 -> 3. Three is the floor for a nonzero count (issueFlash()
-        // raises anything lower so the seeded white/dark/colour trio still
-        // fits), so all three properties are still tested every attempt — this
-        // only drops the one extra random segment and the ~600ms it cost.
-        // 3, which is the floor for a nonzero count — issueFlash() seeds
-        // white + dark + one colour and raises anything lower, so all three
+        // OFF BY DEFAULT (2026-10-11). FACE_FLASH_LIVENESS=true turns it on.
+        //
+        // It was refusing real employees. The unmodified kiosk page was driven
+        // in a real browser against this server with photographs of a real
+        // face as the camera feed. With a feed that does not react to the
+        // screen, the right badge and the right face were refused every time
+        // ("the screen light did not show on your face"). The punch only went
+        // through once the face read about 14 levels out of 255 brighter under
+        // the white segment than under the dark one AND had taken the coloured
+        // segment's cast; at +8 it was still refused, on the colour check.
+        //
+        // A phone or laptop screen does not put that much light on a face in a
+        // daylit room, and a front camera's auto-exposure cancels most of what
+        // it does add. That is the history written through the notes below:
+        // each floor relaxed, then relaxed again, after another refused
+        // employee. No threshold fixes a signal that is not there.
+        //
+        // Turn it on only for a kiosk whose screen is the main light on the
+        // face — a tablet in a dim corridor — and punch on that actual device,
+        // at the brightest time of day, before relying on it.
+        //
+        // When on, the count is 3, which is the floor for a nonzero count —
+        // issueFlash() seeds white + dark + one colour and raises anything
+        // lower, so all three
         // flash properties (brightness, face-vs-background, chroma) are still
         // tested on every attempt. The 4th segment only widened the chroma
         // sample.
@@ -352,7 +369,7 @@ return [
         // so segments had to get LONGER; dropping one keeps the burst from
         // getting slower in the process. 3 x 400 = 1200ms against the previous
         // 4 x 320 = 1280ms — safe and marginally quicker.
-        'flash_count' => 3,
+        'flash_count' => env('FACE_FLASH_LIVENESS', false) ? 3 : 0,
 
         // Segments the sequence is drawn from. 'white'/'dark' carry the
         // brightness and differential checks; the colours carry the chroma
@@ -522,11 +539,11 @@ return [
     | posts 0.99 whatever the threshold is. Raising it filters honest employees
     | on cheap cameras and nobody else.
     |
-    | The check that actually stops a print or a video call is the active
-    | illumination sequence above, because with liveness_flash_frames
-    | .require_images on the server measures it from submitted pixels instead of
-    | believing a number. Treat MiniFASNet as a cheap first filter and put the
-    | tuning effort into min_face_bg_delta and min_chroma_shift.
+    | For a stronger guarantee than this model gives, turn on an active
+    | challenge instead of raising this floor: liveness.pose_count for a head
+    | turn, which works in any light, or FACE_FLASH_LIVENESS on a kiosk where
+    | the flash has been tested (there the server measures the response from
+    | submitted pixels instead of believing a number).
     */
     'antispoof' => [
         'enabled'        => true,
@@ -635,6 +652,14 @@ return [
         // would let one static pose satisfy the gesture challenge — the exact
         // property the challenge exists to prove. The gap below is deliberate.
         'front_yaw_max' => 0.18,
+
+        // The same limit for a punch whose challenge has NO gestures in it. The
+        // gap described above only matters while a turn is being challenged;
+        // without one the frontal gate is purely about capture quality, and
+        // the enrolled left/right captures already cover a head this far round.
+        // 0.30 lets a kiosk mounted off to one side work without the employee
+        // hunting for "straight".
+        'punch_yaw_max' => 0.30,
 
         // |yaw| over this counts as a deliberate head turn. Left alone: easing
         // the front gate above already shortens the slow part of the capture,
