@@ -124,6 +124,23 @@ class EmploymentHistoryTest extends TestCase
             ->assertSee('Out of service for 2 months');
     }
 
+    public function test_a_closed_period_is_never_rewritten_by_a_later_edit(): void
+    {
+        $employee = $this->employee();
+
+        // Read the open period, so the model holds it loaded, then close it
+        // and open the next one behind the model's back.
+        $first = $employee->currentEmployment;
+        $first->update(['date_end' => '2026-11-30', 'separation_reason' => 'Resignation']);
+        $employee->employmentHistory()->create(['position' => 'Clerk', 'date_start' => '2027-02-01']);
+
+        $employee->update(['position' => 'Clerk II', 'date_hired' => '2027-02-01']);
+
+        $this->assertSame('Utility Worker I', $first->fresh()->position);
+        $this->assertSame('2023-06-15', $first->fresh()->date_start->toDateString());
+        $this->assertSame('Clerk II', $employee->currentEmployment()->first()->position);
+    }
+
     public function test_a_rehire_cannot_start_before_the_last_separation(): void
     {
         $employee = $this->employee();

@@ -137,8 +137,10 @@ class Employee extends Authenticatable
         });
 
         static::updated(function ($employee) {
+            // Looked up afresh, never the loaded relation: that may still hold
+            // a period closed since it was read, which must not be rewritten.
             if ($employee->wasChanged(['position', 'emp_dept', 'emp_status', 'item_no', 'date_hired'])) {
-                $employee->currentEmployment?->update(EmploymentHistory::fromEmployee($employee));
+                $employee->currentEmployment()->first()?->update(EmploymentHistory::fromEmployee($employee));
             }
         });
     }

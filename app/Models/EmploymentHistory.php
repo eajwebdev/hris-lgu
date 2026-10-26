@@ -66,9 +66,15 @@ class EmploymentHistory extends Model
         ];
     }
 
-    /** How long the period lasted, or has lasted so far. */
+    /**
+     * How long the period lasted, or has lasted so far. None for a period
+     * with no start date, or one that has not started yet (a rehire
+     * recorded ahead of its date).
+     */
     public function length(): ?\DateInterval
     {
-        return $this->date_start?->diff($this->date_end ?? Carbon::today());
+        $end = $this->date_end ?? Carbon::today();
+
+        return $this->date_start && $this->date_start->lte($end) ? $this->date_start->diff($end) : null;
     }
 }
