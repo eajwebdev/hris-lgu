@@ -232,40 +232,45 @@ return [
         // (distinct, shuffled). left/right are yaw turns; up/down are pitch
         // tilts measured against the employee's own frontal baseline.
         //
-        // 0 = OFF, and that is deliberate policy here, not a tuning slip.
+        // ON, two gestures (FACE_POSE_COUNT, 2026-10-27). This is the defence
+        // against a video of the employee played on a phone held up to the
+        // camera.
         //
-        // The punch is QR + look-at-the-camera: the employee scans their code
-        // and simply looks, with no gesture to perform. What stands behind it
-        // is the badge, the 1:1 identity match on every frame, the anti-spoof
-        // model and the frame-variation check — all of which work in any
-        // light, on any camera.
+        // With it at 0 the punch was badge + look-at-the-camera, and nothing
+        // in that stopped a replay: the face in a video IS the employee, so
+        // the 1:1 match passes; a video varies frame to frame, so the
+        // variation check passes; and the anti-spoof model, loosened to keep
+        // real employees getting through, does not reliably score a sharp
+        // phone screen as fake. The screen-flash challenge below would stop
+        // it, but it is off for the reason given there.
         //
-        // Set this to 1 or 2 for a stronger guarantee. A head turn is the one
-        // active check here that does not depend on the room: a photograph
-        // cannot turn when told to, and the random order means a recording of
-        // the right moves does not exist. It costs each employee a couple of
-        // seconds per punch. (The other active check, the screen-flash
-        // challenge under flash_count below, is off by default for the reason
-        // given there.)
+        // A head turn is the one active check that does not depend on the
+        // room: it works in any light, on any camera. Two gestures drawn from
+        // four directions is one of twelve orders, chosen by the server after
+        // the attempt starts and enforced frame by frame in checkPoses() —
+        // so a recording of the right moves does not exist, and a photograph
+        // cannot turn at all. It costs each employee a few seconds per punch.
+        // 1 halves that cost but leaves only four possibilities, few enough
+        // to keep a clip of each ready; do not go below 1.
         //
-        // checkPoses() and the client's pose loop both no-op on an empty list,
-        // so this switches the whole stage off cleanly.
+        // 0 switches the stage off: checkPoses() and the client's pose loop
+        // both no-op on an empty list.
         //
         // NOTE: this does NOT affect registration, which still captures
         // front/left/right/movement — see face.captures. A richer enrolment
         // template is what makes the 1:1 verify below forgiving of head angle,
         // and enrolment is supervised and one-off, so the cost is paid once.
         'pose_pool'  => ['left', 'right', 'up', 'down'],
-        'pose_count' => 0,
+        'pose_count' => (int) env('FACE_POSE_COUNT', 2),
 
         // Squared-free euclidean distance a challenged-pose frame must sit from
         // the straight-ahead master embedding. A genuine head turn moves the
         // embedding well past this; a flat image rotated in front of the lens
         // barely moves it. Kept modest so a subtle but real turn still passes.
-        // RELAXED 0.05 -> 0.035. With pose_count at 1 a single marginal-but-real
-        // turn now fails the whole punch rather than one of two, so the floor is
-        // eased to match. Still an order of magnitude above where a flat image
-        // swivelled on the spot lands.
+        // RELAXED 0.05 -> 0.035. Every challenged gesture must clear it, so one
+        // marginal-but-real turn fails the whole punch; the floor is eased to
+        // match. Still an order of magnitude above where a flat image swivelled
+        // on the spot lands.
         'min_pose_shift' => 0.035,
 
         // Upper bound on the face captures in a payload, so the endpoint

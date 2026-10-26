@@ -39,9 +39,9 @@ class LivenessVerifier
      * many times they ask.
      *
      * pose_count = 0 turns the gesture stage OFF, exactly as flash_count = 0
-     * turns the illumination stage off. That is the configuration this kiosk
-     * ships with: the punch is QR + look-at-the-camera, and liveness is carried
-     * by the server-measured flash response instead.
+     * turns the illumination stage off. The kiosk ships with two gestures
+     * (FACE_POSE_COUNT): they are what stops a video of the employee played on
+     * a phone, and unlike the flash they work in any light.
      */
     public function issue(string $ip): array
     {

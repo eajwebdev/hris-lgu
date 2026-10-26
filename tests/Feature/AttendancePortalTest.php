@@ -20,10 +20,10 @@ use Tests\TestCase;
  * photograph is that same identity vector barely changing between frames, and that
  * flatness is exactly what marks it as not a live face.
  *
- * Note the honest limit this suite now encodes: frontal-only liveness catches a
- * *still* photo, not a photo waved hard enough to fake frame-to-frame variation,
- * nor a video replay. The head-turn challenge that used to catch those is gone by
- * design; the QR path is the stronger option where that gap matters.
+ * Note the limit of frontal-only liveness: it catches a *still* photo, not a
+ * photo waved hard enough to fake frame-to-frame variation, nor a video replay.
+ * The head-turn challenge is what catches those, and the kiosk ships with it on
+ * (FACE_POSE_COUNT); see the shipped-kiosk tests near the end.
  */
 class AttendancePortalTest extends TestCase
 {
@@ -1091,25 +1091,29 @@ class AttendancePortalTest extends TestCase
     }
 
     /**
-     * The kiosk as it ships: scan the badge, look at the camera. No screen
-     * flash and no gesture, so the payload is the straight-ahead frames and
-     * the anti-spoof scores and nothing else.
+     * The kiosk as it ships: scan the badge, look at the camera, then make the
+     * two head turns the server asks for. No screen flash, so the payload is
+     * the straight-ahead frames, the gesture frames and the anti-spoof scores.
+     *
+     * The gesture count is read from the shipped config, not pinned, so this
+     * fails if the default is ever turned back down to nothing.
      */
-    public function test_the_shipped_kiosk_punches_with_a_badge_and_a_look(): void
+    public function test_the_shipped_kiosk_punches_with_a_badge_a_look_and_two_head_turns(): void
     {
         config([
             'face.require_qr' => true,
             'face.liveness.flash_count' => 0,
-            'face.liveness.pose_count' => 0,
             'face.liveness_flash_frames.require_images' => true,
         ]);
+
+        $this->assertSame(2, config('face.liveness.pose_count'), 'the kiosk ships with two head turns');
 
         $this->enrol($this->alice, 340);
 
         $challenge = $this->challenge();
 
         $this->assertSame([], $challenge['flash']);
-        $this->assertSame([], $challenge['poses']);
+        $this->assertCount(2, $challenge['poses']);
 
         $this->punch($this->livePayload(340, $challenge, 'in', [
             'mode' => 'qr',
@@ -1125,7 +1129,6 @@ class AttendancePortalTest extends TestCase
         config([
             'face.require_qr' => true,
             'face.liveness.flash_count' => 0,
-            'face.liveness.pose_count' => 0,
         ]);
 
         $this->enrol($this->alice, 341);
@@ -1141,6 +1144,69 @@ class AttendancePortalTest extends TestCase
             'liveness_score' => 0.97,
             'liveness_min'   => 0.90,
         ])->assertStatus(403)->assertJsonPath('message', 'Please use your face, not a photo.');
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /**
+     * A video of the employee played on a phone held up to the camera.
+     *
+     * Everything a video CAN supply is perfect here: the real badge, the real
+     * face on every frame, the natural frame-to-frame drift of a moving
+     * person, and anti-spoof scores claiming a live one. What it cannot do is
+     * turn its head on cue, so it sends no gesture frames, and that alone is
+     * what refuses it.
+     */
+    public function test_the_shipped_kiosk_refuses_a_phone_video_that_does_not_turn_on_cue(): void
+    {
+        config([
+            'face.require_qr' => true,
+            'face.liveness.flash_count' => 0,
+        ]);
+
+        $this->enrol($this->alice, 344);
+
+        $challenge = $this->challenge();
+
+        $this->assertCount(2, $challenge['poses']);
+
+        $this->punch([
+            'mode'           => 'qr',
+            'action'         => 'in',
+            'qr'             => shortEncrypt($this->alice->emp_ID),
+            'nonce'          => $challenge['nonce'],
+            'frames'         => $this->liveFrames(344),
+            'liveness_score' => 0.97,
+            'liveness_min'   => 0.90,
+        ])->assertStatus(403)->assertJsonPath('message', 'Face check failed. Please follow the on-screen instructions.');
+
+        $this->assertNull($this->todayFor($this->alice));
+    }
+
+    /**
+     * A recording that does contain head turns, just not the ones this attempt
+     * asked for: the right gestures in the opposite order. The order is drawn
+     * by the server after the attempt starts, so a recording made beforehand
+     * matches it only by chance.
+     */
+    public function test_the_shipped_kiosk_refuses_a_video_whose_head_turns_are_in_the_wrong_order(): void
+    {
+        config([
+            'face.require_qr' => true,
+            'face.liveness.flash_count' => 0,
+        ]);
+
+        $this->enrol($this->alice, 345);
+
+        $challenge = $this->challenge();
+        $recorded = $challenge;
+        $recorded['poses'] = array_reverse($challenge['poses']);
+
+        $this->punch($this->livePayload(345, $challenge, 'in', [
+            'mode'   => 'qr',
+            'qr'     => shortEncrypt($this->alice->emp_ID),
+            'frames' => $this->challengedFrames(345, $recorded),
+        ]))->assertStatus(403)->assertJsonPath('message', 'Face check failed. Please follow the on-screen instructions.');
 
         $this->assertNull($this->todayFor($this->alice));
     }
