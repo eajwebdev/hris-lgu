@@ -11,7 +11,7 @@
 --}}
 <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
     <div>
-        <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Personal Data Sheet</h1>
+        <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Personal Data Sheet</h1>
         <p class="mt-1 text-cream/70">
             @if($guard == 'web')
                 {{ trim(ucwords(strtolower($employee->fname)) . ' ' . ucwords(strtolower($employee->lname))) }}
@@ -25,7 +25,7 @@
          in view. --}}
     @if($autosaves ?? false)
         <p id="pdsSaveState" role="status" data-state="idle"
-           class="inline-flex h-10 items-center gap-2 rounded-xl border border-cream/25 px-4 text-cream/80 data-[state=error]:border-sun-500 data-[state=error]:text-sun-500">
+           class="inline-flex h-10 items-center gap-2 rounded-xl border border-cream/30 bg-forest-950/55 px-4 text-cream/90 backdrop-blur-sm data-[state=error]:border-sun-500 data-[state=error]:text-sun-500">
             <i class="fas fa-cloud-arrow-up"></i> <span>Saves automatically</span>
         </p>
     @endif

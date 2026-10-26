@@ -14,7 +14,7 @@
 @section('hero')
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div>
-            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Positions &amp; Vacancies</h1>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Positions &amp; Vacancies</h1>
             <p class="mt-1 max-w-2xl text-cream/70">
                 DBM-CSC Form No. 1 (Revised 2017). One standing description per plantilla item,
                 reused by every posting of that item.
@@ -22,7 +22,7 @@
         </div>
 
         <div class="flex flex-wrap gap-2">
-            <a href="{{ route('psbMembers') }}" class="{{ $bannerButton }} border-cream/25 hover:border-cream hover:bg-cream hover:text-forest-900">
+            <a href="{{ route('psbMembers') }}" class="{{ $bannerButton }} border-cream/30 bg-forest-950/55 backdrop-blur-sm hover:border-cream hover:bg-cream hover:text-forest-900">
                 <i class="fas fa-user-tie"></i> Selection Board
             </a>
             <a href="{{ route('positionDescriptionCreate') }}" class="{{ $bannerButton }} border-cream bg-cream text-forest-900 hover:bg-white">

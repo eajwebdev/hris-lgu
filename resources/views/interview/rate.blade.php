@@ -1,5 +1,18 @@
 @extends('layouts.master')
 
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Interview Rating</h1>
+            <p class="mt-1 max-w-2xl text-cream/70">{{ $interview->job->title ?? 'Position' }} &middot; score the candidate below, then save.</p>
+        </div>
+
+        <a href="{{ route('interviewAssignments') }}" class="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 font-semibold text-forest-900 shadow-md shadow-forest-950/25 transition-colors [text-shadow:none] hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            <i class="fas fa-arrow-left"></i> My interview ratings
+        </a>
+    </div>
+@endsection
+
 @section('body')
 <style>
     .rating-page .card { border:0; border-radius:18px; box-shadow:0 9px 30px rgba(15,23,42,.07); }

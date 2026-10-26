@@ -9,35 +9,27 @@
     The entries are $menu, built by sidebar_menu() in layouts/app.
 --}}
 <aside id="appSidebar" aria-label="Main navigation"
-       class="fixed inset-y-0 left-0 isolate z-40 flex w-64 -translate-x-full flex-col overflow-hidden bg-forest-900 text-cream transition-[translate,width] duration-200 drawer:translate-x-0 lg:inset-y-2.5 lg:left-2.5 lg:translate-x-0 lg:rounded-3xl rail:w-19">
+       class="fixed inset-y-0 left-0 isolate z-40 flex w-68 -translate-x-full flex-col overflow-hidden bg-forest-900 text-cream transition-[translate,width] duration-200 drawer:translate-x-0 lg:translate-x-0 rail:w-20 print:hidden">
 
     {{-- Backdrop photo under a green wash. The wash is heaviest at the top,
          where the photo is bright sky and the brand and account sit on it; the
          solid forest-900 on the <aside> is what shows if the image is missing. --}}
-    <img src="{{ asset('images/sidebarpic.jpeg') }}" alt="" aria-hidden="true"
+    <img src="{{ asset('images/mabinay-hall-portrait.png') }}" alt="" aria-hidden="true"
          class="pointer-events-none absolute inset-0 -z-20 size-full object-cover">
-    <div class="pointer-events-none absolute inset-0 -z-10 bg-linear-to-b from-forest-950/95 via-forest-950/85 to-forest-900/75"></div>
+    <div class="pointer-events-none absolute inset-0 -z-10 bg-linear-to-b from-forest-950/97 via-forest-950/92 to-forest-900/88"></div>
 
-    <a href="{{ route('dashboard') }}" class="flex shrink-0 items-center gap-3 px-5 pt-5 pb-1 rail:justify-center rail:px-0">
-        <img src="{{ asset('Uploads/logo.png') }}" alt="Municipality of Mabinay Official Seal" class="size-10 shrink-0" width="40" height="40">
+    <a href="{{ route('dashboard') }}" class="flex shrink-0 items-center gap-3 px-6 pt-5 pb-3 rail:justify-center rail:px-0">
+        <img src="{{ asset('Uploads/logo.png') }}" alt="Municipality of Mabinay Official Seal" class="size-14 shrink-0" width="56" height="56">
         <span class="leading-tight rail:hidden">
-            <strong class="block font-display text-lg font-semibold tracking-tight">HRIS</strong>
-            <span class="block text-xs text-cream/60">LGU Mabinay</span>
+            <strong class="block font-display text-2xl font-semibold tracking-tight">HRIS</strong>
+            <span class="block text-xs text-cream/75">Municipality of Mabinay</span>
         </span>
     </a>
 
-    <div class="mx-3 mt-4 flex shrink-0 items-center gap-3 rounded-2xl bg-cream/8 p-3 rail:mx-auto rail:bg-transparent rail:p-0">
-        <img src="{{ $accountPhoto }}" alt="" class="size-10 shrink-0 rounded-full object-cover ring-2 ring-cream/20">
-        <span class="min-w-0 leading-tight rail:hidden">
-            <span class="block truncate font-medium">{{ $accountName }}</span>
-            <span class="block truncate text-xs text-cream/60">{{ $accountRole }}</span>
-        </span>
-    </div>
-
-    <nav class="mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
+    <nav class="mt-1 min-h-0 flex-1 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
         @foreach($menu as $section)
             {{-- Collapsed, the section names go and a rule stands in for them. --}}
-            <p class="px-3 pt-5 pb-1.5 text-xs font-medium text-cream/45 rail:hidden">{{ $section['label'] }}</p>
+            <p class="px-3 pt-4 pb-1.5 text-[10px] font-medium tracking-[.12em] text-cream/55 uppercase rail:hidden">{{ $section['label'] }}</p>
 
             <ul class="space-y-0.5 {{ $loop->first ? 'rail:mt-3' : 'rail:mt-2 rail:border-t rail:border-cream/10 rail:pt-2' }}">
                 @foreach($section['items'] as $item)
@@ -83,4 +75,8 @@
             </ul>
         @endforeach
     </nav>
+    <div class="shrink-0 px-6 pb-5 text-center rail:hidden">
+        <p class="font-display text-2xl italic tracking-wide text-cream/35">Mabinay</p>
+        <p class="text-[8px] tracking-[.35em] text-cream/35 uppercase">Negros Oriental</p>
+    </div>
 </aside>

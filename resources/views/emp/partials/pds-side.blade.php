@@ -51,7 +51,9 @@
                     <input type="file" data-photo-input hidden accept="image/png,image/jpeg,image/gif,image/svg+xml">
                 </div>
 
-                @if($employee->stat_1 == 1)
+                @if($employee->isSeparated())
+                    <span class="mb-1 rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">Separated</span>
+                @elseif($employee->stat_1 == 1)
                     <span class="mb-1 rounded-full bg-forest-100 px-3 py-1 text-xs font-medium text-forest-800">Active</span>
                 @else
                     <span class="mb-1 rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">Suspended</span>
@@ -108,6 +110,20 @@
                     </li>
                 @endforeach
             </ul>
+
+            @isset($sections['employment'])
+                <p class="mx-5 border-t border-line pt-3 text-xs font-medium text-ink/50">Employment</p>
+                <ul class="p-2 pt-1">
+                    @foreach($sections['employment'] as $section)
+                        <li>
+                            <a href="{{ $section['url'] }}" class="{{ $entry }}" @if($section['active']) aria-current="page" @endif>
+                                <span class="{{ $entryIcon }}"><i class="{{ $section['icon'] }}"></i></span>
+                                <span class="min-w-0 flex-1 leading-snug">{{ $section['label'] }}</span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            @endisset
 
             <p class="mx-5 border-t border-line pt-3 text-xs font-medium text-ink/50">Print</p>
             <ul class="p-2 pt-1">

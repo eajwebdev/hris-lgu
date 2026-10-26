@@ -68,7 +68,7 @@
 @section('hero')
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div>
-            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">{{ $fullName }}</h1>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">{{ $fullName }}</h1>
             <p class="mt-1 text-cream/70">
                 IPCR for {{ $year }}, {{ $half }}
                 <span class="mx-1.5 text-cream/30">|</span>

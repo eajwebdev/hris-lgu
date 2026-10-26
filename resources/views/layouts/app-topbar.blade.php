@@ -1,15 +1,11 @@
 {{--
-    Top bar for layouts/app: sidebar toggle and breadcrumb on the left;
+    Top bar for layouts/app: sidebar toggle and search on the left;
     applications, notifications, interview ratings and the account menu on
-    the right.
+    the right. The breadcrumb is in the banner beneath it (layouts/app-frame).
 
-    The breadcrumb is read off the menu (breadcrumb_trail), so a page has one
-    as soon as it is in the sidebar. A view names what is open beneath that
-    with @section('breadcrumb', 'Maria Santos').
-
-    It is the top row of the header banner in layouts/app, so everything
-    here is cream on dark; the dropdown panels are white and set their own
-    ink colour.
+    It sits on the banner photo, and on solid green once the page scrolls, so
+    the toggle is white and everything else is a white chip; the dropdown
+    panels are white and set their own ink colour.
 
     The dropdowns are plain panels toggled by the shell script
     (layouts/app-scripts): a button with data-menu-button and aria-controls
@@ -17,64 +13,33 @@
 --}}
 @php
     $isEmployeeBar = $guard !== 'web';
-    $crumbs = breadcrumb_trail($menu);
 
     // Administrators get the HR feed, ten at a time. An employee gets their
     // own unread rows and the total unread count.
     $barNotifications = $isEmployeeBar ? unread_employee_notifications($notifications1, $guard) : $notifications;
     $barNotificationCount = $isEmployeeBar ? $notificationsCount1 : $notificationsCount;
 
-    $barButton = 'relative grid size-10 cursor-pointer place-items-center rounded-xl text-cream/80 transition-colors hover:bg-cream/12 hover:text-cream focus-visible:outline-2 focus-visible:outline-sun-500 aria-expanded:bg-cream/15 aria-expanded:text-cream';
+    $barButton = 'relative grid size-10 cursor-pointer place-items-center rounded-full bg-white/95 text-forest-900 shadow-sm shadow-forest-950/20 transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-sun-500 aria-expanded:bg-forest-100';
     $barBadge  = 'absolute -top-0.5 -right-0.5 grid h-4.5 min-w-4.5 place-items-center rounded-full px-1 text-[10px] font-semibold tabular-nums';
     $barPanel  = 'fixed inset-x-3 top-20 z-40 overflow-hidden rounded-2xl border border-line bg-surface text-ink shadow-xl shadow-forest-950/10 sm:absolute sm:inset-x-auto sm:top-full sm:right-0 sm:mt-2';
 @endphp
-<header class="flex h-16 shrink-0 items-center gap-1 px-4 sm:px-6">
-    <button type="button" id="sidebarToggle" aria-controls="appSidebar" aria-label="Toggle navigation" class="{{ $barButton }} -ml-2">
+<header class="flex h-19 shrink-0 items-center gap-2">
+    <button type="button" id="sidebarToggle" aria-controls="appSidebar" aria-label="Toggle navigation"
+            class="-ml-1 grid size-10 cursor-pointer place-items-center rounded-xl text-lg text-white transition-colors hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-sun-500">
         <i class="fas fa-bars"></i>
     </button>
 
-    {{-- On a phone only the page itself is named; the steps above it are a
-         tap away in the menu. --}}
-    <nav aria-label="Breadcrumb" class="min-w-0">
-        <ol class="flex min-w-0 items-center gap-1.5 text-cream/65">
-            <li class="shrink-0">
-                <a href="{{ route('dashboard') }}" title="Dashboard" aria-label="Dashboard"
-                   class="grid size-8 place-items-center rounded-lg transition-colors hover:bg-cream/12 hover:text-cream focus-visible:outline-2 focus-visible:outline-sun-500">
-                    <i class="fas fa-house text-xs"></i>
-                </a>
-            </li>
+    <label class="relative ml-1 hidden min-w-0 max-w-md flex-1 md:block">
+        <span class="sr-only">Search the HRIS</span>
+        <i class="fas fa-magnifying-glass pointer-events-none absolute top-1/2 left-5 -translate-y-1/2 text-forest-900"></i>
+        <input type="search" id="globalSearch" placeholder="Search employee, office, or report..." autocomplete="off"
+               class="h-11 w-full rounded-full border border-white/60 bg-white/95 pr-5 pl-12 text-[15px] text-ink shadow-sm shadow-forest-950/20 outline-none transition placeholder:text-ink/50 focus:border-white focus:bg-white focus:ring-4 focus:ring-white/25">
+    </label>
 
-            @foreach($crumbs as $crumb)
-                @php
-                    $isPage = $loop->last && !View::hasSection('breadcrumb');
-                @endphp
-                <li class="flex min-w-0 items-center gap-1.5 {{ $isPage ? '' : 'max-sm:hidden' }}">
-                    <i class="fas fa-angle-right text-[10px] text-cream/35"></i>
-                    @if($isPage)
-                        <span aria-current="page" class="truncate font-medium text-cream">{{ $crumb['label'] }}</span>
-                    @elseif($crumb['url'])
-                        <a href="{{ $crumb['url'] }}" class="truncate rounded underline-offset-2 hover:text-cream hover:underline focus-visible:outline-2 focus-visible:outline-sun-500">{{ $crumb['label'] }}</a>
-                    @else
-                        <span class="truncate">{{ $crumb['label'] }}</span>
-                    @endif
-                </li>
-            @endforeach
-
-            @hasSection('breadcrumb')
-                <li class="flex min-w-0 items-center gap-1.5">
-                    <i class="fas fa-angle-right text-[10px] text-cream/35"></i>
-                    <span aria-current="page" class="truncate font-medium text-cream">@yield('breadcrumb')</span>
-                </li>
-            @endif
-        </ol>
-    </nav>
-
-    <div class="ml-auto flex shrink-0 items-center gap-1 pl-3">
-        <p class="mr-2 hidden text-cream/65 lg:block">{{ now('Asia/Manila')->format('l, F j, Y') }}</p>
-
+    <div class="ml-auto flex shrink-0 items-center gap-2 pl-3">
         {{-- Theme. The two icons are wrapped because Font Awesome's own
              display rule beats a display utility on the <i> itself. --}}
-        <button type="button" id="themeToggle" aria-label="Switch to dark theme" title="Switch theme" class="{{ $barButton }}">
+        <button type="button" id="themeToggle" aria-label="Switch to dark theme" title="Switch theme" class="{{ $barButton }} hidden">
             <span class="dark:hidden"><i class="fas fa-moon"></i></span>
             <span class="hidden dark:inline"><i class="fas fa-sun"></i></span>
         </button>
@@ -145,9 +110,13 @@
         {{-- Account --}}
         <div class="sm:relative">
             <button type="button" data-menu-button aria-controls="accountMenu" aria-expanded="false" aria-label="Account"
-                    class="ml-1 flex cursor-pointer items-center gap-2 rounded-full p-0.5 pr-2 transition-colors hover:bg-cream/12 focus-visible:outline-2 focus-visible:outline-sun-500 aria-expanded:bg-cream/15">
-                <img src="{{ $accountPhoto }}" alt="" class="size-9 rounded-full object-cover ring-2 ring-cream/25">
-                <i class="fas fa-angle-down text-xs text-cream/60"></i>
+                    class="ml-1 flex cursor-pointer items-center gap-3 rounded-full bg-white/95 p-1 pr-3 text-left shadow-sm shadow-forest-950/20 transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-sun-500 aria-expanded:bg-forest-100">
+                <img src="{{ $accountPhoto }}" alt="" class="size-9 rounded-full object-cover ring-2 ring-forest-100">
+                <span class="hidden min-w-0 leading-tight xl:block">
+                    <strong class="block max-w-44 truncate text-sm font-semibold text-ink">{{ $accountName }}</strong>
+                    <span class="block max-w-44 truncate text-xs text-ink/55">{{ $accountRole }}</span>
+                </span>
+                <i class="fas fa-angle-down text-xs text-forest-900"></i>
             </button>
 
             <div id="accountMenu" data-menu hidden class="{{ $barPanel }} sm:w-64">

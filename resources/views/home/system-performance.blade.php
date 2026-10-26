@@ -1,8 +1,11 @@
 @extends('layouts.master')
+@section('hero')
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">System Performance</h1>
+    <p class="mt-1 max-w-2xl text-cream/70">Response times of recent requests, updated as they come in.</p>
+@endsection
+
 @section('body')
 <div class="container">
-    <h3 class="mb-3">📈 System Performance Dashboard (Real-time)</h3>
-
     <div class="row g-2 mb-4 align-items-end">
         <div class="col-md-3">
             <label for="from">From</label>

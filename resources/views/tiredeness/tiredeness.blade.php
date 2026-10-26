@@ -9,7 +9,7 @@
 @endphp
 
 @section('hero')
-    <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Tardiness &amp; Undertime</h1>
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Tardiness &amp; Undertime</h1>
     <p class="mt-1 text-cream/70">Late arrivals and early departures for a month, for one employee or everyone.</p>
 @endsection
 

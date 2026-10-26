@@ -5,7 +5,7 @@
     {{-- Header Banner --}}
     <div class="row mb-3">
         <div class="col-12">
-            <div class="card bg-gradient-success text-white shadow-sm">
+            <div class="card legacy-module-head text-white shadow-sm">
                 <div class="card-body py-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>

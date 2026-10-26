@@ -1,3 +1,25 @@
+{{--
+    Signed-in layout for the pages still on AdminLTE / Bootstrap 4.
+
+    The frame around the page — sidebar, top bar, banner, footer, privacy and
+    confirm dialogs, toasts — is layouts/app-frame, the very same partial
+    layouts/app draws, so these pages look and behave like the rest of the
+    system. Only the page body is Bootstrap. resources/css/shell.css styles the
+    frame without letting Tailwind reach into the body; see the notes there.
+
+    A page puts its heading in a `hero` section, as the Tailwind pages do, and
+    gets the municipal hall banner for free.
+--}}
+@php
+    [
+        'account' => $account,
+        'accountPhoto' => $accountPhoto,
+        'accountName' => $accountName,
+        'accountRole' => $accountRole,
+        'menu' => $menu,
+        'needsPrivacyConsent' => $needsPrivacyConsent,
+    ] = shell_account($guard ??= guard());
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,10 +27,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>HRIS - LGU Mabinay {{ isset($title) ? ' | '.$title : '' }}</title>
-    <!-- Google Font: Inter -->
+    <!-- The shell's fonts, the same as layouts/app -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Instrument+Sans:wght@400..700&display=swap">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="{{ asset('template/plugins/fontawesome-free-v6/css/all.min.css') }}">
     <!-- icheck bootstrap -->
@@ -37,14 +59,6 @@
     <link rel="shortcut icon" href="{{ asset('Uploads/logo.png') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
-    .profile-image {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        object-fit: cover;
-        margin-top: -7px;
-        margin-right: 10px;
-    }
     .img-circle1 {
         width: 40px !important;
         height: 40px !important;
@@ -53,342 +67,33 @@
         border: 2px solid #ddd !important;
         display: block !important;
     }
-
-    .nav-item.dropdown .dropdown-menu.notifications{
-        width: 500px !important; /* Or whatever width you prefer */
-        max-width: none !important; /* Ensure it doesn't get constrained by max-width */
-    }
     .btn-success1 {
         background-color: #28a745 !important;
         border-color: #28a745 !important;
     }
     body.modal-open,
-    body.modal-open html,
-    body.modal-open .wrapper,
-    body.modal-open .content-wrapper {
-        overflow: hidden !important;   
+    body.modal-open html {
+        overflow: hidden !important;
         height: 100vh !important;
         touch-action: none !important;
     }
-    .privacy-container h3 {
-        margin-top: 1.5rem;
-    }
-    .privacy-container ul {
-        padding-left: 20px;
-    }
-
-    /* =====================================================================
-       STRICT SIDEBAR COLLAPSE NO-HOVER-EXPAND OVERRIDE
-       ===================================================================== */
-    body.sidebar-collapse .main-sidebar,
-    body.sidebar-collapse .main-sidebar::before,
-    body.sidebar-collapse .main-sidebar:hover,
-    body.sidebar-collapse.sidebar-focused .main-sidebar,
-    body.sidebar-collapse .main-sidebar.sidebar-focused,
-    body.sidebar-collapse .main-sidebar:focus,
-    body.sidebar-no-expand.sidebar-collapse .main-sidebar:hover {
-        width: 4.6rem !important;
-        transition: none !important;
-    }
-
-    /* Brand Link & Logo in collapsed mode */
-    body.sidebar-collapse .brand-link,
-    body.sidebar-collapse .main-sidebar:hover .brand-link {
-        width: 4.6rem !important;
-        padding: 0.8125rem 0.5rem !important;
-        text-align: center !important;
-        margin: 0 !important;
-    }
-
-    body.sidebar-collapse .brand-image,
-    body.sidebar-collapse .main-sidebar:hover .brand-image {
-        float: none !important;
-        margin: 0 auto !important;
-        display: inline-block !important;
-        max-height: 33px !important;
-    }
-
-    body.sidebar-collapse .brand-text,
-    body.sidebar-collapse .main-sidebar:hover .brand-text {
-        display: none !important;
-        opacity: 0 !important;
-        visibility: hidden !important;
-        width: 0 !important;
-    }
-
-    /* User Panel Avatar & Info in collapsed mode */
-    body.sidebar-collapse .user-panel,
-    body.sidebar-collapse .main-sidebar:hover .user-panel {
-        width: 4.6rem !important;
-        padding: 0 !important;
-        margin: 1rem 0 !important;
-        display: flex !important;
-        justify-content: center !important;
-    }
-
-    body.sidebar-collapse .user-panel .image,
-    body.sidebar-collapse .main-sidebar:hover .user-panel .image {
-        display: block !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        margin: 0 auto !important;
-        float: none !important;
-    }
-
-    body.sidebar-collapse .user-panel .info,
-    body.sidebar-collapse .main-sidebar:hover .user-panel .info {
-        display: none !important;
-        opacity: 0 !important;
-        visibility: hidden !important;
-        width: 0 !important;
-    }
-
-    /* Nav links in collapsed mode */
-    body.sidebar-collapse .main-sidebar .nav-sidebar .nav-link,
-    body.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-link {
-        width: 4.6rem !important;
-    }
-
-    body.sidebar-collapse .main-sidebar .nav-sidebar .nav-link p,
-    body.sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-link p,
-    body.sidebar-collapse .main-sidebar .nav-header,
-    body.sidebar-collapse .main-sidebar:hover .nav-header {
-        display: none !important;
-        opacity: 0 !important;
-        visibility: hidden !important;
-        width: 0 !important;
-    }
     </style>
-</head>
-<body class="hold-transition sidebar-mini layout-fixed layout-navbar-fixed text-sm sidebar-no-expand">
-    <div class="wrapper">
-        <!-- Dims the page behind the off-canvas sidebar on phones -->
-        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    {{-- After every legacy stylesheet, so the frame's rules are the last word. --}}
+    @vite('resources/css/shell.css')
 
-        <!-- Navbar -->
-        <nav class="main-header navbar navbar-expand navbar-light">
-            <!-- Left navbar links -->
-            <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars text-success1"></i></a>
-                </li>
-            </ul>
-            
-            <!-- Right navbar links -->
-            <ul class="navbar-nav ml-auto">
-                @if($guard == "web")
-                    @include('layouts.notif-admin')
-                @else
-                    @include('layouts.notif-employee')
-                @endif
-
-                @if(!empty($guard))
-                    <li class="nav-item" id="interviewRatingNavItem" style="{{ ($activeInterviewRatingCount ?? 0) > 0 ? '' : 'display:none;' }}">
-                        <a class="nav-link text-success1"
-                           href="{{ route('interviewAssignments') }}"
-                           id="interviewRatingNavLink"
-                           title="Interview Ratings">
-                            <i class="fas fa-comments"></i>
-                            <span class="badge badge-danger navbar-badge" id="interviewRatingBadge">{{ $activeInterviewRatingCount ?? 0 }}</span>
-                        </a>
-                    </li>
-                @endif
-                
-                <!-- User Dropdown -->
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle text-success1" href="#" role="button" id="navbarDropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        @php
-                            $profileUrl = asset('Profile/Employee/' . auth()->guard($guard)->user()->profile);
-                            $profilePath = public_path('Profile/Employee/' . auth()->guard($guard)->user()->profile);
-                        @endphp
-                        <img src="{{ file_exists($profilePath) && isset(auth()->guard($guard)->user()->profile) ? $profileUrl : asset('Profile/Employee/default.png') }}" alt="User Image" class="profile-image">
-                    </a>                    
-                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdownMenuLink">
-                        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: inline;">
-                            @csrf
-                            <button type="submit" class="dropdown-item">
-                                <i class="fas fa-power-off fa-xs"></i> Sign Out
-                            </button>
-                        </form>
-                    </div>
-                </li>
-            </ul>
-        </nav>
-        
-        <!-- /.navbar -->
-
-        <!-- Main Sidebar Container -->
-        <aside class="main-sidebar elevation-0">
-            <!-- Brand Logo -->
-            <a href="{{ route('dashboard') }}" class="brand-link">
-                <img src="{{ asset('Uploads/logo.png') }}" alt="Municipality of Mabinay Official Seal" class="brand-image">
-                <span class="brand-text">
-                    HRIS
-                    <small>LGU Mabinay</small>
-                </span>
-            </a>
-
-            <!-- Sidebar -->
-            <div class="sidebar">
-                <hr class="sidebar-divider">
-                <!-- Sidebar user panel (optional) --><br>
-                <div class="user-panel mt-4 d-flex">
-                    <div class="image">
-                        @php
-                            $profileUrl = asset('Profile/Employee/' . auth()->guard($guard)->user()->profile);
-                            $profilePath = public_path('Profile/Employee/' . auth()->guard($guard)->user()->profile);
-                        @endphp
-                        <img src="{{ file_exists($profilePath) && auth()->guard($guard)->check() && auth()->guard($guard)->user()->profile ? $profileUrl : asset('Profile/Employee/default.png') }}" 
-                             class="img-circle1 elevation-2" 
-                             alt="User Image">
-                    </div>                    
-                    <div class="info ml-2" style="margin-top: -7px;">
-                        <span class="d-block">
-                            {{ ucwords(strtolower(auth()->guard($guard)->user()->fname)) }} {{ ucwords(strtolower(auth()->guard($guard)->user()->lname)) }}
-                        </span>
-                        <span class="d-block text-sm text-muted">
-                            @if($guard == "employee")
-                                {{ auth()->guard($guard)->user()->emp_status == 1 ? auth()->guard($guard)->user()->position : 'Employee' }}
-                            @else
-                                {{ ucfirst(auth()->guard($guard)->user()->role) }}
-                            @endif
-                        </span>
-                    </div>
-                </div>                
-                <hr>
-                <!-- Sidebar Menu -->
-                @include('partials.control')
-                <!-- /.sidebar-menu -->
-            </div>
-            <!-- /.sidebar -->
-        </aside>
-
-        <!-- Content Wrapper. Contains page content -->
-        <div class="content-wrapper" style="padding-top: 20px;">
-            <!-- Main content -->
-            <div class="content">
-                @yield('body')
-            </div>
-            <!-- /.content -->
-        </div>
-        <!-- /.content-wrapper -->
-
-        @if($guard == "employee" && auth()->guard($guard)->user()->dpn == 0)
-            <div class="modal fade show" id="dpnModal" tabindex="-1" aria-modal="true" role="dialog" style="display: block; background: rgba(0,0,0,0.6); z-index: 1050;">
-                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
-                    <div class="modal-content shadow border-0" style="max-height: 85vh;">
-                        <div class="modal-header bg-white border-bottom py-2">
-                            <h5 class="modal-title font-weight-bold text-teal">
-                                <i class="fas fa-user-shield text-teal mr-2"></i> LGU Mabinay Data Privacy Notice &amp; Consent
-                            </h5>
-                        </div>
-                        <div class="modal-body px-4 py-3" style="max-height: calc(85vh - 120px); overflow-y: auto;">
-                            @include('data-privacy') 
-                        </div>
-
-                        <div class="modal-footer justify-content-between px-4 py-3 bg-light">
-                            <small class="text-muted font-weight-bold">Municipality of Mabinay &copy; {{ now()->year }}</small>
-
-                            <div class="d-flex gap-2">
-                                <form method="POST" action="{{ route('dataPrivacyNotice') }}">
-                                    @csrf
-                                    <button type="submit" class="btn btn-success px-4 mr-2 font-weight-bold">
-                                        <i class="fas fa-check-circle mr-1"></i> I Accept
-                                    </button>
-                                </form>
-
-                                <form method="POST" action="{{ route('logout') }}">
-                                    @csrf
-                                    <button type="submit" class="btn btn-outline-danger px-4 font-weight-bold">
-                                        <i class="fas fa-times-circle mr-1"></i> Decline
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <script>
-                document.body.classList.add('modal-open');
-                document.body.style.overflow = 'hidden';
-            </script>
-        @endif
-
-        <div id="dataPrivacyModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="dataPrivacyModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" role="document">
-                <div class="modal-content shadow border-0" style="max-height: 85vh;">
-                    <div class="modal-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
-                        <h5 class="modal-title font-weight-bold text-teal" id="dataPrivacyModalLabel">
-                            <i class="fas fa-user-shield text-teal mr-2"></i> LGU Mabinay Data Privacy Policy
-                        </h5>
-                        <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body px-4 py-3" style="max-height: calc(85vh - 120px); overflow-y: auto;">
-                        @include('data-privacy') 
-                    </div>
-
-                    <div class="modal-footer justify-content-between px-4 py-2 bg-light">
-                        <small class="text-muted font-weight-bold">Municipality of Mabinay &copy; {{ now()->year }}</small>
-                        <button type="button" class="btn btn-secondary btn-sm font-weight-bold px-3" data-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Footer -->
-        <footer class="main-footer">
-            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;">
-                <div>
-                    <strong>&copy; {{ now()->year }} Municipality of Mabinay.</strong> All rights reserved.
-                    &nbsp;|&nbsp;
-                    <a href="#" data-toggle="modal" data-target="#dataPrivacyModal">
-                        Data Privacy Policy
-                    </a>
-                </div>
-                <div class="d-none d-sm-inline">
-                    Managed by <strong>EAJ Web Development Services</strong>.
-                </div>
-            </div>
-        </footer>
-
-
-    </div>
-
-<script>
-// Phones: the sidebar opens as a drawer over the page. Tapping the dimmed
-// backdrop, following a link, or pressing Escape closes it again.
-(function () {
-    var body = document.body;
-    var backdrop = document.getElementById('sidebarBackdrop');
-
-    function closeSidebar() {
-        body.classList.remove('sidebar-open');
-        body.classList.add('sidebar-collapse');
-    }
-
-    if (backdrop) {
-        backdrop.addEventListener('click', closeSidebar);
-    }
-
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && body.classList.contains('sidebar-open')) {
-            closeSidebar();
-        }
-    });
-
-    document.querySelectorAll('.main-sidebar .nav-sidebar .nav-link').forEach(function (link) {
-        link.addEventListener('click', function () {
-            // Treeview parents only expand — they should not close the drawer.
-            if (window.innerWidth < 992 && !this.parentElement.classList.contains('has-treeview')) {
-                closeSidebar();
+    <script>
+        // Put the sidebar back the way it was left, before first paint.
+        try {
+            if (localStorage.getItem('hris.sidebar') === 'collapsed') {
+                document.documentElement.dataset.sidebar = 'collapsed';
             }
-        });
-    });
-})();
-</script>
+        } catch (e) {}
+    </script>
+</head>
+<body class="hris-legacy text-sm">
+<div class="hris-shell font-sans text-ink antialiased">
+    @include('layouts.app-frame', ['pageClass' => 'content'])
+</div>
 
 @include('script.masterScript')
 @if(request()->is('employees') || request()->is('employees/*'))
@@ -397,75 +102,35 @@
 @if(request()->is('pds/face-recognition') || request()->is('pds/face-recognition/*'))
     @include('script.faceRegistrationScript')
 @endif
-@if(!empty($guard))
+@include('layouts.app-scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    let interviewRatingNavRunning = false;
-
-    function refreshInterviewRatingNav() {
-        if (interviewRatingNavRunning) {
-            return;
-        }
-
-        interviewRatingNavRunning = true;
-        fetch("{{ route('interviewAssignmentsStatus') }}", {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            cache: 'no-store'
-        })
-            .then(response => response.json())
-            .then(function (data) {
-                const count = parseInt(data.count || 0, 10);
-                const item = document.getElementById('interviewRatingNavItem');
-                const badge = document.getElementById('interviewRatingBadge');
-                const link = document.getElementById('interviewRatingNavLink');
-
-                if (!item || !badge || !link) {
-                    return;
-                }
-
-                badge.textContent = count;
-                link.setAttribute('href', "{{ route('interviewAssignments') }}");
-                if (count > 0) {
-                    item.style.display = '';
-                } else {
-                    item.style.display = 'none';
-                }
-            })
-            .catch(function () {})
-            .finally(function () {
-                interviewRatingNavRunning = false;
-            });
+    // The few scripts that still raise toastr directly get the shell's toasts
+    // instead, so a message looks the same whichever page it comes from.
+    if (window.toastr && window.hrisToast) {
+        ['success', 'info', 'warning', 'error'].forEach(function (kind) {
+            window.toastr[kind] = function (message) {
+                var holder = document.createElement('div');
+                holder.innerHTML = String(message).replace(/<br\s*\/?>/gi, ' ');
+                window.hrisToast(kind === 'error' || kind === 'warning' ? 'error' : 'success', holder.textContent);
+            };
+        });
     }
 
-    refreshInterviewRatingNav();
-    window.addEventListener('focus', refreshInterviewRatingNav);
-    window.addEventListener('pageshow', refreshInterviewRatingNav);
-    document.addEventListener('visibilitychange', function () {
-        if (!document.hidden) {
-            refreshInterviewRatingNav();
-        }
-    });
-    // Lock background scrolling on all modal open events
+    // Lock background scrolling while a Bootstrap modal is open.
     $(document).on('show.bs.modal shown.bs.modal', '.modal', function () {
-        $('body, html, .wrapper, .content-wrapper').css({
-            'overflow': 'hidden',
-            'height': '100vh'
-        });
+        $('body, html').css({ 'overflow': 'hidden', 'height': '100vh' });
         $('body').addClass('modal-open');
     });
 
     $(document).on('hidden.bs.modal', '.modal', function () {
         if ($('.modal.show').length === 0) {
-            $('body, html, .wrapper, .content-wrapper').css({
-                'overflow': '',
-                'height': ''
-            });
+            $('body, html').css({ 'overflow': '', 'height': '' });
             $('body').removeClass('modal-open');
         }
     });
 });
 </script>
-@endif
 @stack('scripts')
 @yield('scripts')
 @include('partials.notification_realtime')

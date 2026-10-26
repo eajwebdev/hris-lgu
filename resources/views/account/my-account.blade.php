@@ -1,5 +1,10 @@
 @extends('layouts.master')
 
+@section('hero')
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">My Account</h1>
+    <p class="mt-1 max-w-2xl text-cream/70">Update your sign-in email and replace your account password.</p>
+@endsection
+
 @section('body')
 <style>
     .mtop {
@@ -13,16 +18,16 @@
         opacity: 1;
     }
 </style>
-<div class="container">
+<div class="container-fluid">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card">
+        <div class="col-xl-8 col-lg-10">
+            <div class="card legacy-card">
                 <div class="card-header">
                     <h2 class="card-title text-success1">
-                        <b>My Account</b>
+                        <b>Sign-in details</b>
                     </h2>
                 </div>
-                <div class="card-body bg-form">
+                <div class="card-body">
                     <form class="form-horizontal add-form" action="{{ route('updateAccount') }}" method="POST">
                         @csrf
                         <div class="form-group mtop">

@@ -8,19 +8,22 @@
     --brand:            #EF9017;   /* seal orange */
     --brand-600:        #D97C0B;
     --brand-700:        #B26205;
-    --brand-soft:       #FEF3E2;
+    --brand-soft:       #FBEBD0;
     --accent:           #1E7A45;   /* seal green */
     --accent-600:       #17663A;
-    --accent-soft:      #E8F5EE;
+    --accent-soft:      #E3F1E8;
+    --forest-900:       #0F3D26;   /* primary buttons, as on layouts/app */
+    --forest-950:       #0A2A1A;
+    --cream:            #F6F1E4;
 
-    /* Neutrals (shadcn "zinc/slate" family) */
-    --background:       #F7F8FA;
+    /* Neutrals: paper, surface, ink and line from resources/css/tokens.css */
+    --background:       #F4F7F5;
     --surface:          #FFFFFF;
-    --foreground:       #0F172A;
-    --muted:            #64748B;
-    --muted-soft:       #F1F5F9;
-    --border:           #E5E7EB;
-    --border-strong:    #D5D9E0;
+    --foreground:       #14201A;
+    --muted:            #6B736F;
+    --muted-soft:       #F4F7F5;
+    --border:           #DEDDD4;
+    --border-strong:    #CFCDC2;
 
     /* Feedback */
     --success:          #16A34A;
@@ -29,14 +32,17 @@
     --info:             #0EA5E9;
 
     /* Elevation + shape */
-    --radius:           12px;
-    --radius-sm:        8px;
+    --radius:           16px;   /* cards, as rounded-2xl */
+    --radius-sm:        12px;   /* fields and buttons, as rounded-xl */
     --radius-lg:        16px;
     --shadow-xs:        0 1px 2px rgba(15, 23, 42, .05);
     --shadow-sm:        0 1px 3px rgba(15, 23, 42, .07), 0 1px 2px rgba(15, 23, 42, .04);
     --shadow-md:        0 4px 16px -2px rgba(15, 23, 42, .08), 0 2px 6px -2px rgba(15, 23, 42, .05);
     --shadow-lg:        0 18px 40px -12px rgba(15, 23, 42, .18);
-    --ring:             0 0 0 3px rgba(239, 144, 23, .22);
+    --ring:             0 0 0 4px rgba(30, 122, 69, .15);
+
+    --font-sans:        "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-display:     "Bricolage Grotesque", "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ---------------------------------------------------------------- base */
@@ -45,7 +51,7 @@ body,
     background-color: var(--background) !important;
     color: var(--foreground);
     -webkit-font-smoothing: antialiased;
-    font-family: "Inter", "Source Sans Pro", -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-sans);
 }
 
 a { color: var(--accent-600); }
@@ -302,6 +308,174 @@ body:not(.sidebar-collapse) .main-footer {
 .sidebar-collapse .main-sidebar:hover::before { width: var(--sidebar-mini-w); }
 .sidebar-collapse .main-sidebar:hover .brand-text,
 .sidebar-collapse .main-sidebar:hover .nav-sidebar .nav-link p { display: none; }
+
+/* =========================================== shared design language
+   These pages sit in the same frame as the Tailwind pages (layouts/app-frame,
+   styled by resources/css/shell.css); only their bodies are Bootstrap. The
+   rules below make those bodies read like the Tailwind pages: the same fonts,
+   white cards with a hairline border and no shadow, fields on the paper tint
+   with a green focus ring, quiet sentence-case captions, and dark-green
+   primary buttons. The values are the tokens at the top of this file.
+   ==================================================================== */
+.hris-page {
+    font-family: var(--font-sans);
+    color: var(--foreground);
+}
+.hris-page h1, .hris-page h2, .hris-page h3, .hris-page h4, .hris-page h5,
+.hris-page .card-title,
+.hris-page .modal-title {
+    font-family: var(--font-display);
+    letter-spacing: -.01em;
+}
+.modal-content {
+    border: 1px solid var(--border);
+    border-radius: var(--radius) !important;
+    font-family: var(--font-sans);
+}
+.modal-header .modal-title { font-family: var(--font-display); font-weight: 600; }
+
+/* Cards: rounded-2xl border border-line bg-surface */
+.hris-page .card,
+.hris-page .small-box,
+.hris-page .info-box {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: none !important;
+}
+.hris-page .card:hover { box-shadow: none; }
+.hris-page .card-header {
+    background: var(--surface);
+    padding: .9rem 1.25rem;
+}
+.hris-page .card-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+.hris-page .card-title b,
+.hris-page .card-title strong { font-weight: 600; }
+.hris-page .card-footer { background: var(--surface); }
+
+/* Fields: rounded-xl border border-line bg-paper, focus ring forest-600/15 */
+.hris-page .form-control,
+.hris-page .custom-select,
+.hris-page .select2-container--bootstrap4 .select2-selection,
+.hris-page .select2-container--default .select2-selection--single,
+.hris-page .select2-container--default .select2-selection--multiple {
+    min-height: 40px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm) !important;
+    /* !important: template/dist/css/style.css paints .form-control-sm white with it */
+    background-color: var(--muted-soft) !important;
+    box-shadow: none;
+}
+.hris-page textarea.form-control { min-height: 80px; }
+.hris-page .form-control-sm { min-height: 34px; }
+.hris-page .form-control:focus,
+.hris-page .custom-select:focus,
+.hris-page .select2-container--focus .select2-selection,
+.hris-page .select2-container--open .select2-selection {
+    border-color: var(--accent) !important;
+    background-color: var(--surface) !important;
+    box-shadow: var(--ring) !important;
+}
+.hris-page .form-control::placeholder { color: rgba(20, 32, 26, .4); }
+.hris-page .form-control:disabled,
+.hris-page .form-control[readonly] { background-color: #ECEFEC !important; }
+
+/* Captions: text-xs font-medium text-ink/60. The old grey "badge" labels
+   (label.badge, .lbel) become the same quiet caption. */
+.hris-page label,
+.hris-page label.badge,
+.hris-page .badge.lbel {
+    display: inline-block;
+    margin: 0 0 .35rem;
+    padding: 0;
+    border-radius: 0;
+    background: transparent !important;
+    color: var(--muted) !important;
+    font-size: .75rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    text-align: left;
+    white-space: normal;
+}
+.hris-page label.badge,
+.hris-page .badge.lbel { display: block; }
+/* Ticks and radios keep their own label beside them */
+.hris-page .form-check-label,
+.hris-page .custom-control-label,
+.hris-page .icheck-primary > label,
+.hris-page .icheck-success > label {
+    margin: 0;
+    color: var(--foreground) !important;
+    font-size: .875rem;
+}
+
+/* Buttons: h-10 rounded-xl font-medium; primary is forest-900 on cream */
+.hris-page .btn,
+.modal-content .btn {
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+}
+.hris-page .btn:not(.btn-sm):not(.btn-xs):not(.btn-lg):not(.btn-link),
+.modal-content .btn:not(.btn-sm):not(.btn-xs):not(.btn-lg):not(.btn-link) {
+    min-height: 40px;
+    padding: .5rem 1.1rem;
+}
+.hris-page .btn-primary,
+.hris-page .btn-success,
+.hris-page .btn-success1,
+.modal-content .btn-primary,
+.modal-content .btn-success {
+    background-color: var(--forest-900) !important;
+    border-color: var(--forest-900) !important;
+    color: var(--cream) !important;
+}
+.hris-page .btn-primary:hover,
+.hris-page .btn-success:hover,
+.hris-page .btn-success1:hover,
+.modal-content .btn-primary:hover,
+.modal-content .btn-success:hover {
+    background-color: var(--forest-950) !important;
+    border-color: var(--forest-950) !important;
+}
+.hris-page .btn-outline-success,
+.hris-page .btn-outline-primary {
+    border-color: var(--border);
+    color: var(--forest-900);
+}
+.hris-page .btn-outline-success:hover,
+.hris-page .btn-outline-primary:hover {
+    border-color: var(--forest-900);
+    background: var(--forest-900);
+    color: var(--cream);
+}
+
+/* Tables: the header is a quiet sentence-case row, as on the Tailwind lists */
+.hris-page .table thead th {
+    background: var(--surface);
+    color: var(--muted);
+    font-size: .8rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    padding: .8rem 1rem;
+}
+.hris-page .table td { padding: .8rem 1rem; }
+.hris-page .table-hover tbody tr:hover { background-color: var(--muted-soft); }
+/* Rows are separated by hairlines only; the card is the outer edge. */
+.hris-page .table-bordered { border: 0; }
+.hris-page .table-bordered th,
+.hris-page .table-bordered td { border-right: 0; border-left: 0; }
+
+/* Pages that tinted their form card grey (.bg-form) get the white card
+   every other page has; the fields carry the paper tint instead. */
+.hris-page .bg-form { background-color: var(--surface) !important; }
+
+/* Section headings inside a form (e.g. "Residential address") */
+.hris-page .text-success1 { color: var(--forest-900) !important; }
 
 /* ==================================================== phones: off-canvas */
 .sidebar-backdrop { display: none; }
@@ -1046,9 +1220,11 @@ label { font-weight: 600; font-size: .8rem; color: #334155; }
    inside its own box. It must never widen the page and push the layout
    sideways, which is what happened on phones.
    ================================================================== */
+/* clip, not hidden: hidden turns <body> into a scroll container, and the
+   frame's pinned top bar (position: sticky) then never sticks. */
 html, body {
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 .content-wrapper,

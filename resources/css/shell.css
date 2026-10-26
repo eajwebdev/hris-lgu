@@ -1,0 +1,113 @@
+/*
+ * The signed-in shell — sidebar, top bar, banner, footer, dialogs, toasts —
+ * for the pages still on layouts/master, whose bodies are AdminLTE /
+ * Bootstrap 4. layouts/master includes the very same partials as layouts/app,
+ * so every page in the system shares one sidebar, one top bar and one banner;
+ * this file is what lets that markup render correctly with Bootstrap loaded.
+ *
+ * Three things keep the two frameworks out of each other's way:
+ *
+ *   No preflight. Tailwind's reset would restyle every Bootstrap page body.
+ *   The scoped reset at the bottom covers the shell instead.
+ *
+ *   @scope (.hris-shell) to (.hris-page). Utilities reach the shell and stop
+ *   at the page body, so a Bootstrap `mb-3` inside a page keeps Bootstrap's
+ *   meaning. Content Bootstrap plugins attach to <body> (modals' backdrops,
+ *   select2 and date-picker dropdowns, toastr) sits outside .hris-shell and
+ *   is not touched either.
+ *
+ *   important + theme(inline). Bootstrap's spacing, shadow and radius
+ *   helpers are !important and share names with Tailwind's at different
+ *   sizes (px-4 is 1.5rem there, 1rem here), and public/css/hris-theme.css
+ *   defines --radius-lg and --shadow-* on :root. Important utilities win the
+ *   first fight; inlined theme values sidestep the second.
+ *
+ * The cost of inlining: the dark palette in tokens.css cannot reach the
+ * shell here. The AdminLTE pages have no dark version to match it anyway.
+ */
+@import "tailwindcss/theme.css" layer(theme) theme(inline);
+@import "./tokens.css" theme(inline static);
+@source "../views";
+
+@media important {
+    @scope (.hris-shell) to (.hris-page) {
+        @tailwind utilities;
+    }
+}
+
+/* The parts of preflight the shell markup relies on, scoped the same way.
+   Unlayered, and after Bootstrap in the page, so equal-specificity rules
+   from Bootstrap's reboot lose to these. */
+@scope (.hris-shell) to (.hris-page) {
+    *, ::before, ::after {
+        box-sizing: border-box;
+        border: 0 solid;
+    }
+
+    h1, h2, h3, h4, h5, h6, p, ul, ol, li, dl, dd, figure, blockquote, hr, label, form, fieldset, legend {
+        margin: 0;
+        padding: 0;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        font-family: inherit;
+        font-size: inherit;
+        font-weight: inherit;
+        line-height: inherit;
+        color: inherit;
+    }
+
+    ul, ol, menu {
+        list-style: none;
+    }
+
+    /* AdminLTE bolds every label through a (0,2,1) selector, and the top
+       bar's search box and the banner's pickers sit inside labels. The
+       :not(#_) lifts this one above it without naming any element. */
+    label:not(#_) {
+        font-size: inherit;
+        font-weight: inherit;
+        color: inherit;
+    }
+
+    a, a:hover, a:focus {
+        color: inherit;
+        text-decoration: inherit;
+    }
+
+    img, svg, video {
+        display: block;
+        vertical-align: middle;
+    }
+
+    img, video {
+        max-width: 100%;
+        height: auto;
+    }
+
+    button, input, select, textarea {
+        margin: 0;
+        font: inherit;
+        letter-spacing: inherit;
+        color: inherit;
+        background-color: transparent;
+        border-radius: 0;
+    }
+
+    /* Bootstrap's reboot rings every focused button, mouse clicks included;
+       the shell draws its own focus-visible outlines. */
+    button:focus:not(:focus-visible) {
+        outline: none;
+    }
+
+    dialog {
+        padding: 0;
+        color: inherit;
+    }
+
+    /* The shell script shows and hides things with the hidden attribute; it
+       has to beat the important display utilities beside it. */
+    [hidden][hidden]:where(:not([hidden="until-found"])) {
+        display: none !important;
+    }
+}

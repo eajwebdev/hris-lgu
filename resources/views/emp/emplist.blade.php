@@ -2,6 +2,7 @@
 
 @php
     $activeCount = $employee->where('stat_1', 1)->count();
+    $canManageEmployment = \App\Http\Middleware\EnsureFaceRegistrar::allows();
     $statusNames = $employee->pluck('status_name')->filter()->unique()->sort()->values();
 
     $bannerButton = 'inline-flex h-10 items-center gap-2 rounded-xl border px-4 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500';
@@ -17,7 +18,7 @@
 @section('hero')
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div>
-            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Employees</h1>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Employees</h1>
             <p class="mt-1 text-cream/70">
                 {{ number_format($employee->count()) }} on record
                 <span class="mx-1.5 text-cream/30">|</span>
@@ -26,10 +27,10 @@
         </div>
 
         <div class="flex flex-wrap gap-2">
-            <a href="{{ route('empQr') }}" target="_blank" class="{{ $bannerButton }} border-cream/25 hover:border-cream hover:bg-cream hover:text-forest-900">
+            <a href="{{ route('empQr') }}" target="_blank" class="{{ $bannerButton }} border-cream/30 bg-forest-950/55 backdrop-blur-sm hover:border-cream hover:bg-cream hover:text-forest-900">
                 <i class="fas fa-qrcode"></i> QR codes
             </a>
-            <a href="{{ route('genEmp') }}" target="_blank" class="{{ $bannerButton }} border-cream/25 hover:border-cream hover:bg-cream hover:text-forest-900">
+            <a href="{{ route('genEmp') }}" target="_blank" class="{{ $bannerButton }} border-cream/30 bg-forest-950/55 backdrop-blur-sm hover:border-cream hover:bg-cream hover:text-forest-900">
                 <i class="fas fa-file-pdf"></i> List as PDF
             </a>
             <a href="{{ route('empAdd') }}" class="{{ $bannerButton }} border-cream bg-cream text-forest-900 hover:bg-white">
@@ -107,7 +108,12 @@
                         class="transition-colors hover:bg-paper/70">
                         <td class="px-4 py-3 pl-5">
                             <p class="font-semibold">{{ $fullName }}</p>
-                            <p class="mt-0.5 text-xs text-ink/55">{{ $emp->position ?: 'No position set' }}</p>
+                            <p class="mt-0.5 text-xs text-ink/55">
+                                @unless($emp->employed)
+                                    <span class="mr-1 rounded bg-red-50 px-1.5 py-px font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">Separated</span>
+                                @endunless
+                                {{ $emp->position ?: 'No position set' }}
+                            </p>
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap tabular-nums">{{ $emp->emp_ID }}</td>
                         <td class="px-4 py-3 whitespace-nowrap max-sm:hidden">{{ $emp->status_name ?: '--' }}</td>
@@ -148,6 +154,12 @@
                                 <a href="{{ route('PDS', $emp->id) }}" title="Personal Data Sheet" class="{{ $rowAction }}">
                                     <i class="fas fa-file-lines"></i><span class="sr-only">Personal Data Sheet</span>
                                 </a>
+
+                                @if($canManageEmployment)
+                                    <a href="{{ route('employmentHistory', $emp->id) }}" title="Employment history" class="{{ $rowAction }}">
+                                        <i class="fas fa-clock-rotate-left"></i><span class="sr-only">Employment history</span>
+                                    </a>
+                                @endif
 
                                 <button type="button" title="Working hours" data-hours-for="{{ $emp->emp_ID }}" data-employee-name="{{ $spokenName }}" class="{{ $rowAction }} cursor-pointer">
                                     <i class="fas fa-clock"></i><span class="sr-only">Working hours</span>
@@ -272,11 +284,11 @@
         })
             .then(function (response) { return response.ok ? response.json() : Promise.reject(); })
             .then(function (data) {
-                if (!data.success) { return Promise.reject(); }
+                if (!data.success) { return Promise.reject(data.message); }
                 change.box.checked = change.enable;
                 change.box.closest('[data-row]').dataset.active = change.enable ? '1' : '0';
             })
-            .catch(function () { hrisToast('error', 'The account could not be changed. Please try again.'); });
+            .catch(function (message) { hrisToast('error', typeof message === 'string' ? message : 'The account could not be changed. Please try again.'); });
     });
 
     /* ------------------------------------------------------ working hours */

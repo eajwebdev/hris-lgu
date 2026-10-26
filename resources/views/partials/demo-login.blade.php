@@ -2,7 +2,8 @@
     Demo quick-access panel.
 
     Rendered only when the controller passes $demoAccounts (i.e. APP_DEMO=true).
-    It lists every account and signs in as the chosen one with no password, by
+    It lists the administrator accounts (never employees' personal ones) and
+    signs in as the chosen one with no password, by
     posting its key to the demoLogin route. Local demos / testing only; it is
     never present in production because demoAccounts() returns null there.
 

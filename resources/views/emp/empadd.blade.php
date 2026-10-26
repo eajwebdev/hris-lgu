@@ -1,586 +1,415 @@
-@extends('layouts.master')
+@extends('layouts.app')
+
+@php
+    // Add Employee. One ordinary form posted to EmployeeController::empCreate;
+    // the fields are described here and drawn by emp/partials/add-field.
+
+    $same = fn (array $values) => array_combine($values, $values);
+
+    $countries = [
+        'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
+        'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina', 'Botswana',
+        'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cambodia', 'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile',
+        'China', 'Colombia', 'Comoros', 'Congo', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Democratic Republic of the Congo', 'Denmark',
+        'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia',
+        'Fiji', 'Finland', 'France', 'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana',
+        'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Ivory Coast', 'Jamaica', 'Japan',
+        'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait', 'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein',
+        'Lithuania', 'Luxembourg', 'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico',
+        'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands',
+        'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway', 'Oman', 'Pakistan', 'Palau', 'Panama', 'Papua New Guinea',
+        'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia',
+        'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone',
+        'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan',
+        'Suriname', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago',
+        'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay',
+        'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
+    ];
+
+    $personalFields = [
+        ['name' => 'date_hired', 'label' => 'Date Hired', 'type' => 'date', 'icon' => 'fa-calendar-days'],
+        ['name' => 'item_no', 'label' => 'Item / Plantilla No.', 'icon' => 'fa-file-lines', 'placeholder' => 'Enter item no.'],
+        ['name' => 'emp_ID', 'label' => 'Employee ID', 'icon' => 'fa-user', 'placeholder' => 'e.g. 1234-56', 'required' => true,
+            'status' => 'empIdStatus', 'attrs' => ['id' => 'emp_ID']],
+        ['name' => 'lname', 'label' => 'Last Name', 'icon' => 'fa-font', 'placeholder' => 'Enter last name', 'required' => true],
+        ['name' => 'fname', 'label' => 'First Name', 'icon' => 'fa-font', 'placeholder' => 'Enter first name', 'required' => true],
+        ['name' => 'mname', 'label' => 'Middle Name', 'icon' => 'fa-font', 'placeholder' => 'Enter middle name'],
+
+        ['name' => 'suffix', 'label' => 'Suffix', 'type' => 'select', 'prompt' => 'Select suffix',
+            'options' => $same(['Jr.', 'Sr.', 'I', 'II', 'III', 'IV', 'V'])],
+        ['name' => 'prefix', 'label' => 'Prefix', 'type' => 'select', 'prompt' => 'Select prefix',
+            'options' => $same(['Atty.', 'Dr.', 'Eng.', 'Mr.', 'Mrs.', 'Ms.', 'Not Applicable'])],
+        ['name' => 'title_prefix', 'label' => 'Title Prefix', 'icon' => 'fa-briefcase', 'placeholder' => 'e.g. MBA / DPA / MD etc.'],
+        ['name' => 'bdate', 'label' => 'Birth Date', 'type' => 'date', 'icon' => 'fa-calendar-days'],
+        // Worked out from the birth date.
+        ['name' => 'age', 'label' => 'Age', 'icon' => 'fa-hashtag', 'placeholder' => 'From the birth date', 'readonly' => true],
+        ['name' => 'b_place', 'label' => 'Birth Place', 'icon' => 'fa-location-dot', 'placeholder' => 'Enter birth place'],
+
+        ['name' => 'sex', 'label' => 'Sex', 'type' => 'select', 'prompt' => 'Select sex', 'required' => true,
+            'options' => $same(['Male', 'Female'])],
+        ['name' => 'civil_status', 'label' => 'Civil Status', 'type' => 'select', 'prompt' => 'Select civil status',
+            'options' => $same(['Single', 'Married', 'Separated', 'Widowed']) + ['Other' => 'Other/s']],
+        ['name' => 'citizenship', 'label' => 'Citizenship', 'type' => 'select', 'prompt' => 'Select citizenship',
+            'options' => [1 => 'Filipino', 2 => 'Dual Citizenship']],
+    ];
+
+    // After the citizenship answers, which are drawn by hand between them.
+    $assignmentFields = [
+        ['name' => 'emp_status', 'label' => 'Employment Status', 'type' => 'select', 'prompt' => 'Select status', 'icon' => 'fa-user-check', 'required' => true,
+            'options' => $stat->pluck('status_name', 'id')->all()],
+        ['name' => 'position', 'label' => 'Position', 'icon' => 'fa-user-tie', 'placeholder' => 'Enter position', 'required' => true],
+        ['name' => 'emp_dept', 'label' => 'Department/Office', 'type' => 'select', 'prompt' => 'Select department/office', 'icon' => 'fa-building', 'required' => true,
+            'options' => $offices->pluck('office_name', 'id')->all()],
+        ['name' => 'supervisor', 'label' => 'Immediate Supervisor', 'type' => 'select', 'prompt' => 'Select supervisor', 'icon' => 'fa-sitemap',
+            'options' => $supervisor->mapWithKeys(fn ($sup) => [$sup->id => strtoupper(trim($sup->lname . ' ' . $sup->fname . ' ' . ($sup->mname ? substr($sup->mname, 0, 1) . '.' : '')))])->all()],
+
+        // The two heights and the two weights are one measurement each: the
+        // page fills in the other unit as one is typed.
+        ['name' => 'height_cm', 'label' => 'Height (cm)', 'type' => 'number', 'icon' => 'fa-ruler-vertical', 'placeholder' => 'e.g. 170', 'attrs' => ['step' => 'any', 'min' => '0']],
+        ['name' => 'height_ft', 'label' => 'Height (ft)', 'type' => 'number', 'icon' => 'fa-ruler-vertical', 'placeholder' => 'e.g. 5.6', 'attrs' => ['step' => 'any', 'min' => '0']],
+        ['name' => 'weight_kg', 'label' => 'Weight (kg)', 'type' => 'number', 'icon' => 'fa-weight-scale', 'placeholder' => 'e.g. 65', 'attrs' => ['step' => 'any', 'min' => '0']],
+        ['name' => 'weight_lb', 'label' => 'Weight (lbs)', 'type' => 'number', 'icon' => 'fa-weight-scale', 'placeholder' => 'e.g. 143', 'attrs' => ['step' => 'any', 'min' => '0']],
+        ['name' => 'b_type', 'label' => 'Blood Type', 'type' => 'select', 'prompt' => 'Select blood type', 'icon' => 'fa-droplet',
+            'options' => $same(['A+', 'A-', 'AB+', 'AB-', 'B+', 'B-', 'O+', 'O-'])],
+
+        ['name' => 'gsis', 'label' => 'GSIS', 'icon' => 'fa-id-card', 'placeholder' => 'Enter GSIS No.'],
+        ['name' => 'pagibig', 'label' => 'PAGIBIG', 'icon' => 'fa-house', 'placeholder' => 'Enter PAGIBIG No.'],
+        ['name' => 'philhealth', 'label' => 'PhilHealth', 'icon' => 'fa-notes-medical', 'placeholder' => 'Enter PhilHealth No.'],
+        ['name' => 'sss', 'label' => 'SSS', 'icon' => 'fa-shield-halved', 'placeholder' => 'Enter SSS No.'],
+
+        ['name' => 'tin', 'label' => 'TIN', 'icon' => 'fa-receipt', 'placeholder' => 'Enter TIN No.', 'span' => 3],
+        ['name' => 'telephone', 'label' => 'Telephone Number', 'icon' => 'fa-phone', 'placeholder' => 'Enter telephone number', 'span' => 3],
+        ['name' => 'org_email', 'label' => 'Email Address', 'type' => 'email', 'icon' => 'fa-envelope', 'placeholder' => 'Enter email address', 'span' => 3],
+        ['name' => 'mobile', 'label' => 'Mobile Number', 'icon' => 'fa-mobile-screen', 'placeholder' => '0912-345-6789', 'span' => 3],
+    ];
+
+    // The two addresses are the same eight fields under two column prefixes.
+    // Only the regions come with the page; each list below a region is
+    // fetched once the one above it is chosen.
+    $addresses = [
+        'add_' => ['title' => 'Residential Address', 'about' => 'Current home address of the employee.', 'icon' => 'fa-house'],
+        'padd_' => ['title' => 'Permanent Address', 'about' => 'Permanent address, if different from the residential address.', 'icon' => 'fa-location-dot'],
+    ];
+
+    $card = 'rounded-2xl border border-line bg-surface p-5 shadow-sm shadow-forest-950/5 sm:p-6';
+    $badge = 'grid size-11 shrink-0 place-items-center rounded-xl bg-forest-700 text-lg text-white shadow-sm dark:bg-forest-600';
+    $heading = 'font-display text-lg font-bold tracking-tight';
+    $about = 'text-xs text-ink/55';
+    $radio = 'inline-flex cursor-pointer items-center gap-2 has-disabled:cursor-not-allowed has-disabled:text-ink/40';
+@endphp
+
+@section('breadcrumb', 'Add Employee')
+
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Add Employee</h1>
+            <p class="mt-1 max-w-2xl text-white/85">Create the employee record, assignment, contact details, and account information.</p>
+        </div>
+
+        <a href="{{ route('emp_list') }}"
+           class="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 font-semibold text-forest-900 shadow-md shadow-forest-950/25 transition-colors [text-shadow:none] hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            <i class="fas fa-arrow-left"></i> Employee list
+        </a>
+    </div>
+@endsection
 
 @section('body')
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-12">
-            <div class="card"> 
-                <div class="card-header">
-                    <h2 class="card-title text-success1">
-                        <b>PERSONAL INFORMATION</b>
-                    </h2>
-                </div>
-                <div class="card-body bg-form">
-                    <form class="form-horizontal add-form" action="{{ route('empCreate') }}" method="POST">
-                        @csrf
-                        <div class="form-group mtop">
-                            <div class="form-row">
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Date Hired</label>
-                                    <input type="date" name="date_hired" class="form-control form-control-sm" id="date_hired">
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Item / Plantilla No.</label>
-                                    <input type="text" name="item_no" class="form-control form-control-sm" id="item_no" placeholder="N/A" autocomplete="off">
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Employee ID <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
-                                    <input type="text" name="emp_ID" id="emp_ID" class="form-control form-control-sm" placeholder="e.g. 1234-56" autocomplete="off" required>
-                                    {{-- .field-note hangs below the input instead of sitting in the
-                                         column, so the availability message cannot lift this field
-                                         out of line with the rest of the row (see hris-theme.css). --}}
-                                    <small id="emp_ID_feedback" class="form-text field-note"></small>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Last Name <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
-                                    <input type="text" name="lname" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" required>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">First Name <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
-                                    <input type="text" name="fname" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" required>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Middle Name</label>
-                                    <input type="text" name="mname" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" oninput="this.value = this.value.replace(/\./g, '')">
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Suffix</label>
-                                    <select class="form-control form-control-sm" name="suffix">
-                                        <option disabled selected> Select </option>
-                                        <option value="Jr.">Jr.</option>
-                                        <option value="Sr.">Sr.</option>
-                                        <option value="I">I</option>
-                                        <option value="II">II</option>
-                                        <option value="III">III</option>
-                                        <option value="IV">IV</option>
-                                        <option value="V">V</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Prefix</label>
-                                    <select class="form-control form-control-sm" name="prefix">
-                                        <option disabled selected> Select </option>
-                                        <option>Atty.</option>
-                                        <option>Dr.</option>
-                                        <option>Eng.</option>
-                                        <option>Mr.</option>
-                                        <option>Mrs.</option>
-                                        <option>Ms.</option>
-                                        <option>Not Applicable</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Title Prefix</label>
-                                    <input type="text" name="title_prefix" class="form-control form-control-sm" placeholder="e.g MBA/ DPA / MD etc.">
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Birth Date</label>
-                                    <input type="date" name="bdate" class="form-control form-control-sm" id="bday" onchange="calculateAge()">
-                                </div>
+<form id="addEmployeeForm" action="{{ route('empCreate') }}" method="POST" class="@container space-y-5">
+    @csrf
 
-                                <div class="col-md-1">
-                                    <label class="badge badge-secondary lbel">Age</label>
-                                    <input type="text" name="age" class="form-control form-control-sm" id="age" readonly>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Birth Place</label>
-                                    <input type="text" name="b_place" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Sex <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
-                                    <select class="form-control form-control-sm" name="sex" autocomplete="off" required>
-                                        <option disabled selected> Select </option>
-                                        <option value="Male">Male</option>
-                                        <option value="Female">Female</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Civil Status</label>
-                                    <select class="form-control form-control-sm" name="civil_status">
-                                        <option disabled selected> Select </option>
-                                        <option>Single</option>
-                                        <option>Married</option>
-                                        <option>Separated</option>
-                                        <option>Widowed</option>
-                                        <option value="Other">Other/s</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-4">
-                                    <label class="badge badge-secondary lbel">Citizenship</label>
-                                    <div class="row">
-                                        <div class="col-4">
-                                            <select class="form-control form-control-sm" name="citizenship">
-                                                <option disabled selected> Select </option>
-                                                <option value="1">Filipino</option>
-                                                <option value="2">Dual Citizenship</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-8">
-                                            <div style="float: left; display: flex; align-items: center;">
-                                                <input class="c-radio" type="radio" name="c_category" id="by-birth">
-                                                <span class="c-label" style="width: 90px;">By Birth</span>
-                                            </div>
-                                            <div style="float: right; display: flex; align-items: center;">
-                                                <input class="c-radio" type="radio" name="c_category" id="by-naturalization">
-                                                <span class="c-label" style="width: 110px;">By Naturalization</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Country</label>
-                                    <select class="form-control form-control-sm select2" name="country">
-                                        <option value="" disabled selected>Select</option>
-                                        <option value="Afghanistan">Afghanistan</option>
-                                        <option value="Albania">Albania</option>
-                                        <option value="Algeria">Algeria</option>
-                                        <option value="Andorra">Andorra</option>
-                                        <option value="Angola">Angola</option>
-                                        <option value="Antigua and Barbuda">Antigua and Barbuda</option>
-                                        <option value="Argentina">Argentina</option>
-                                        <option value="Armenia">Armenia</option>
-                                        <option value="Australia">Australia</option>
-                                        <option value="Austria">Austria</option>
-                                        <option value="Azerbaijan">Azerbaijan</option>
-                                        <option value="Bahamas">Bahamas</option>
-                                        <option value="Bahrain">Bahrain</option>
-                                        <option value="Bangladesh">Bangladesh</option>
-                                        <option value="Barbados">Barbados</option>
-                                        <option value="Belarus">Belarus</option>
-                                        <option value="Belgium">Belgium</option>
-                                        <option value="Belize">Belize</option>
-                                        <option value="Benin">Benin</option>
-                                        <option value="Bhutan">Bhutan</option>
-                                        <option value="Bolivia">Bolivia</option>
-                                        <option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option>
-                                        <option value="Botswana">Botswana</option>
-                                        <option value="Brazil">Brazil</option>
-                                        <option value="Brunei">Brunei</option>
-                                        <option value="Bulgaria">Bulgaria</option>
-                                        <option value="Burkina Faso">Burkina Faso</option>
-                                        <option value="Burundi">Burundi</option>
-                                        <option value="Cabo Verde">Cabo Verde</option>
-                                        <option value="Cambodia">Cambodia</option>
-                                        <option value="Cameroon">Cameroon</option>
-                                        <option value="Canada">Canada</option>
-                                        <option value="Central African Republic">Central African Republic</option>
-                                        <option value="Chad">Chad</option>
-                                        <option value="Chile">Chile</option>
-                                        <option value="China">China</option>
-                                        <option value="Colombia">Colombia</option>
-                                        <option value="Comoros">Comoros</option>
-                                        <option value="Congo">Congo</option>
-                                        <option value="Costa Rica">Costa Rica</option>
-                                        <option value="Croatia">Croatia</option>
-                                        <option value="Cuba">Cuba</option>
-                                        <option value="Cyprus">Cyprus</option>
-                                        <option value="Czech Republic">Czech Republic</option>
-                                        <option value="Democratic Republic of the Congo">Democratic Republic of the Congo</option>
-                                        <option value="Denmark">Denmark</option>
-                                        <option value="Djibouti">Djibouti</option>
-                                        <option value="Dominica">Dominica</option>
-                                        <option value="Dominican Republic">Dominican Republic</option>
-                                        <option value="Ecuador">Ecuador</option>
-                                        <option value="Egypt">Egypt</option>
-                                        <option value="El Salvador">El Salvador</option>
-                                        <option value="Equatorial Guinea">Equatorial Guinea</option>
-                                        <option value="Eritrea">Eritrea</option>
-                                        <option value="Estonia">Estonia</option>
-                                        <option value="Eswatini">Eswatini</option>
-                                        <option value="Ethiopia">Ethiopia</option>
-                                        <option value="Fiji">Fiji</option>
-                                        <option value="Finland">Finland</option>
-                                        <option value="France">France</option>
-                                        <option value="Gabon">Gabon</option>
-                                        <option value="Gambia">Gambia</option>
-                                        <option value="Georgia">Georgia</option>
-                                        <option value="Germany">Germany</option>
-                                        <option value="Ghana">Ghana</option>
-                                        <option value="Greece">Greece</option>
-                                        <option value="Grenada">Grenada</option>
-                                        <option value="Guatemala">Guatemala</option>
-                                        <option value="Guinea">Guinea</option>
-                                        <option value="Guinea-Bissau">Guinea-Bissau</option>
-                                        <option value="Guyana">Guyana</option>
-                                        <option value="Haiti">Haiti</option>
-                                        <option value="Honduras">Honduras</option>
-                                        <option value="Hungary">Hungary</option>
-                                        <option value="Iceland">Iceland</option>
-                                        <option value="India">India</option>
-                                        <option value="Indonesia">Indonesia</option>
-                                        <option value="Iran">Iran</option>
-                                        <option value="Iraq">Iraq</option>
-                                        <option value="Ireland">Ireland</option>
-                                        <option value="Israel">Israel</option>
-                                        <option value="Italy">Italy</option>
-                                        <option value="Ivory Coast">Ivory Coast</option>
-                                        <option value="Jamaica">Jamaica</option>
-                                        <option value="Japan">Japan</option>
-                                        <option value="Jordan">Jordan</option>
-                                        <option value="Kazakhstan">Kazakhstan</option>
-                                        <option value="Kenya">Kenya</option>
-                                        <option value="Kiribati">Kiribati</option>
-                                        <option value="Kuwait">Kuwait</option>
-                                        <option value="Kyrgyzstan">Kyrgyzstan</option>
-                                        <option value="Laos">Laos</option>
-                                        <option value="Latvia">Latvia</option>
-                                        <option value="Lebanon">Lebanon</option>
-                                        <option value="Lesotho">Lesotho</option>
-                                        <option value="Liberia">Liberia</option>
-                                        <option value="Libya">Libya</option>
-                                        <option value="Liechtenstein">Liechtenstein</option>
-                                        <option value="Lithuania">Lithuania</option>
-                                        <option value="Luxembourg">Luxembourg</option>
-                                        <option value="Madagascar">Madagascar</option>
-                                        <option value="Malawi">Malawi</option>
-                                        <option value="Malaysia">Malaysia</option>
-                                        <option value="Maldives">Maldives</option>
-                                        <option value="Mali">Mali</option>
-                                        <option value="Malta">Malta</option>
-                                        <option value="Marshall Islands">Marshall Islands</option>
-                                        <option value="Mauritania">Mauritania</option>
-                                        <option value="Mauritius">Mauritius</option>
-                                        <option value="Mexico">Mexico</option>
-                                        <option value="Micronesia">Micronesia</option>
-                                        <option value="Moldova">Moldova</option>
-                                        <option value="Monaco">Monaco</option>
-                                        <option value="Mongolia">Mongolia</option>
-                                        <option value="Montenegro">Montenegro</option>
-                                        <option value="Morocco">Morocco</option>
-                                        <option value="Mozambique">Mozambique</option>
-                                        <option value="Myanmar">Myanmar</option>
-                                        <option value="Namibia">Namibia</option>
-                                        <option value="Nauru">Nauru</option>
-                                        <option value="Nepal">Nepal</option>
-                                        <option value="Netherlands">Netherlands</option>
-                                        <option value="New Zealand">New Zealand</option>
-                                        <option value="Nicaragua">Nicaragua</option>
-                                        <option value="Niger">Niger</option>
-                                        <option value="Nigeria">Nigeria</option>
-                                        <option value="North Korea">North Korea</option>
-                                        <option value="North Macedonia">North Macedonia</option>
-                                        <option value="Norway">Norway</option>
-                                        <option value="Oman">Oman</option>
-                                        <option value="Pakistan">Pakistan</option>
-                                        <option value="Palau">Palau</option>
-                                        <option value="Panama">Panama</option>
-                                        <option value="Papua New Guinea">Papua New Guinea</option>
-                                        <option value="Paraguay">Paraguay</option>
-                                        <option value="Peru">Peru</option>
-                                        <option value="Philippines">Philippines</option>
-                                        <option value="Poland">Poland</option>
-                                        <option value="Portugal">Portugal</option>
-                                        <option value="Qatar">Qatar</option>
-                                        <option value="Romania">Romania</option>
-                                        <option value="Russia">Russia</option>
-                                        <option value="Rwanda">Rwanda</option>
-                                        <option value="Saint Kitts and Nevis">Saint Kitts and Nevis</option>
-                                        <option value="Saint Lucia">Saint Lucia</option>
-                                        <option value="Saint Vincent and the Grenadines">Saint Vincent and the Grenadines</option>
-                                        <option value="Samoa">Samoa</option>
-                                        <option value="San Marino">San Marino</option>
-                                        <option value="Sao Tome and Principe">Sao Tome and Principe</option>
-                                        <option value="Saudi Arabia">Saudi Arabia</option>
-                                        <option value="Senegal">Senegal</option>
-                                        <option value="Serbia">Serbia</option>
-                                        <option value="Seychelles">Seychelles</option>
-                                        <option value="Sierra Leone">Sierra Leone</option>
-                                        <option value="Singapore">Singapore</option>
-                                        <option value="Slovakia">Slovakia</option>
-                                        <option value="Slovenia">Slovenia</option>
-                                        <option value="Solomon Islands">Solomon Islands</option>
-                                        <option value="Somalia">Somalia</option>
-                                        <option value="South Africa">South Africa</option>
-                                        <option value="South Korea">South Korea</option>
-                                        <option value="South Sudan">South Sudan</option>
-                                        <option value="Spain">Spain</option>
-                                        <option value="Sri Lanka">Sri Lanka</option>
-                                        <option value="Sudan">Sudan</option>
-                                        <option value="Suriname">Suriname</option>
-                                        <option value="Sweden">Sweden</option>
-                                        <option value="Switzerland">Switzerland</option>
-                                        <option value="Syria">Syria</option>
-                                        <option value="Taiwan">Taiwan</option>
-                                        <option value="Tajikistan">Tajikistan</option>
-                                        <option value="Tanzania">Tanzania</option>
-                                        <option value="Thailand">Thailand</option>
-                                        <option value="Timor-Leste">Timor-Leste</option>
-                                        <option value="Togo">Togo</option>
-                                        <option value="Tonga">Tonga</option>
-                                        <option value="Trinidad and Tobago">Trinidad and Tobago</option>
-                                        <option value="Tunisia">Tunisia</option>
-                                        <option value="Turkey">Turkey</option>
-                                        <option value="Turkmenistan">Turkmenistan</option>
-                                        <option value="Tuvalu">Tuvalu</option>
-                                        <option value="Uganda">Uganda</option>
-                                        <option value="Ukraine">Ukraine</option>
-                                        <option value="United Arab Emirates">United Arab Emirates</option>
-                                        <option value="United Kingdom">United Kingdom</option>
-                                        <option value="United States">United States</option>
-                                        <option value="Uruguay">Uruguay</option>
-                                        <option value="Uzbekistan">Uzbekistan</option>
-                                        <option value="Vanuatu">Vanuatu</option>
-                                        <option value="Vatican City">Vatican City</option>
-                                        <option value="Venezuela">Venezuela</option>
-                                        <option value="Vietnam">Vietnam</option>
-                                        <option value="Yemen">Yemen</option>
-                                        <option value="Zambia">Zambia</option>
-                                        <option value="Zimbabwe">Zimbabwe</option>
-                                    </select>
-                                </div>                                
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Employe Status <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
-                                    <select class="form-control form-control-sm select2" style="width: 100%;" name="emp_status" autocomplete="off" required>
-                                        <option value=""> select </option>
-                                        @foreach ($stat as $st)
-                                            <option value="{{ $st->id }}">{{ $st->status_name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div> 
-                                
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Position <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
-                                    <input type="text" name="position" id="position" class="form-control form-control-sm" placeholder="N/A" autocomplete="off" required>
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Department/Office <span class="text-danger"> <i class="fas fa-asterisk "></i></span></label>
-                                    <select class="form-control form-control-sm select2" style="width: 100%;" name="emp_dept" autocomplete="off" required>
-                                        <option value=""> select </option>
-                                        @foreach ($offices as $q)
-                                            <option value="{{ $q->id }}">{{ $q->office_name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Immediate Supervisor</label>
-                                    <select class="form-control form-control-sm select2" style="width: 100%;" name="supervisor">
-                                        <option value="0"> select </option>
-                                        @foreach ($supervisor as $sup)
-                                            <option value="{{ $sup->id }}">{{ strtoupper($sup->lname) }} {{ strtoupper($sup->fname) }} {{ isset($sup->mname) ? strtoupper(substr($sup->mname, 0, 1)).'.' : '' }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Height (cm)</label>
-                                    <input type="text" name="height_cm" id="height_cm" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Height (ft)</label>
-                                    <input type="text" name="height_ft" id="height_ft" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Weight (kg)</label>
-                                    <input type="text" name="weight_kg" id="weight_kg" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Weight (lb)</label>
-                                    <input type="text" name="weight_lb" id="weight_lb" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-                                
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">Blood Type</label>
-                                    <select class="form-control form-control-sm" name="b_type">
-                                        <option disabled selected> Select </option>
-                                        <option>A+</option>
-                                        <option>A-</option>
-                                        <option>AB+</option>
-                                        <option>AB-</option>
-                                        <option>B+</option>
-                                        <option>B-</option>
-                                        <option>O+</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">GSIS</label>
-                                    <input type="text" name="gsis" class="form-control form-control-sm"  placeholder="N/A" autocomplete="off">
-                                </div>
-                                
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">PAGIBIG</label>
-                                    <input type="text" name="pagibig" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">PHILHEALTH</label>
-                                    <input type="text" name="philhealth" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                                <div class="col-md-2">
-                                    <label class="badge badge-secondary lbel">SSS</label>
-                                    <input type="text" name="sss" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">TIN</label>
-                                    <input type="text" name="tin" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Telephone Number</label>
-                                    <input type="text" name="telephone" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Email Address</label>
-                                    <input type="text" name="org_email" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Mobile Number</label>
-                                    <input type="text" name="mobile" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-
-                            </div>
-                        </div>
-                        <div class="form-group mtop">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <h2 class="card-title text-success1 mt-3 mb-2">
-                                        <b>RESIDENTIAL ADDRESS</b>
-                                    </h2>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group mtop">
-                            <div class="form-row">
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary">Region:</label>
-                                    <select id="region" name="add_region" class="form-control select2 form-control-sm" style="width: 100%;">
-                                        <option value="">Select</option>
-                                        @foreach($regions as $region)
-                                            <option value="{{ $region->region_id }}">{{ $region->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary">Province:</label>
-                                    <select id="province" name="add_prov" class="form-control select2 form-control-sm" style="width: 100%;" disabled>
-                                        <option value="">Select</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary">City / Municipality:</label>
-                                    <select id="city" name="add_city" class="form-control select2 form-control-sm" style="width: 100%;" disabled>
-                                        <option value="">Select</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary">Barangay:</label>
-                                    <select id="barangay" name="add_brgy" class="form-control select2 form-control-sm" style="width: 100%;" disabled>
-                                        <option value="">Select</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">House/Block/Lot No.</label>
-                                    <input type="text" name="add_block" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Street</label>
-                                    <input type="text" name="add_street" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Subdivision/Village</label>
-                                    <input type="text" name="add_village" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">ZIP Code</label>
-                                    <input type="number" name="add_zcode" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group mtop">
-                            <div class="form-row">
-                                <div class="col-md-12">
-                                    <h2 class="card-title text-success1 mt-3 mb-2">
-                                        <b>PERMANENT ADDRESS</b>
-                                    </h2>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group mtop">
-                            <div class="form-row">
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary">Region:</label>
-                                    <select id="region1" name="padd_region" class="form-control select2 form-control-sm" style="width: 100%;">
-                                        <option value="">Select</option>
-                                        @foreach($regions as $region)
-                                            <option value="{{ $region->region_id }}">{{ $region->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary">Province:</label>
-                                    <select id="province1" name="padd_prov" class="form-control select2 form-control-sm" style="width: 100%;" disabled>
-                                        <option value="">Select</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary">City / Municipality:</label>
-                                    <select id="city1" name="padd_city" class="form-control select2 form-control-sm" style="width: 100%;" disabled>
-                                        <option value="">Select</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary">Barangay:</label>
-                                    <select id="barangay1" name="padd_brgy" class="form-control select2 form-control-sm" style="width: 100%;" disabled>
-                                        <option value="">Select</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">House/Block/Lot No.</label>
-                                    <input type="text" name="padd_block" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Street</label>
-                                    <input type="text" name="padd_street" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">Subdivision/Village</label>
-                                    <input type="text" name="padd_village" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="badge badge-secondary lbel">ZIP Code</label>
-                                    <input type="number" name="padd_zcode" class="form-control form-control-sm" placeholder="N/A" autocomplete="off">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="form-row float-right">
-                                <div class="col-md-12">
-                                    <button type="submit" name="btn-submit" class="btn btn-success">
-                                        <i class="fas fa-save"></i> Save
-                                    </button>
-                                </div>
-                            </div>
-                        </div>   
-                    </form>
-                </div>
+    <section class="{{ $card }}">
+        <header class="flex items-center gap-3.5">
+            <span class="{{ $badge }}"><i class="fas fa-id-card"></i></span>
+            <div>
+                <h2 class="{{ $heading }}">Personal Information</h2>
+                <p class="{{ $about }}">Basic information about the employee.</p>
             </div>
+        </header>
+
+        <div class="mt-5 grid gap-4 @md:grid-cols-2 @3xl:grid-cols-4 @5xl:grid-cols-12">
+            @foreach($personalFields as $spec)
+                @include('emp.partials.add-field', ['spec' => $spec])
+            @endforeach
+
+            {{-- Only dual citizenship names how the second came about and the
+                 other country; for a Filipino both stay locked and empty. --}}
+            <fieldset class="@5xl:col-span-2">
+                <legend class="block text-[13px] font-semibold text-ink">Dual citizenship by</legend>
+                <div class="mt-1.5 flex min-h-11 flex-wrap items-center gap-x-5 gap-y-1">
+                    @foreach([1 => 'By Birth', 2 => 'By Naturalization'] as $category => $wording)
+                        <label class="{{ $radio }}">
+                            <input type="radio" name="c_category" value="{{ $category }}" data-dual
+                                   class="size-4.5 accent-forest-600" @checked(old('c_category') == $category)>
+                            {{ $wording }}
+                        </label>
+                    @endforeach
+                </div>
+            </fieldset>
+
+            @include('emp.partials.add-field', ['spec' => [
+                'name' => 'country', 'label' => 'Country', 'type' => 'select', 'prompt' => 'Select country',
+                'options' => $same($countries), 'attrs' => ['data-dual' => ''],
+            ]])
+
+            @foreach($assignmentFields as $spec)
+                @include('emp.partials.add-field', ['spec' => $spec])
+            @endforeach
         </div>
+    </section>
+
+    <div class="grid gap-5 @5xl:grid-cols-2">
+        @foreach($addresses as $prefix => $address)
+            <section class="{{ $card }} @container" data-address="{{ $prefix }}">
+                <header class="flex flex-wrap items-center gap-x-3.5 gap-y-3">
+                    <span class="{{ $badge }}"><i class="fas {{ $address['icon'] }}"></i></span>
+                    <div class="min-w-0 flex-1">
+                        <h2 class="{{ $heading }}">{{ $address['title'] }}</h2>
+                        <p class="{{ $about }}">{{ $address['about'] }}</p>
+                    </div>
+
+                    @if($prefix === 'padd_')
+                        <label class="inline-flex cursor-pointer items-center gap-2.5 font-medium">
+                            <input type="checkbox" id="sameAddress" class="size-4.5 rounded accent-forest-600">
+                            Same as residential address
+                        </label>
+                    @endif
+                </header>
+
+                <div class="mt-5 grid gap-4 transition-opacity @sm:grid-cols-2 @2xl:grid-cols-4" data-address-fields>
+                    @foreach([
+                        ['name' => $prefix . 'region', 'label' => 'Region', 'icon' => 'fa-map', 'prompt' => 'Select region', 'level' => 'region',
+                            'options' => $regions->pluck('name', 'region_id')->all()],
+                        ['name' => $prefix . 'prov', 'label' => 'Province', 'icon' => 'fa-map-location-dot', 'prompt' => 'Select province', 'level' => 'prov', 'options' => []],
+                        ['name' => $prefix . 'city', 'label' => 'City / Municipality', 'icon' => 'fa-city', 'prompt' => 'Select city / municipality', 'level' => 'city', 'options' => []],
+                        ['name' => $prefix . 'brgy', 'label' => 'Barangay', 'icon' => 'fa-map-pin', 'prompt' => 'Select barangay', 'level' => 'brgy', 'options' => []],
+                    ] as $place)
+                        @include('emp.partials.add-field', ['spec' => $place + [
+                            'type' => 'select', 'span' => 1,
+                            'attrs' => ['data-address-level' => $place['level'], 'data-old' => (string) old($place['name'])] + ($place['level'] === 'region' ? [] : ['disabled' => '']),
+                        ]])
+                    @endforeach
+
+                    @foreach([
+                        ['name' => $prefix . 'block', 'label' => 'House/Block/Lot No.', 'icon' => 'fa-house', 'placeholder' => 'Enter house/block/lot no.'],
+                        ['name' => $prefix . 'street', 'label' => 'Street', 'icon' => 'fa-road', 'placeholder' => 'Enter street'],
+                        ['name' => $prefix . 'village', 'label' => 'Subdivision/Village', 'icon' => 'fa-signs-post', 'placeholder' => 'Enter subdivision/village'],
+                        ['name' => $prefix . 'zcode', 'label' => 'ZIP Code', 'type' => 'number', 'icon' => 'fa-location-dot', 'placeholder' => 'Enter zip code'],
+                    ] as $spec)
+                        @include('emp.partials.add-field', ['spec' => $spec + ['span' => 1]])
+                    @endforeach
+                </div>
+            </section>
+        @endforeach
     </div>
-</div>
 
-@include('emp.modal-camera')
-
+    <div class="flex justify-end gap-3">
+        <a href="{{ route('emp_list') }}"
+           class="inline-flex h-11 items-center rounded-xl border border-line bg-surface px-6 font-semibold transition-colors hover:border-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            Cancel
+        </a>
+        <button type="submit"
+                class="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-forest-700 px-6 font-semibold text-white shadow-sm transition-colors hover:bg-forest-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500 dark:bg-forest-600 dark:hover:bg-forest-500">
+            <i class="fas fa-floppy-disk"></i> Save
+        </button>
+    </div>
+</form>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    var form = document.getElementById('addEmployeeForm');
+    var field = function (name) { return form.elements[name]; };
+
+    // A middle name is stored without the full stop of an initial.
+    field('mname').addEventListener('input', function () { this.value = this.value.replace(/\./g, ''); });
+
+    /* --------------------------------------------------------- employee ID */
+    // Checked against the employees on record a moment after typing stops.
+    // A taken ID holds the form back; the server refuses one as well.
+    var empId = field('emp_ID');
+    var empIdStatus = document.getElementById('empIdStatus');
+    var empIdTimer = null;
+    var empIdTaken = false;
+    var empIdUrl = "{{ route('checkEmpId', ['empID' => ':empID']) }}";
+
+    function sayEmpId(state, message) {
+        empIdStatus.textContent = message;
+        empIdStatus.className = 'mt-1 text-xs empty:hidden ' + (state === 'taken' ? 'text-red-600' : state === 'free' ? 'text-forest-700' : 'text-ink/55');
+        empId.classList.toggle('border-red-500', state === 'taken');
+    }
+
+    empId.addEventListener('input', function () {
+        var typed = this.value.trim();
+        clearTimeout(empIdTimer);
+        empIdTaken = false;
+
+        if (!typed) { sayEmpId(null, ''); return; }
+        sayEmpId(null, 'Checking availability…');
+
+        empIdTimer = setTimeout(function () {
+            fetch(empIdUrl.replace(':empID', encodeURIComponent(typed)), { headers: { 'Accept': 'application/json' } })
+                .then(function (response) { return response.ok ? response.json() : Promise.reject(); })
+                .then(function (answer) {
+                    if (empId.value.trim() !== typed) return;
+                    empIdTaken = !!answer.exists;
+                    sayEmpId(empIdTaken ? 'taken' : 'free', empIdTaken ? 'This Employee ID already exists.' : 'Employee ID is available.');
+                })
+                .catch(function () { sayEmpId(null, ''); });
+        }, 400);
+    });
+
+    form.addEventListener('submit', function (event) {
+        if (!empIdTaken) return;
+        event.preventDefault();
+        sayEmpId('taken', 'This Employee ID already exists. Please use a different one.');
+        empId.focus();
+    });
+
+    /* ----------------------------------------------------------------- age */
+    field('bdate').addEventListener('change', function () {
+        var born = new Date(this.value);
+        var today = new Date();
+        var age = today.getFullYear() - born.getFullYear();
+        if (today.getMonth() < born.getMonth() || (today.getMonth() === born.getMonth() && today.getDate() < born.getDate())) { age--; }
+        field('age').value = isNaN(age) || age < 0 ? '' : age;
+    });
+
+    /* --------------------------------------------------------- citizenship */
+    var dual = Array.prototype.slice.call(form.querySelectorAll('[data-dual]'));
+
+    function lockDual() {
+        var locked = field('citizenship').value !== '2';
+        dual.forEach(function (control) {
+            control.disabled = locked;
+            if (!locked) return;
+            if (control.type === 'radio') { control.checked = false; } else { control.value = ''; }
+        });
+    }
+
+    field('citizenship').addEventListener('change', lockDual);
+    lockDual();
+
+    /* --------------------------------------------------- height and weight */
+    function paired(from, to, convert) {
+        field(from).addEventListener('input', function () {
+            var amount = parseFloat(this.value);
+            field(to).value = isNaN(amount) ? '' : convert(amount);
+        });
+    }
+
+    paired('height_cm', 'height_ft', function (cm) { return (cm / 30.48).toFixed(2); });
+    paired('height_ft', 'height_cm', function (ft) { return Math.round(ft * 30.48); });
+    paired('weight_kg', 'weight_lb', function (kg) { return Math.round(kg * 2.20462); });
+    paired('weight_lb', 'weight_kg', function (lb) { return Math.round(lb / 2.20462); });
+
+    /* -------------------------------------------------------------- mobile */
+    // 0912-345-6789 as it is typed.
+    field('mobile').addEventListener('input', function () {
+        var digits = this.value.replace(/\D/g, '').substring(0, 11);
+        this.value = [digits.substring(0, 4), digits.substring(4, 7), digits.substring(7, 11)].filter(Boolean).join('-');
+    });
+
+    /* ----------------------------------------------------------- addresses */
+    // Region, province, city, barangay: choosing one empties everything
+    // beneath it and fetches the list for the next.
+    var levels = ['region', 'prov', 'city', 'brgy'];
+    var lists = {
+        prov: { url: "{{ route('getProvinces', ['regionId' => ':id']) }}", key: 'province_id' },
+        city: { url: "{{ route('getCities', ['provinceId' => ':id']) }}", key: 'city_id' },
+        brgy: { url: "{{ route('getBarangays', ['cityId' => ':id']) }}", key: 'id' }
+    };
+
+    function fetchList(level, parent) {
+        return fetch(lists[level].url.replace(':id', encodeURIComponent(parent)), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        }).then(function (response) { return response.ok ? response.json() : Promise.reject(); });
+    }
+
+    var addresses = {};
+
+    Array.prototype.forEach.call(form.querySelectorAll('[data-address]'), function (address) {
+        var selects = {};
+        levels.forEach(function (level) { selects[level] = address.querySelector('[data-address-level="' + level + '"]'); });
+        addresses[address.dataset.address] = { section: address, selects: selects };
+
+        // Counts the fetches, so a slow answer to an earlier choice cannot
+        // overwrite the list for a later one.
+        var asked = 0;
+
+        function fill(level, places, keep) {
+            var select = selects[level];
+            select.length = 1;
+            places.forEach(function (place) { select.add(new Option(place.name, place[lists[level].key])); });
+            select.value = keep || '';
+            if (select.selectedIndex < 1) { select.selectedIndex = 0; }
+            select.disabled = !places.length;
+            address.dispatchEvent(new Event('address:filled'));
+        }
+
+        address.addEventListener('change', function (event) {
+            var at = levels.indexOf(event.target.dataset.addressLevel);
+            if (at === -1) return;
+
+            levels.slice(at + 1).forEach(function (level) { fill(level, [], ''); });
+
+            var next = levels[at + 1];
+            if (!next || !event.target.value) return;
+
+            var mine = ++asked;
+            fetchList(next, event.target.value)
+                .then(function (places) { if (mine === asked) { fill(next, places, ''); } })
+                .catch(function () { hrisToast('error', 'That list could not be loaded. Choose it again.'); });
+        });
+
+        // A form sent back with errors keeps its region; bring back the
+        // lists beneath it and what was chosen in each.
+        (function restore(at) {
+            var parent = selects[levels[at - 1]];
+            var level = levels[at];
+            if (!level || !parent.value) return;
+            fetchList(level, parent.value).then(function (places) {
+                fill(level, places, selects[level].dataset.old);
+                restore(at + 1);
+            }).catch(function () {});
+        })(1);
+    });
+
+    /* ----------------------------------------- same as residential address */
+    // While ticked, the permanent address is a copy of the residential one,
+    // kept in step as that changes, and cannot be edited itself. The copies
+    // are still ordinary fields, so the form posts both addresses.
+    var same = document.getElementById('sameAddress');
+    var home = addresses['add_'];
+    var lasting = addresses['padd_'];
+    var lastingFields = lasting.section.querySelector('[data-address-fields]');
+
+    function copyAddress() {
+        if (!same.checked) return;
+
+        levels.forEach(function (level) {
+            var from = home.selects[level], to = lasting.selects[level];
+            to.length = 0;
+            Array.prototype.forEach.call(from.options, function (option) { to.add(new Option(option.text, option.value)); });
+            to.value = from.value;
+            to.disabled = from.disabled;
+        });
+
+        ['block', 'street', 'village', 'zcode'].forEach(function (part) {
+            field('padd_' + part).value = field('add_' + part).value;
+        });
+    }
+
+    same.addEventListener('change', function () {
+        lastingFields.inert = same.checked;
+        lastingFields.classList.toggle('opacity-60', same.checked);
+        copyAddress();
+    });
+
+    home.section.addEventListener('input', copyAddress);
+    home.section.addEventListener('change', copyAddress);
+    home.section.addEventListener('address:filled', copyAddress);
+})();
+</script>
+@endpush

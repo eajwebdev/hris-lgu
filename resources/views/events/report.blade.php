@@ -13,7 +13,7 @@
 @section('hero')
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div>
-            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Events</h1>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Events</h1>
             <p class="mt-1 text-cream/70">Who clocked in and out of an event, as a printable list.</p>
         </div>
         @include('events.partials.tabs')

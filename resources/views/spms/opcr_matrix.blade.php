@@ -1,5 +1,25 @@
 @extends('layouts.master')
 
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <p class="text-xs font-medium text-cream/70">SPMS &middot; Office Performance Commitment &amp; Review</p>
+            <h1 class="mt-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">{{ $opcr->office->office_name }}</h1>
+            <p class="mt-1 text-cream/70">
+                {{ $opcr->year }}, {{ $opcr->semester == 1 ? '1st half (Jan to Jun)' : '2nd half (Jul to Dec)' }}
+                <span class="mx-1.5 text-cream/30">|</span>
+                Office head: {{ $opcr->head ? ($opcr->head->fname . ' ' . $opcr->head->lname) : 'not set' }}
+            </p>
+        </div>
+
+        {{-- Session messages show as the shell's toasts, so the page no longer repeats them as alerts. --}}
+        <a href="{{ route('spms.opcr') }}"
+           class="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 font-semibold text-forest-900 shadow-md shadow-forest-950/25 transition-colors [text-shadow:none] hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            <i class="fas fa-arrow-left"></i> OPCR documents
+        </a>
+    </div>
+@endsection
+
 @section('body')
 <style>
     .btn-teal {
@@ -140,35 +160,6 @@
 </style>
 
 <div class="container-fluid py-2">
-    {{-- Breadcrumb & Navigation Bar --}}
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <span class="breadcrumb-drive">
-            <i class="fas fa-info-circle text-info mr-1"></i> Dashboard &nbsp;/&nbsp; Drive &nbsp;/&nbsp; OPCR
-        </span>
-        <a href="{{ route('spms.opcr') }}" class="btn btn-outline-secondary btn-sm font-weight-bold">
-            <i class="fas fa-arrow-left mr-1"></i> Back to OPCR Documents
-        </a>
-    </div>
-
-    {{-- Flash Messages --}}
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-3" role="alert">
-            <i class="fas fa-exclamation-triangle mr-2"></i> {{ session('error') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show shadow-sm mb-3" role="alert">
-            <i class="fas fa-check-circle mr-2"></i> {{ session('success') }}
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-    @endif
-
     {{-- Header Banner & Office Head Badge --}}
     <div class="row mb-3 align-items-center">
         <div class="col-md-6">

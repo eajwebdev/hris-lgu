@@ -1,5 +1,10 @@
 @extends('layouts.master')
 
+@section('hero')
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">My Interview Ratings</h1>
+    <p class="mt-1 max-w-2xl text-cream/70">Only the candidates currently assigned to you are shown here.</p>
+@endsection
+
 @section('body')
 <style>
     .assignment-page .card { border:0; border-radius:18px; box-shadow:0 9px 30px rgba(15,23,42,.07); }
@@ -16,8 +21,6 @@
 <div class="container-fluid assignment-page" data-current-count="{{ $ratings->count() }}" data-assignment-key="{{ $assignmentKey }}">
     <div class="card">
         <div class="card-body">
-            <h4 class="font-weight-bold mb-1"><i class="fas fa-comments mr-1"></i> My Interview Ratings</h4>
-            <p class="text-muted mb-4">Only currently cast candidates assigned to you are shown here.</p>
 
             @forelse($ratings as $rating)
                 @php $app = $rating->application; @endphp

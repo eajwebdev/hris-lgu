@@ -9,6 +9,7 @@ use App\Http\Controllers\MasterController;
 use App\Http\Controllers\PositionDescriptionController;
 use App\Http\Controllers\ComparativeAssessmentController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmploymentHistoryController;
 use App\Http\Controllers\TirednessController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\UserController;
@@ -249,6 +250,13 @@ Route::group(['middleware' => ['login_auth', 'password.changed', NoCacheMiddlewa
         Route::get('/emp-qr', [EmployeeController::class, 'empQr'])->name('empQr');
 
         Route::post('/delete/{id}', [EmployeeController::class, 'empDelete'])->name('empDelete');
+
+        // Employment history: each period worked, separation and rehire.
+        Route::middleware('face.registrar')->group(function () {
+            Route::get('/{id}/employment-history', [EmploymentHistoryController::class, 'show'])->whereNumber('id')->name('employmentHistory');
+            Route::post('/{id}/separate', [EmploymentHistoryController::class, 'separate'])->whereNumber('id')->name('employeeSeparate');
+            Route::post('/{id}/rehire', [EmploymentHistoryController::class, 'rehire'])->whereNumber('id')->name('employeeRehire');
+        });
 
         /*
          * Face recognition — Phase 1, enrolment only.

@@ -173,6 +173,44 @@ if (!function_exists('sidebar_menu')) {
     }
 }
 
+if (!function_exists('shell_account')) {
+    /**
+     * What the signed-in shell shows about the account — photo, name, role —
+     * plus the menu and whether the privacy notice still needs an answer.
+     *
+     * layouts/app and layouts/master both draw the same sidebar and top bar
+     * partials around their pages; this is the one place their variables come
+     * from, so the two layouts cannot disagree about who is signed in.
+     *
+     * @return array{account: mixed, accountPhoto: string, accountName: string, accountRole: string, menu: array, needsPrivacyConsent: bool}
+     */
+    function shell_account(string $guard): array
+    {
+        $account = auth()->guard($guard)->user();
+
+        $accountPhoto = $account->profile && file_exists(public_path('Profile/Employee/' . $account->profile))
+            ? asset('Profile/Employee/' . $account->profile)
+            : asset('Profile/Employee/default.png');
+
+        $accountName = trim(ucwords(strtolower($account->fname)) . ' ' . ucwords(strtolower($account->lname)));
+
+        $accountRole = $guard === 'employee'
+            ? ($account->emp_status == 1 && $account->position ? $account->position : 'Employee')
+            : ucfirst($account->role);
+
+        return [
+            'account'             => $account,
+            'accountPhoto'        => $accountPhoto,
+            'accountName'         => $accountName,
+            'accountRole'         => $accountRole,
+            // Built once: the sidebar draws it and the top bar's breadcrumb reads it.
+            'menu'                => sidebar_menu($guard),
+            // Employees must accept the privacy notice before using the system.
+            'needsPrivacyConsent' => $guard === 'employee' && $account->dpn == 0,
+        ];
+    }
+}
+
 if (!function_exists('sees_job_applications')) {
     /**
      * Whether the signed-in account gets the job-application alerts in the
@@ -416,6 +454,8 @@ if (!function_exists('pds_sections')) {
         // route runs on 'face.self', so an employee opening their own page
         // directly is allowed and one naming somebody else's id gets a 403.
         if (\App\Http\Middleware\EnsureFaceRegistrar::allows()) {
+            // HR's record of the periods worked, separations and rehires.
+            $sections[] = $entry('Employment History', route('employmentHistory', $employee->id), 'fas fa-clock-rotate-left', $on('employees/*/employment-history'), null, 'employment');
             $sections[] = $entry('Face Recognition', $url('faceRecognition'), 'fas fa-user-shield', $on('pds/face-recognition*'), (bool) $employee->faceSummary()['registered'], 'identity');
         }
 

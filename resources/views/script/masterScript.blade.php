@@ -39,45 +39,7 @@
     });
 
     $(function () {
-        @if(Session::has('error'))
-        toastr.options = {
-                "closeButton":true,
-                "progressBar":true,
-                'positionClass': 'toast-bottom-right'
-            }
-            toastr.error("{{ session('error') }}")
-        @endif
-        
-        @if(Session::has('error1'))
-            toastr.options = {
-                "closeButton":true,
-                "progressBar":true,
-                'positionClass': 'toast-bottom-center'
-            }
-            toastr.error("{{ session('error1') }}")
-        @endif
-
-        @if(Session::has('success'))
-            toastr.options = {
-                "closeButton":true,
-                "progressBar":true,
-                'positionClass': 'toast-bottom-right'
-            }
-            toastr.success("{{ session('success') }}")
-        @endif
-
-        @if($errors->any())
-                var errorMessage = "";
-                @foreach($errors->all() as $error)
-                    errorMessage += "{{ $error }}" + "<br>";
-                @endforeach
-                toastr.options = {
-                    "closeButton": true,
-                    "progressBar": true,
-                    "positionClass": "toast-bottom-right"
-                };
-                toastr.error(errorMessage);
-        @endif
+        // Session messages are shown by the shell's toasts (layouts/app-frame).
 
         $("#example1").DataTable({
             "responsive": false,

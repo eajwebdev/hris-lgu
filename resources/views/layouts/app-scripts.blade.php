@@ -46,6 +46,35 @@
         });
     });
 
+    /* ------------------------------------------------------------- top bar */
+    // Clear while it sits on the banner photo; solid once the page has
+    // scrolled and there is page beneath it instead.
+    var topbar = document.getElementById('appTopbar');
+
+    function markScrolled() {
+        if (window.scrollY > 8) { topbar.dataset.scrolled = ''; } else { delete topbar.dataset.scrolled; }
+    }
+
+    window.addEventListener('scroll', markScrolled, { passive: true });
+    markScrolled();
+
+    /* ------------------------------------------------------- global search */
+    var globalSearch = document.getElementById('globalSearch');
+    if (globalSearch) {
+        globalSearch.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter') return;
+            var query = globalSearch.value.trim().toLowerCase();
+            if (!query) return;
+            var match = Array.prototype.find.call(sidebar.querySelectorAll('a[href]'), function (link) {
+                return link.textContent.trim().toLowerCase().indexOf(query) !== -1;
+            });
+            if (match) {
+                event.preventDefault();
+                window.location.href = match.href;
+            }
+        });
+    }
+
     /* --------------------------------------------------------------- theme */
     // Light unless dark has been chosen here; the choice is kept per browser.
     var themeToggle = document.getElementById('themeToggle');

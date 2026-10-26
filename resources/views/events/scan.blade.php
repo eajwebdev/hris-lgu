@@ -1,5 +1,30 @@
 @extends('layouts.master')
 
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Event QR Attendance</h1>
+            <p class="mt-1 max-w-2xl text-cream/70">Scan employee QR codes and follow the event's attendance as it comes in.</p>
+        </div>
+
+        {{-- The page script finds the picker by its id, wherever it sits. --}}
+        <label class="flex w-full flex-col gap-1.5 sm:w-auto">
+            <span class="text-xs font-medium text-cream/70">Event</span>
+            <select id="eventPick"
+                    class="h-10 w-full rounded-xl border border-cream/25 bg-forest-950/40 px-3 text-cream outline-none transition-colors focus:border-cream sm:w-72 [&>option]:text-ink">
+                <option value="" disabled {{ $events->isEmpty() ? 'selected' : '' }}>— select an event —</option>
+                    @foreach($events as $ev)
+                        <option value="{{ $ev->id }}" @if($loop->first) selected @endif
+                            data-venue="{{ $ev->venue }}"
+                            data-when="{{ \Carbon\Carbon::parse($ev->start)->format('M d, Y') }}">
+                            {{ $ev->title }}
+                        </option>
+                    @endforeach
+            </select>
+        </label>
+    </div>
+@endsection
+
 @section('body')
 <style>
     :root {
@@ -148,25 +173,6 @@
 
 <div class="container-fluid">
     <div class="scan-wrap">
-
-        <div class="scan-head">
-            <div>
-                <h1><i class="fas fa-qrcode text-success1"></i> Event QR Attendance</h1>
-            </div>
-            <div class="pick">
-                <label for="eventPick" class="mb-0 mr-1" style="font-weight:600; font-size:.85rem;">Event:</label>
-                <select id="eventPick">
-                    <option value="" disabled {{ $events->isEmpty() ? 'selected' : '' }}>— select an event —</option>
-                    @foreach($events as $ev)
-                        <option value="{{ $ev->id }}" @if($loop->first) selected @endif
-                            data-venue="{{ $ev->venue }}"
-                            data-when="{{ \Carbon\Carbon::parse($ev->start)->format('M d, Y') }}">
-                            {{ $ev->title }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-        </div>
 
         @if($events->isEmpty())
             <div class="noevent">

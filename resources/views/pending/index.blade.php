@@ -52,7 +52,7 @@
 @section('breadcrumb', 'Pending')
 
 @section('hero')
-    <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Pending</h1>
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Pending</h1>
     <p class="mt-1 max-w-2xl text-cream/70">Leave applications on their way through the signatories, and Personal Data Sheet entries waiting for HR's review.</p>
 @endsection
 

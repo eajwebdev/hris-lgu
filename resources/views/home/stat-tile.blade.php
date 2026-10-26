@@ -1,74 +1,33 @@
-{{--
-    A dashboard figure with its recent history underneath: label, number, one
-    line of context, and a strip of columns ending on the current period.
-
-    The dashboard's own, compact tile. The larger card with line charts and a
-    change badge is partials/stat-tile (Face Attendance); the two are kept
-    apart on purpose, so restyling one page's cards does not move the other's.
-
-      $label, $value, $icon   the figure
-      $note                   one line under the number
-      $series                 [['label' => 'Mon, Oct 5', 'value' => 12], ...] oldest first
-      $caption                what the columns are ("Filed, last 14 days")
-      $unit                   noun for the hover readout ("present", "filed")
-      $href                   optional; makes the whole tile a link
-      $waiting                optional; tints the icon when the tile needs attention
-
-    The last column is the period the number counts, so it alone takes the
-    full colour; the ones before it are the same green held back. Hovering a
-    column reads it out (the shell script, layouts/app-scripts), and the same
-    values are written out for screen readers, so nothing depends on the hover.
---}}
 @php
     $href = $href ?? null;
-    $waiting = $waiting ?? false;
     $tag = $href ? 'a' : 'div';
-    $peak = max(1, collect($series)->max('value'));
-    $empty = collect($series)->sum('value') == 0;
+    $values = collect($series)->pluck('value')->map(fn ($value) => (float) $value)->values();
+    $peak = max(1, (float) $values->max());
+    $denominator = max(1, $values->count() - 1);
+    $points = $values->map(fn ($value, $index) => round($index / $denominator * 66, 1).','.round(34 - ($value / $peak * 26), 1))->implode(' ');
+    $tone = match (true) {
+        str_contains(strtolower($label), 'present'), str_contains(strtolower($label), 'experience') => ['bg-blue-100 text-blue-600', '#3995ff'],
+        str_contains(strtolower($label), 'absent') => ['bg-red-100 text-red-600', '#ff5158'],
+        str_contains(strtolower($label), 'leave') => ['bg-amber-100 text-amber-600', '#f5ae22'],
+        str_contains(strtolower($label), 'eligib') => ['bg-purple-100 text-purple-600', '#bd76f4'],
+        str_contains(strtolower($label), 'voluntary') => ['bg-orange-100 text-orange-600', '#ff8739'],
+        default => ['bg-emerald-100 text-emerald-600', '#31b96b'],
+    };
 @endphp
 <{{ $tag }} @if($href) href="{{ $href }}" @endif
-    class="relative flex flex-col rounded-2xl border border-line bg-surface p-4 sm:p-5 {{ $href ? 'transition-colors hover:border-forest-600/40 focus-visible:outline-2 focus-visible:outline-sun-500' : '' }}">
-    <div class="flex items-start justify-between gap-3">
-        <p class="text-ink/60">{{ $label }}</p>
-        <span class="grid size-9 shrink-0 place-items-center rounded-xl {{ $waiting ? 'bg-sun-100 text-sun-700' : 'bg-forest-100 text-forest-700' }}">
-            <i class="fas {{ $icon }}"></i>
-        </span>
+    class="group relative flex min-h-29 items-center gap-4 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-forest-600/25 hover:shadow-md focus-visible:outline-2 focus-visible:outline-sun-500">
+    <span class="grid size-14 shrink-0 place-items-center rounded-xl text-xl {{ $tone[0] }}">
+        <i class="fas {{ $icon }}"></i>
+    </span>
+    <div class="min-w-0 flex-1">
+        <p class="truncate text-[13px] text-ink/60">{{ $label }}</p>
+        <p class="mt-0.5 font-display text-3xl font-bold leading-none tracking-tight tabular-nums">{{ number_format($value) }}</p>
+        <p class="mt-1 truncate text-xs text-ink/50">{{ $note }}</p>
     </div>
-
-    <p class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">{{ number_format($value) }}</p>
-    <p class="mt-1 text-xs text-ink/55">{{ $note }}</p>
-
-    {{-- Caption above, columns last: the baselines then line up along the
-         bottom of a row of tiles however the text above them wraps. --}}
-    <figure class="mt-auto pt-4">
-        <figcaption class="mb-1.5 text-[11px] text-ink/45">{{ $caption }}</figcaption>
-
-        {{-- Each column sits in a full-height slot, so the pointer only has to
-             be above or below it, not on it. --}}
-        <div class="relative flex h-10 items-end gap-0.5 border-b border-line" aria-hidden="true">
-            @foreach($series as $point)
-                <div class="group/col flex h-full flex-1 items-end justify-center"
-                     data-spark="{{ number_format($point['value']) }} {{ $unit }}" data-spark-label="{{ $point['label'] }}">
-                    @if($point['value'] > 0)
-                        <div class="w-full max-w-6 rounded-t-[3px] transition-colors group-hover/col:bg-forest-800 {{ $loop->last ? 'bg-forest-600 dark:bg-forest-500' : 'bg-forest-600/25 dark:bg-forest-500/35' }}"
-                             style="height: {{ max(8, round($point['value'] / $peak * 100)) }}%"></div>
-                    @endif
-                </div>
-            @endforeach
-
-            @if($empty)
-                <p class="pointer-events-none absolute inset-x-0 bottom-1.5 text-[11px] text-ink/35">None in this period</p>
-            @endif
-        </div>
-
-        {{-- The columns in words, for screen readers. Text rather than a
-             table: a hidden table still takes its full width, and widened the
-             page on a phone. --}}
-        <p class="sr-only">
-            {{ $label }}, {{ $caption }}:
-            @foreach($series as $point)
-                {{ $point['label'] }}, {{ number_format($point['value']) }} {{ $unit }}@if(!$loop->last);@endif
-            @endforeach
-        </p>
-    </figure>
+    <svg viewBox="0 0 66 38" class="mt-8 hidden h-10 w-16 shrink-0 overflow-visible 2xl:block" role="img" aria-label="{{ $caption }}">
+        <polyline points="{{ $points }}" fill="none" stroke="{{ $tone[1] }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    @if($href)
+        <span class="absolute top-3 right-3 grid size-7 place-items-center rounded-full bg-forest-100 text-[10px] text-forest-800 transition-transform group-hover:translate-x-0.5"><i class="fas fa-angle-right"></i></span>
+    @endif
 </{{ $tag }}>

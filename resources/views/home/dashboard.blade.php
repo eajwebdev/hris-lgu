@@ -8,35 +8,21 @@
     $cardTitle = 'font-display text-lg font-semibold tracking-tight';
 @endphp
 
-{{-- The greeting sits on the header banner, under the top bar. --}}
+{{-- Drawn on the tall banner layouts/app-frame gives the dashboard. --}}
 @section('hero')
-    @if($guard == 'employee')
-        @php
-            $heroPhoto = $employee->profile && file_exists(public_path('Profile/Employee/' . $employee->profile))
-                ? asset('Profile/Employee/' . $employee->profile)
-                : asset('Profile/Employee/default.png');
-        @endphp
-        <div class="flex items-center gap-5">
-            <img src="{{ $heroPhoto }}" alt="" class="size-16 shrink-0 rounded-full object-cover ring-4 ring-cream/15 sm:size-20">
-            <div class="min-w-0">
-                <p class="text-cream/70 lg:hidden">{{ now('Asia/Manila')->format('F j, Y') }}</p>
-                <h1 class="font-display text-3xl/none font-semibold tracking-tight sm:text-4xl/none">
-                    Maayong adlaw, {{ $viewerFirstName }}<span class="text-sun-500">.</span>
-                </h1>
-                <p class="mt-2 text-cream/75">
-                    {{ $employee->position ?: 'Employee' }}
-                    @if($employee->emp_ID)
-                        <span class="mx-2 text-cream/30">|</span>{{ $employee->emp_ID }}
-                    @endif
-                </p>
-            </div>
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="max-w-lg font-display text-4xl/[.93] font-bold tracking-tight sm:text-5xl/[.92]">
+                Maayong adlaw,<br><span class="text-[#79ef73]">{{ $guard === 'employee' ? $viewerFirstName : 'System' }}.</span>
+            </h1>
+            <p class="mt-3 max-w-md text-base/relaxed text-white/90 sm:text-lg/relaxed">
+                Human Resource Information System<br>Municipality of Mabinay
+            </p>
         </div>
-    @else
-        <p class="text-cream/70 lg:hidden">{{ now('Asia/Manila')->format('l, F j, Y') }}</p>
-        <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-            Maayong adlaw, {{ $viewerFirstName }}<span class="text-sun-500">.</span>
-        </h1>
-    @endif
+        <p class="inline-flex items-center gap-3 rounded-xl bg-forest-950/75 px-4 py-3 font-semibold shadow-lg backdrop-blur [text-shadow:none]">
+            <i class="fas fa-calendar-days"></i>{{ now('Asia/Manila')->format('D, M d, Y') }}
+        </p>
+    </div>
 @endsection
 
 @section('body')
@@ -233,70 +219,67 @@
         ];
     @endphp
 
-    <div class="grid gap-5 xl:grid-cols-3">
-        <div class="space-y-5 xl:col-span-2">
-            <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-                @foreach($stats as $stat)
-                    @include('home.stat-tile', $stat)
-                @endforeach
-            </div>
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        @foreach($stats as $stat)
+            @include('home.stat-tile', $stat)
+        @endforeach
+    </div>
 
-            <section class="{{ $card }} p-4 sm:p-5">
-                <div id="calendar"></div>
+    <div class="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1.75fr)_minmax(320px,1fr)]">
+        <section class="{{ $card }} min-w-0 p-4 sm:p-5">
+            <div id="calendar"></div>
+        </section>
+
+        <div class="grid gap-3 self-start md:grid-cols-2 xl:grid-cols-1">
+            <section class="{{ $card }} p-5">
+                <h2 class="{{ $cardTitle }}">Employee Status</h2>
+                @php
+                    $statusColors = ['#20b76a', '#59aee8', '#f5b82e', '#fb7b32'];
+                    $offset = 0;
+                    $gradientStops = [];
+                    foreach ($statuses as $status => $label) {
+                        $pct = (float) $empStatusPercentages->get($status)['percentage'];
+                        $gradientStops[] = $statusColors[$status - 1].' '.$offset.'% '.($offset + $pct).'%';
+                        $offset += $pct;
+                    }
+                    if ($offset < 100) $gradientStops[] = '#e9efeb '.$offset.'% 100%';
+                @endphp
+                <div class="mt-4 flex items-center gap-6">
+                    <div class="relative grid size-34 shrink-0 place-items-center rounded-full"
+                         style="background:conic-gradient({{ implode(',', $gradientStops) }})">
+                        <div class="grid size-22 place-items-center rounded-full bg-surface text-center shadow-inner">
+                            <p><strong class="block font-display text-3xl leading-none">{{ number_format($totalEmployees) }}</strong><span class="text-xs text-ink/55">Employees</span></p>
+                        </div>
+                    </div>
+                    <ul class="min-w-0 flex-1 space-y-2.5">
+                        @foreach($statuses as $status => $label)
+                            @php $share = $empStatusPercentages->get($status); @endphp
+                            <li class="flex items-start gap-2 text-xs">
+                                <span class="mt-1 size-2.5 shrink-0 rounded-full" style="background:{{ $statusColors[$status - 1] }}"></span>
+                                <span class="min-w-0 text-ink/60"><span class="block truncate">{{ $label }}</span><strong class="text-ink">{{ $share['count'] }}</strong> &nbsp;({{ number_format($share['percentage'], 2) }}%)</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
             </section>
-        </div>
 
-        <div class="grid gap-5 self-start md:grid-cols-2 xl:grid-cols-1">
-            <section class="{{ $card }}">
-                <h2 class="{{ $cardTitle }} px-5 pt-5 pb-3">Employee Status</h2>
-
-                <ul class="divide-y divide-line border-t border-line">
-                    @foreach($statuses as $status => $label)
-                        @php
-                            $share = $empStatusPercentages->get($status);
-                        @endphp
-                        <li class="px-5 py-3.5">
-                            <div class="flex items-baseline justify-between gap-4">
-                                <span>{{ $label }}</span>
-                                <span class="tabular-nums text-ink/55">
-                                    <strong class="font-semibold text-ink">{{ $share['count'] }}</strong>
-                                    <span class="mx-1 text-ink/25">&middot;</span>{{ number_format($share['percentage'], 2) }}%
-                                </span>
-                            </div>
-                            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-line/70">
-                                <div class="h-full rounded-full bg-forest-600 dark:bg-forest-500" style="width: {{ number_format($share['percentage'], 2) }}%"></div>
-                            </div>
-                        </li>
-                    @endforeach
-                </ul>
-            </section>
-
-            <section class="{{ $card }}">
-                <h2 class="{{ $cardTitle }} px-5 pt-5 pb-3">Birthday</h2>
-
+            <section class="{{ $card }} overflow-hidden">
+                <div class="flex items-center justify-between px-5 py-4">
+                    <h2 class="{{ $cardTitle }}"><i class="fas fa-cake-candles mr-2 text-forest-700"></i>Birthday</h2>
+                    <a href="{{ route('emp_list') }}" class="text-xs font-semibold text-forest-700 hover:underline">View All <i class="fas fa-angle-right ml-1"></i></a>
+                </div>
                 <ul class="divide-y divide-line border-t border-line">
                     @forelse($upcomingBirthdays as $celebrant)
                         @php
-                            $photo = $celebrant->profile && file_exists(public_path('Profile/Employee/' . $celebrant->profile))
-                                ? asset('Profile/Employee/' . $celebrant->profile)
-                                : asset('Profile/Employee/default.png');
-                            $isToday = $celebrant->bdate->format('F j') == now('Asia/Manila')->format('F j');
+                            $photo = $celebrant->profile && file_exists(public_path('Profile/Employee/' . $celebrant->profile)) ? asset('Profile/Employee/' . $celebrant->profile) : asset('Profile/Employee/default.png');
                         @endphp
                         <li class="flex items-center gap-3 px-5 py-3">
-                            <img src="{{ $photo }}" alt="" class="size-10 shrink-0 rounded-xl object-cover">
-                            <div class="min-w-0 flex-1 leading-tight">
-                                <p class="truncate font-medium">{{ ucfirst(strtolower($celebrant->lname)) . ' ' . ucfirst(strtolower($celebrant->fname)) }}</p>
-                                <p class="mt-0.5 truncate text-xs text-ink/55">{{ $celebrant->office_abbr }}</p>
-                            </div>
-                            <p class="shrink-0 text-right text-xs text-ink/55">
-                                @if($isToday)
-                                    <i class="fas fa-birthday-cake mr-1 text-sun-600" title="Today"></i>
-                                @endif
-                                {{ $celebrant->bdate->format('F j, Y') }}
-                            </p>
+                            <img src="{{ $photo }}" alt="" class="size-9 rounded-full object-cover">
+                            <p class="min-w-0 flex-1 truncate font-medium">{{ ucfirst(strtolower($celebrant->fname.' '.$celebrant->lname)) }}</p>
+                            <time class="text-xs text-ink/55">{{ $celebrant->bdate->format('M j') }}</time>
                         </li>
                     @empty
-                        <li class="px-5 py-6 text-ink/55">No birthdays to show.</li>
+                        <li class="px-5 py-8 text-center text-ink/55"><i class="fas fa-gift mb-2 block text-3xl text-forest-500"></i>No birthdays to show.</li>
                     @endforelse
                 </ul>
             </section>

@@ -1,5 +1,53 @@
 @extends('layouts.master')
 
+@section('hero')
+    @php
+        $bannerButton = 'inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border px-4 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500';
+        $quiet = $bannerButton . ' border-cream/30 bg-forest-950/55 backdrop-blur-sm hover:border-cream hover:bg-cream hover:text-forest-900';
+    @endphp
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <p class="text-xs font-medium text-cream/70">Personnel Selection Board &middot; Interview Assessment</p>
+            <h1 class="mt-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">{{ $interview->job->title ?? 'Position' }}</h1>
+            <p class="mt-1 text-cream/70">
+                @if($interview->job && $interview->job->plantilla_item_no)
+                    {{ $interview->job->plantilla_item_no }}
+                    <span class="mx-1.5 text-cream/30">|</span>
+                @endif
+                <i class="fas fa-building mr-1"></i>{{ optional(optional($interview->job)->positionDescription)->bureau_office ?? $interview->job->assignment ?? 'Office not set' }}
+            </p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+            <a href="{{ route('interviewEvaluationList') }}" class="{{ $quiet }}"><i class="fas fa-arrow-left"></i> Back</a>
+            @if(auth()->guard('web')->check() && in_array(auth()->guard('web')->user()->role, ['Administrator', 'HR Administrator'], true))
+                {{-- The two modals live in the page body; Bootstrap's data-api finds them from here. --}}
+                <button type="button" class="{{ $quiet }}" data-toggle="modal" data-target="#panelMembersModal">
+                    <i class="fas fa-users"></i> Panel
+                </button>
+                <button type="button" class="{{ $quiet }}" data-toggle="modal" data-target="#panelProgressModal">
+                    <i class="fas fa-chart-line"></i> Scoring progress
+                </button>
+                @if($interview->jid)
+                    <a href="{{ route('psbAssessment', $interview->jid) }}" class="{{ $quiet }}">
+                        <i class="fas fa-scale-balanced"></i> Comparative assessment
+                    </a>
+                @endif
+                <a href="{{ route('interviewConsolidatedScreen', $interview->id) }}" target="_blank" class="{{ $quiet }}">
+                    <i class="fas fa-ranking-star"></i> Ranking
+                </a>
+                <a href="{{ route('interviewSummaryRatingPdf', $interview->id) }}" target="_blank" class="{{ $quiet }}">
+                    <i class="fas fa-file-pdf"></i> Summary rating
+                </a>
+                <a href="{{ route('psbInterviewForm', $interview->id) }}" target="_blank" class="{{ $bannerButton }} border-cream bg-cream text-forest-900 hover:bg-white"
+                   title="Personnel Selection Board interview form, ready to sign">
+                    <i class="fas fa-print"></i> PSB interview form
+                </a>
+            @endif
+        </div>
+    </div>
+@endsection
+
 @section('body')
 <style>
     .interview-manage .card { border:0; border-radius:18px; box-shadow:0 9px 30px rgba(15,23,42,.07); }
@@ -26,45 +74,6 @@
 </style>
 
 <div class="container-fluid interview-manage">
-    <div class="card mb-3">
-        <div class="interview-manage-head">
-            <div>
-                <small class="text-muted">Personnel Selection Board &middot; Interview Assessment</small>
-                <h4>{{ $interview->job->title ?? 'Position' }}</h4>
-                @if($interview->job && $interview->job->plantilla_item_no)
-                    <div class="text-muted small">{{ $interview->job->plantilla_item_no }}</div>
-                @endif
-                <div class="text-muted small"><i class="fas fa-building mr-1"></i>{{ optional(optional($interview->job)->positionDescription)->bureau_office ?? $interview->job->assignment ?? 'Office not set' }}</div>
-            </div>
-            <div class="d-flex flex-wrap align-items-center" style="gap:8px;">
-                @if(auth()->guard('web')->check() && in_array(auth()->guard('web')->user()->role, ['Administrator', 'HR Administrator'], true))
-                    <a href="{{ route('interviewConsolidatedScreen', $interview->id) }}" target="_blank" class="btn btn-warning">
-                        <i class="fas fa-ranking-star"></i> Ranking
-                    </a>
-                    <a href="{{ route('interviewSummaryRatingPdf', $interview->id) }}" target="_blank" class="btn btn-danger">
-                        <i class="fas fa-file-pdf"></i> Summary Rating
-                    </a>
-                    <a href="{{ route('psbInterviewForm', $interview->id) }}" target="_blank" class="btn btn-success"
-                       title="Personnel Selection Board interview form, ready to sign">
-                        <i class="fas fa-print"></i> PSB Interview Form
-                    </a>
-                    @if($interview->jid)
-                        <a href="{{ route('psbAssessment', $interview->jid) }}" class="btn btn-outline-success">
-                            <i class="fas fa-scale-balanced"></i> Comparative Assessment
-                        </a>
-                    @endif
-                    <button type="button" class="btn btn-info" data-toggle="modal" data-target="#panelMembersModal">
-                        <i class="fas fa-users"></i> Panel
-                    </button>
-                    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#panelProgressModal">
-                        <i class="fas fa-chart-line"></i> Scoring Progress
-                    </button>
-                @endif
-                <a href="{{ route('interviewEvaluationList') }}" class="btn btn-light border"><i class="fas fa-arrow-left"></i> Back</a>
-            </div>
-        </div>
-    </div>
-
     <div class="card">
         <div class="card-body">
             <div class="d-flex align-items-center justify-content-between mb-3">

@@ -4,8 +4,13 @@
     "name": "_commonjsHelpers"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DBkHGSAY.css",
+    "file": "assets/app-sBkzUYVi.css",
     "src": "resources/css/app.css",
+    "isEntry": true
+  },
+  "resources/css/shell.css": {
+    "file": "assets/shell-Bjh_rRIR.css",
+    "src": "resources/css/shell.css",
     "isEntry": true
   },
   "resources/js/app.js": {

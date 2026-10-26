@@ -59,7 +59,7 @@
 @section('hero')
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div>
-            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Face Attendance</h1>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Face Attendance</h1>
             <p class="mt-1 text-cream/70">Punches made through the attendance portal on {{ $day->format('l, F j, Y') }}.</p>
         </div>
 
@@ -69,7 +69,7 @@
              dot have punches on them. --}}
         <div class="relative" id="dayPicker" data-selected="{{ $date }}" data-today="{{ $today }}"
              data-url="{{ route('attendanceMonitor') }}" data-busy='@json($busyDays)'>
-            <div class="inline-flex overflow-hidden rounded-xl border border-cream/25">
+            <div class="inline-flex overflow-hidden rounded-xl border border-cream/30 bg-forest-950/55 backdrop-blur-sm">
                 <a href="{{ route('attendanceMonitor', ['date' => $day->copy()->subDay()->toDateString()]) }}" title="Previous day" class="{{ $dayButton }}">
                     <i class="fas fa-angle-left"></i><span class="sr-only">Previous day</span>
                 </a>

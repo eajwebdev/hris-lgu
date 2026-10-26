@@ -105,7 +105,9 @@ class EmployeeController extends Controller
                 'statuses.status_name',
                 'employees.emp_status',
                 'employees.stat_1'
-            );
+            )
+            // Whether they are in a period of service now; see EmploymentHistory.
+            ->withExists('currentEmployment as employed');
         
         // Retrieve employees
         $employee = $employee->get();
@@ -158,7 +160,13 @@ class EmployeeController extends Controller
                 ->first();
 
         if ($existingEmployee) {
-            return redirect()->back()->withErrors(['Employee already exists.']);
+            // A returning employee is rehired on the record they already
+            // have, not added a second time.
+            return redirect()->back()->withInput()->withErrors([
+                trim(ucwords(strtolower($existingEmployee->fname)) . ' ' . ucwords(strtolower($existingEmployee->lname)))
+                . ' is already on record (Employee ID ' . $existingEmployee->emp_ID . ').'
+                . ($existingEmployee->isSeparated() ? ' If they are returning, rehire them from their Employment History.' : ''),
+            ]);
         }
 
 
@@ -207,7 +215,7 @@ class EmployeeController extends Controller
             'emp_ID' => $newEmpID,
             'emp_status' => $request->emp_status,
             'emp_dept' => $request->emp_dept,
-            'em_supervise' => $request->em_supervise,
+            'supervisor' => $request->supervisor,
             'item_no' => $request->item_no,
             'prefix' => $request->prefix,
             'bdate' => $request->bdate,
@@ -496,6 +504,13 @@ class EmployeeController extends Controller
     public function toggleAcctStat(Request $request)
     {
         $employee = Employee::findOrFail($request->id);
+
+        // A separated employee's sign-in comes back with a rehire, which also
+        // starts their new period; switching it on alone would skip that.
+        if ($request->stat_1 == 1 && $employee->isSeparated()) {
+            return response()->json(['success' => false, 'message' => 'This employee is separated. Rehire them from their Employment History to turn their sign-in back on.']);
+        }
+
         $employee->stat_1 = $request->stat_1;
         $employee->save();
         

@@ -21,7 +21,9 @@
     <div class="grid lg:min-h-screen lg:grid-cols-[minmax(0,1.12fr)_minmax(460px,1fr)]">
 
         {{-- Brand panel --}}
-        <aside class="relative isolate m-2.5 flex flex-col overflow-hidden rounded-3xl bg-forest-900 px-6 pt-5 pb-32 text-cream sm:m-3 sm:px-10 sm:pt-8 lg:pb-0">
+        <aside class="relative isolate m-2.5 flex flex-col overflow-hidden rounded-3xl bg-forest-900 bg-cover bg-center px-6 pt-5 pb-32 text-cream sm:m-3 sm:px-10 sm:pt-8 lg:pb-0"
+               style="background-image:url('{{ asset('images/mabinay-hall-portrait.png') }}')">
+            <div class="pointer-events-none absolute inset-0 -z-10 bg-linear-to-br from-forest-950/95 via-forest-950/82 to-forest-900/35"></div>
             <div class="flex items-center justify-between gap-4">
                 @include('partials.auth-brand')
                 @include('partials.auth-clock')
@@ -57,7 +59,7 @@
                 </ul>
             </div>
 
-            @include('partials.auth-scene')
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-36 bg-linear-to-t from-forest-950/90 to-transparent"></div>
         </aside>
 
         {{-- Sign-in --}}

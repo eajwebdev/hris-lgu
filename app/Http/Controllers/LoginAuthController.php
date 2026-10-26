@@ -19,7 +19,7 @@ class LoginAuthController extends Controller
             return redirect()->route('dashboard');
         }
         
-        return view('login-page', ['demoAccounts' => $this->demoAccounts()]);
+        return view('login', ['demoAccounts' => $this->demoAccounts()]);
     }
 
     public function getLogin()
@@ -78,33 +78,31 @@ class LoginAuthController extends Controller
      * Exists only while APP_DEMO is on — the route is public but the action
      * 404s otherwise, so nothing reaches it in production. It also skips the
      * "replace the issued password" hold, since a demo is rarely given by
-     * somebody who wants to stop and set eighty passwords first.
+     * somebody who wants to stop and set passwords first.
+     *
+     * Administrator accounts only; employees' personal accounts are never
+     * reachable this way, even by posting an employee key by hand.
      */
     public function demoLogin(Request $request)
     {
         abort_unless(config('app.demo'), 404);
 
         $request->validate([
-            'account' => ['required', 'regex:/^(web|employee):\d+$/'],
+            'account' => ['required', 'regex:/^web:\d+$/'],
         ]);
 
-        [$guard, $id] = explode(':', $request->account);
+        [, $id] = explode(':', $request->account);
 
-        $account = $guard === 'web' ? User::find($id) : Employee::find($id);
+        $account = User::find($id);
 
         if (! $account) {
             return redirect()->back()->with('error', 'Invalid Credentials');
         }
 
-        if ($guard === 'employee' && $account->stat_1 != 1) {
-            return redirect()->back()->with('error', 'Account Suspended');
-        }
-
-        // One identity per session. LoginAuth checks the "web" guard first, so
-        // a left-over admin login would otherwise win over the account just
-        // picked — drop the other guard before logging this one in.
-        Auth::guard($guard === 'web' ? 'employee' : 'web')->logout();
-        Auth::guard($guard)->login($account);
+        // One identity per session. LoginAuth checks the "web" guard first, but
+        // a left-over employee login should not linger alongside it.
+        Auth::guard('employee')->logout();
+        Auth::guard('web')->login($account);
 
         $request->session()->regenerate();
         $request->session()->forget(EnsurePasswordChanged::SESSION_KEY);
@@ -132,20 +130,10 @@ class LoginAuthController extends Controller
                 'role'     => $user->role ?: 'Administrator',
             ]);
 
-        $employees = Employee::orderBy('lname')->orderBy('fname')
-            ->get(['id', 'fname', 'lname', 'username', 'role', 'position', 'stat_1'])
-            ->map(fn ($employee) => [
-                'key'      => 'employee:' . $employee->id,
-                'name'     => $label($employee),
-                'username' => $employee->username,
-                'role'     => $employee->stat_1 != 1
-                    ? 'Suspended'
-                    : ($employee->position ?: ucfirst((string) ($employee->role ?: 'employee'))),
-            ]);
-
+        // Employees' personal accounts are deliberately left out: the demo
+        // offers the administrator side only.
         return array_filter([
             'Administrators' => $admins->all(),
-            'Employees'      => $employees->all(),
         ]);
     }
 

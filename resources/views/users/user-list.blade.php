@@ -46,7 +46,7 @@
 @section('hero')
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div>
-            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Users</h1>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Users</h1>
             <p class="mt-1 max-w-2xl text-cream/70">Accounts for administrators and HR staff. Employees sign in with their own employee record, not from here.</p>
         </div>
 

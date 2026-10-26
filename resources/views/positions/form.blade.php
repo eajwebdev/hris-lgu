@@ -52,7 +52,7 @@
 @section('hero')
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div class="min-w-0">
-            <h1 class="font-display text-3xl font-semibold tracking-tight max-sm:line-clamp-2 max-sm:text-2xl sm:text-4xl">{{ $isNew ? 'New position description' : $description->full_title }}</h1>
+            <h1 class="font-display text-3xl font-bold tracking-tight max-sm:line-clamp-2 max-sm:text-2xl sm:text-4xl">{{ $isNew ? 'New position description' : $description->full_title }}</h1>
             <p class="mt-1 text-cream/70">DBM-CSC Form No. 1, Revised Version No. 1, s. 2017</p>
         </div>
 
@@ -61,11 +61,11 @@
              third of the screen; Cancel is also at the foot of the form. --}}
         <div class="flex flex-wrap gap-2">
             @unless($isNew)
-                <a href="{{ route('positionDescriptionPrint', $description->id) }}" target="_blank" class="{{ $bannerButton }} border-cream/25 hover:border-cream hover:bg-cream hover:text-forest-900 max-sm:hidden">
+                <a href="{{ route('positionDescriptionPrint', $description->id) }}" target="_blank" class="{{ $bannerButton }} border-cream/30 bg-forest-950/55 backdrop-blur-sm hover:border-cream hover:bg-cream hover:text-forest-900 max-sm:hidden">
                     <i class="fas fa-print"></i> Print form
                 </a>
             @endunless
-            <a href="{{ route('positionDescriptionList') }}" class="{{ $bannerButton }} border-cream/25 hover:border-cream hover:bg-cream hover:text-forest-900 max-sm:hidden">Cancel</a>
+            <a href="{{ route('positionDescriptionList') }}" class="{{ $bannerButton }} border-cream/30 bg-forest-950/55 backdrop-blur-sm hover:border-cream hover:bg-cream hover:text-forest-900 max-sm:hidden">Cancel</a>
             <button type="submit" form="pdForm" class="{{ $bannerButton }} border-cream bg-cream text-forest-900 hover:bg-white">
                 <i class="fas fa-save"></i> {{ $isNew ? 'Create description' : 'Save changes' }}
             </button>

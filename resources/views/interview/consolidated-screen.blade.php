@@ -1,5 +1,22 @@
 @extends('layouts.master')
 
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <p class="text-xs font-medium text-cream/70">Interview Candidate Results</p>
+            <h1 class="mt-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">{{ $interview->job->title ?? 'Applicant Ranking' }}</h1>
+            @if($interview->job && $interview->job->plantilla_item_no)
+                <p class="mt-1 text-cream/70">{{ $interview->job->plantilla_item_no }}</p>
+            @endif
+        </div>
+
+        <a href="{{ route('interviewEvaluationShow', $interview->id) }}"
+           class="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 font-semibold text-forest-900 shadow-md shadow-forest-950/25 transition-colors [text-shadow:none] hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            <i class="fas fa-arrow-left"></i> Back to interview
+        </a>
+    </div>
+@endsection
+
 @section('body')
 <style>
     .interview-leaderboard {
@@ -343,19 +360,6 @@
 </style>
 
 <div class="container-fluid interview-leaderboard">
-    <div class="interview-board-header">
-        <div>
-            <small class="text-white-50">Interview Candidate Results</small>
-            <h1><i class="fas fa-ranking-star mr-2"></i>{{ $interview->job->title ?? 'Applicant Ranking' }}</h1>
-            @if($interview->job && $interview->job->plantilla_item_no)
-                <small class="text-white-50">{{ $interview->job->plantilla_item_no }}</small>
-            @endif
-        </div>
-        <a href="{{ route('interviewEvaluationShow', $interview->id) }}" class="btn btn-light">
-            <i class="fas fa-arrow-left mr-1"></i> Back to Interview
-        </a>
-    </div>
-
     <div class="interview-live-summary">
         <div>
             <small class="text-muted">Scoring access</small>

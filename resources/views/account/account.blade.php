@@ -1,19 +1,21 @@
 @extends('layouts.master')
 
+@section('hero')
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Account Management</h1>
+    <p class="mt-1 max-w-2xl text-white/85">Review employee usernames and manage access credentials.</p>
+@endsection
+
 @section('body')
 @php
     $current_route=request()->route()->getName();
 @endphp
 <div class="container-fluid">
-    <div class="row" style="padding-top: 100px;">
+    <div class="row">
         <div class="col-lg-12">
-            <div class="card card-success card-outline">
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{{ route('dashboard') }}"><i class="fas fa-dashboard"></i> Dashboard</a></li>
-                        <li class="breadcrumb-item">Account</li>
-                    </ol> 
-                </nav>
+            <div class="card legacy-card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-address-card text-success mr-2"></i>Employee Accounts</h2>
+                </div>
                 <div class="card-body">
                     <div class="row">
                         @if($guard == 'web')

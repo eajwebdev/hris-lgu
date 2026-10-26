@@ -1,5 +1,18 @@
 @extends('layouts.master')
 
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Job Applications</h1>
+            <p class="mt-1 max-w-2xl text-cream/70">{{ number_format($jobapplication->count()) }} received across every posting.</p>
+        </div>
+
+        <a href="{{ route('positionDescriptionList') }}" class="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 font-semibold text-forest-900 shadow-md shadow-forest-950/25 transition-colors [text-shadow:none] hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            <i class="fas fa-briefcase"></i> Positions &amp; Vacancies
+        </a>
+    </div>
+@endsection
+
 @section('body')
 @php
     $current_route = request()->route()->getName();
@@ -9,14 +22,9 @@
 
         {{-- RIGHT COLUMN (Job Applications List - All Applications) --}}
         <div class="col-lg-12">
-            <div class="card card-info card-outline">
+            <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-users"></i> Job Applications ({{ $jobapplication->count() }} total)
-                    </h3>
-                    <div class="card-tools">
-                        <span class="badge bg-info">All Applications</span>
-                    </div>
+                    <h3 class="card-title">All applications</h3>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">

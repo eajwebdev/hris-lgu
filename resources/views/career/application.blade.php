@@ -51,7 +51,7 @@
 @section('hero')
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div>
-            <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Applications</h1>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Applications</h1>
             <p class="mt-1 max-w-2xl text-cream/70">Everyone who has applied for a vacancy, and where each application stands.</p>
         </div>
 

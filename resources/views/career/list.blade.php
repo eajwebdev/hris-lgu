@@ -1,5 +1,18 @@
 @extends('layouts.master')
 
+@section('hero')
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div>
+            <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Edit Job Posting</h1>
+            <p class="mt-1 max-w-2xl text-cream/70">{{ $jEdit->title ?? 'Job posting' }} &middot; every posting is advertised from a position description.</p>
+        </div>
+
+        <a href="{{ route('positionDescriptionList') }}" class="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 font-semibold text-forest-900 shadow-md shadow-forest-950/25 transition-colors [text-shadow:none] hover:bg-cream focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">
+            <i class="fas fa-arrow-left"></i> Positions &amp; Vacancies
+        </a>
+    </div>
+@endsection
+
 @section('body')
 @php
     $current_route = request()->route()->getName();

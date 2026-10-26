@@ -103,12 +103,43 @@ class Employee extends Authenticatable
         return app(\App\Services\FaceEmbeddingService::class)->summary($this);
     }
 
+    /** Every period worked for the LGU, latest first. */
+    public function employmentHistory()
+    {
+        return $this->hasMany(EmploymentHistory::class)->orderByDesc('date_start')->orderByDesc('id');
+    }
+
+    /** The period being worked now; none once the employee is separated. */
+    public function currentEmployment()
+    {
+        return $this->hasOne(EmploymentHistory::class)->whereNull('date_end')->latest('id');
+    }
+
+    public function isSeparated(): bool
+    {
+        return ! $this->currentEmployment()->exists();
+    }
+
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($employee) {
             $employee->password = Hash::make($employee->password);
+        });
+
+        // The open period of the employment history follows the record: it
+        // starts with the record, and an edit to the position, office,
+        // status, item no. or date hired is an edit to it. A separated
+        // employee has no open period, so their history is left as it was.
+        static::created(function ($employee) {
+            $employee->employmentHistory()->create(EmploymentHistory::fromEmployee($employee));
+        });
+
+        static::updated(function ($employee) {
+            if ($employee->wasChanged(['position', 'emp_dept', 'emp_status', 'item_no', 'date_hired'])) {
+                $employee->currentEmployment?->update(EmploymentHistory::fromEmployee($employee));
+            }
         });
     }
 

@@ -26,7 +26,7 @@
 @endphp
 
 @section('hero')
-    <h1 class="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Settings</h1>
+    <h1 class="font-display text-3xl font-bold tracking-tight sm:text-4xl">Settings</h1>
     <p class="mt-1 max-w-2xl text-cream/70">Who signs and approves, who may see what, and where attendance is expected from.</p>
 @endsection
 
