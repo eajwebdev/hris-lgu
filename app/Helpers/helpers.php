@@ -446,17 +446,17 @@ if (!function_exists('pds_sections')) {
             $entry('Attachment to CS Form No. 212', $url('genpdsAtthachment'), 'fas fa-eye', false, null, 'print'),
 
             $entry('E-Signature', $url('signature'), 'fas fa-signature', $on('pds/signature*'), null, 'identity'),
+
+            // Everyone, so an employee who skipped the dashboard prompt (or
+            // wants to re-enrol) has a permanent way back to it. The route runs
+            // on 'face.self': an employee only ever reaches their own record,
+            // and naming somebody else's id gets a 403.
+            $entry('Face Recognition', $url('faceRecognition'), 'fas fa-user-shield', $on('pds/face-recognition*'), (bool) $employee->faceSummary()['registered'], 'identity'),
         ];
 
-        // Registrars only. The PDS is the HR-facing record, so enrolling a
-        // face from here belongs to Admin and HR; an employee reaches their
-        // own enrolment from the dashboard. This only hides the link: the
-        // route runs on 'face.self', so an employee opening their own page
-        // directly is allowed and one naming somebody else's id gets a 403.
+        // HR's record of the periods worked, separations and rehires.
         if (\App\Http\Middleware\EnsureFaceRegistrar::allows()) {
-            // HR's record of the periods worked, separations and rehires.
             $sections[] = $entry('Employment History', route('employmentHistory', $employee->id), 'fas fa-clock-rotate-left', $on('employees/*/employment-history'), null, 'employment');
-            $sections[] = $entry('Face Recognition', $url('faceRecognition'), 'fas fa-user-shield', $on('pds/face-recognition*'), (bool) $employee->faceSummary()['registered'], 'identity');
         }
 
         return $sections;

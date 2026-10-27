@@ -468,23 +468,21 @@ class FaceRegistrationTest extends TestCase
     }
 
     /**
-     * The PDS submenu is HR's context, so an employee does NOT get the entry
-     * there — they get it on their dashboard instead.
-     *
-     * The PDS is the record Admin and HR work through on somebody's file.
-     * Hanging biometric enrolment off an employee's own copy of that form is
-     * what made it read as part of their personal information, which it is not.
+     * The dashboard prompt can be closed for now, so the PDS menu is the
+     * permanent way back: an employee who skipped it, or wants to re-enrol,
+     * finds Face Recognition there — pointing at their own page, not by id.
      */
-    public function test_the_employees_pds_submenu_does_not_carry_the_face_entry(): void
+    public function test_the_employees_pds_submenu_carries_the_face_entry(): void
     {
         $this->actingAs($this->employee, 'employee');
 
         $this->get(route('empPDS'))
             ->assertOk()
-            ->assertDontSee('Face Recognition');
+            ->assertSee('Face Recognition')
+            ->assertSee(route('faceRecognition'));
     }
 
-    /** ...it is on the dashboard, where an employee actually looks. */
+    /** ...and on the dashboard, where an employee actually looks. */
     public function test_the_dashboard_links_the_employee_to_face_registration(): void
     {
         $this->actingAs($this->employee, 'employee');

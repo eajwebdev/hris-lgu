@@ -297,10 +297,15 @@
      needs a camera and reasonable light, and somebody checking their payslip
      from a phone on the road should be reminded, not locked out of the
      dashboard. It ignores Escape and clicks on the backdrop, so it has to be
-     answered deliberately instead of dismissed by a stray tap. --}}
+     answered deliberately instead of dismissed by a stray tap. Closing it here
+     is not the last chance: the PDS menu carries a Face Recognition entry. --}}
 @if($guard == 'employee' && ($promptFaceRegistration ?? false))
     <dialog id="facePromptDialog" data-dialog-static aria-labelledby="facePromptLabel"
             class="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-7 text-center text-ink shadow-2xl shadow-forest-950/25 backdrop:bg-forest-950/60">
+        <button type="button" data-dialog-close aria-label="Close"
+                class="absolute top-3 right-3 grid size-9 cursor-pointer place-items-center rounded-lg text-ink/45 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-sun-500">
+            <i class="fas fa-xmark"></i>
+        </button>
         <span class="mx-auto grid size-16 place-items-center rounded-full bg-forest-100 text-2xl text-forest-700">
             <i class="fas fa-user-shield"></i>
         </span>
@@ -309,6 +314,9 @@
             You have no face registered yet. Registering lets you clock in and
             out at the attendance kiosk without typing anything. It takes about
             a minute and needs a camera with decent light.
+        </p>
+        <p class="mt-2 text-xs text-ink/50">
+            Not now? You can register anytime from PDS &rsaquo; Face Recognition.
         </p>
         <a href="{{ route('faceRecognition') }}"
            class="mt-6 flex h-11 items-center justify-center rounded-xl bg-forest-900 font-medium text-cream transition-colors hover:bg-forest-950 dark:bg-forest-600 dark:hover:bg-forest-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500">

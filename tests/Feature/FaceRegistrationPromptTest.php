@@ -161,7 +161,7 @@ class FaceRegistrationPromptTest extends TestCase
         $this->actingAs($this->employee, 'employee')
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('facePromptModal')
+            ->assertSee('id="facePromptDialog"', false)
             ->assertSee('Register your face');
     }
 
@@ -181,12 +181,12 @@ class FaceRegistrationPromptTest extends TestCase
 
         $this->actingAs($this->employee, 'employee')
             ->get(route('dashboard'))
-            ->assertSee('facePromptModal');
+            ->assertSee('id="facePromptDialog"', false);
 
         // Same session, second load — still no face on file, so still asked.
         $this->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('facePromptModal');
+            ->assertSee('id="facePromptDialog"', false);
 
         // ...and it stops the moment they enrol, rather than on a visit count.
         // Re-authenticated against the refreshed model because enrolFace() signs
@@ -197,7 +197,7 @@ class FaceRegistrationPromptTest extends TestCase
         $this->actingAs($this->employee, 'employee')
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('facePromptModal');
+            ->assertDontSee('id="facePromptDialog"', false);
     }
 
     /** Somebody who already has a face on file is never asked. */
@@ -209,7 +209,7 @@ class FaceRegistrationPromptTest extends TestCase
         $this->actingAs($this->employee, 'employee')
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('facePromptModal');
+            ->assertDontSee('id="facePromptDialog"', false);
     }
 
     /**
@@ -225,7 +225,7 @@ class FaceRegistrationPromptTest extends TestCase
         $this->actingAs($this->employee, 'employee')
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('facePromptModal');
+            ->assertDontSee('id="facePromptDialog"', false);
     }
 
     /**
@@ -239,7 +239,7 @@ class FaceRegistrationPromptTest extends TestCase
         $this->actingAs($this->employee, 'employee')
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('facePromptModal');
+            ->assertSee('id="facePromptDialog"', false);
     }
 
     /**
@@ -261,7 +261,7 @@ class FaceRegistrationPromptTest extends TestCase
         $this->actingAs($admin, 'web')
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('facePromptModal');
+            ->assertDontSee('id="facePromptDialog"', false);
     }
 
     /** The dashboard tile shows enrolment state at a glance, both ways round. */
@@ -270,7 +270,7 @@ class FaceRegistrationPromptTest extends TestCase
         $this->actingAs($this->employee, 'employee')
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('fa-times-circle text-danger', false);
+            ->assertSee('fa-times-circle text-base text-red-600', false);
 
         $this->enrolFace();
 
@@ -281,7 +281,7 @@ class FaceRegistrationPromptTest extends TestCase
         $this->actingAs($this->employee, 'employee')
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('fa-check-circle text-success', false);
+            ->assertSee('fa-check-circle text-base text-forest-600', false);
     }
 
     protected function tearDown(): void
