@@ -31,7 +31,10 @@ class LoginAuth
             || $request->is('pds/references/*') || $request->is('pds/government-id/*')) {
                 return redirect()->route('dashboard')->with('error1', 'You do not have permission to access this page');
             }
-            if ($request->is('leave') && auth()->guard('employee')->user()->emp_status != 1) {
+            // The filing screen, for whoever earns leave (Permanent and Casual,
+            // config/leave.php) — this used to admit Permanent only, so Casual
+            // employees saw the menu link and were turned away by it.
+            if ($request->is('leave') && ! auth()->guard('employee')->user()->isLeaveEligible()) {
                 return redirect()->route('dashboard')->with('error1', 'You do not have permission to access this page');
             }    
 

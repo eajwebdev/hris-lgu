@@ -41,5 +41,14 @@ return [
     ],
 
     'cpt_sync' => ['token' => env('CPT_SYNC_TOKEN')],
+
+    // EAJ-Face-AI microservice used by FaceAIService. The service types its
+    // base URL as a string, so a missing entry was a TypeError on
+    // construction instead of a clear "service offline".
+    'face_ai' => [
+        'base_url' => env('FACE_AI_URL', 'http://127.0.0.1:8000/api'),
+        'key' => env('FACE_AI_KEY', ''),
+        'timeout' => (int) env('FACE_AI_TIMEOUT', 10),
+    ],
 ];
 

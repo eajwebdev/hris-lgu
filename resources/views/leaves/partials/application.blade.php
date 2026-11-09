@@ -20,13 +20,14 @@
     $isStaff = $guard == 'web';
     $me = auth()->guard($guard)->user();
     $hasEsign = filled($me->esign ?? null);
-    // HR approves at the HRMO stop only with the leave approval right, the
-    // eighth of the user's access flags.
-    $mayApproveAsHr = $isStaff && (explode(',', (string) $me->access)[7] ?? 0) == 1;
+    // HR approves at the HRMO stop only with the leave approval right (the
+    // eighth access flag, or the HR role when no flags were ever set).
+    $mayApproveAsHr = $isStaff && $me->canApproveLeave();
     $isApprover = !$isStaff && $setting->isApprovingOfficial($me->id);
-    // In the list of other people's applications, the OIC of the office
-    // signs in the supervisor's place.
-    $oicSigns = !$own && filled($oic->oic_id ?? null);
+    // In the list of other people's applications, the OIC of the applicant's
+    // office signs in the supervisor's place when that OIC is the one looking.
+    $oicSigns = !$own && filled($leave->office_oic_id ?? null)
+        && $leave->office_oic_id == $me->id && $leave->supervisor != $me->id;
 
     // "Santos, Maria Jr. C." from the four name columns under a prefix.
     $named = fn ($row, string $who) => trim(preg_replace('/\s+/', ' ',
@@ -99,7 +100,7 @@
 
     // -------------------------------------------- the supervisor, or the OIC
     $supervising = [];
-    $signsHere = $oicSigns ? $oic->oic_id == $me->id : $leave->supervisor == $me->id;
+    $signsHere = !$isStaff && !$own && ($oicSigns || $leave->supervisor == $me->id);
     if (!$isStaff && $signsHere && $leave->status == 2 && $leave->remarks_stat != 2 && $forSigning) {
         $supervising = $hasEsign
             ? [
@@ -112,7 +113,7 @@
     }
     // HR signs here on the supervisor's behalf when the supervisor is also
     // the one who gives final approval.
-    if ($isStaff && $leave->supervisor == $leave->approver && $leave->status == 2) {
+    if ($mayApproveAsHr && ($leave->supervisor == $leave->approver || $setting->isApprovingOfficial($leave->supervisor)) && $leave->status == 2 && $leave->remarks_stat == 0) {
         $supervising[] = $send('Approve', 'fa-check', 'primary', route('leaveApprove'), ['id' => $leave->id, 'by' => 2],
             ['Approve this for the supervisor?', 'It is recorded as recommended by the supervisor, ' . $recommend, 'Approve'], 'Leave application approved.');
     }
@@ -129,7 +130,7 @@
     }
 
     $filer = $own ? ($isStaff ? null : 'Me') : $named($leave, 'employee_');
-    $supervisorName = $oicSigns ? $named($oic, 'o') : $named($leave, 'supervisor_');
+    $supervisorName = $oicSigns ? $named($me, '') : $named($leave, 'supervisor_');
 
     // [role, who, signed, when, actions]
     $stops = [
@@ -145,13 +146,15 @@
     // What the stops do not own: HR may send an application straight to the
     // Mayor, or take it out altogether.
     $overall = [];
-    if ($isStaff && $leave->status != 3) {
+    // Forwarding needs the days checked first: that is what the credits
+    // taken at the supervisor's stop are worked out from.
+    if ($mayApproveAsHr && $reviewed && $leave->status < 3 && $refusedAt === null) {
         $overall[] = $send('Forward to Mayor', 'fa-forward', 'quiet', route('leaveApprove'), ['id' => $leave->id, 'by' => 2],
             ['Forward this to the Mayor / Vice Mayor?', 'It skips the signatures still missing: ' . $recommend, 'Forward it'], 'Leave application forwarded.');
     }
-    if ($isStaff && $leave->sup_sign != 2) {
+    if ($isStaff) {
         $overall[] = $send('Cancel application', 'fa-xmark', 'danger', route('cancelLeave', $leave->id), [],
-            ['Cancel this leave application?', 'It is deleted for good; the employee would have to file it again.', 'Cancel the application', true], 'Leave application cancelled.');
+            ['Cancel this leave application?', 'It is deleted for good and any leave credits it took are given back; the employee would have to file it again.', 'Cancel the application', true], 'Leave application cancelled.');
     }
 
     $button = 'inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-3.5 font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sun-500 disabled:cursor-wait disabled:opacity-60';

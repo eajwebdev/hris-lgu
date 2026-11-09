@@ -369,8 +369,10 @@ Route::group(['middleware' => ['login_auth', 'password.changed', NoCacheMiddlewa
             ->middleware('face.self')
             ->name('faceRecognition');
 
-        Route::get('/signature/{id?}', [PdsController::class, 'signature'])->name('signature');
-        Route::post('/upload-signature/{id?}', [PdsController::class, 'uploadSignature'])->name('uploadSignature');
+        // An employee reads and replaces only their own e-signature (it signs leave
+        // forms in their name); Admin/HR may manage anyone's.
+        Route::get('/signature/{id?}', [PdsController::class, 'signature'])->middleware('face.self')->name('signature');
+        Route::post('/upload-signature/{id?}', [PdsController::class, 'uploadSignature'])->middleware('face.self')->name('uploadSignature');
     });
     
     // Office
@@ -473,7 +475,6 @@ Route::group(['middleware' => ['login_auth', 'password.changed', NoCacheMiddlewa
         Route::get('/settings', [MasterController::class, 'systemSetting'])->name('settings');
         Route::post('/settings', [MasterController::class, 'systemSettingUpdate'])->name('settingsUpdate');
     });
-    Route::get('/leave/disapprove', [LeaveApplicationController::class, 'leaveDisapprove']);
     Route::post('/logout', [MasterController::class, 'logout'])->name('logout');
 
     // SPMS Routes

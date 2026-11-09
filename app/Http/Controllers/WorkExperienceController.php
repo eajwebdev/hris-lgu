@@ -121,8 +121,11 @@ class WorkExperienceController extends Controller
             'attachment' => $attachmentPath,
             'list_accom' => $listAccomString,
             'actual_summary' => $request->input('actual_summary'),
+            // Waiting on HR's review, like the other PDS entries; left NULL it
+            // never showed in HR's pending queue (which looks for status 0).
+            'status' => 0,
         ]);
-    
+
         Notification::create([
             'empid' => $request->input('empid'),
             'lapp_id' => $workexperience->id,

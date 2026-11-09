@@ -123,7 +123,7 @@ class PendingController extends Controller
                 break;
                 
             default:
-                return redirect()->route('');
+                return redirect()->route('dashboard');
         }
 
         if($type != 1){

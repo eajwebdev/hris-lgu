@@ -550,7 +550,7 @@ class AttendanceGeoTest extends TestCase
 
         $this->get(route('settings'))
             ->assertOk()
-            ->assertSee('Attendance Stations')
+            ->assertSee('Attendance stations')
             ->assertSee('Municipal Hall')
             ->assertSee(route('stationStore'));
     }
@@ -573,7 +573,7 @@ class AttendanceGeoTest extends TestCase
 
         $this->get(route('attendanceMonitor'))
             ->assertOk()
-            ->assertSee('FACE ATTENDANCE MONITOR')
+            ->assertSee('Face Attendance')
             ->assertSee(trim("{$this->alice->fname} {$this->alice->lname}"))
             ->assertSee('from Municipal Hall')
             ->assertSee('1 out of range');

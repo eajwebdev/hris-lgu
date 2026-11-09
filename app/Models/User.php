@@ -52,4 +52,21 @@ class User extends Authenticatable
     {
         return $this->role === $role;
     }
+
+    /**
+     * May this account sign at the HRMO stop of a leave application?
+     *
+     * The eighth access flag is the Leave right. An account whose flags were
+     * never set (access NULL, as for the seeded Administrator and HR
+     * Administrator) falls back on its role; otherwise HR could never approve
+     * anything and every application stopped after the employee signed.
+     */
+    public function canApproveLeave(): bool
+    {
+        if (blank($this->access)) {
+            return in_array($this->role, ['Administrator', 'HR Administrator'], true);
+        }
+
+        return (explode(',', (string) $this->access)[7] ?? '0') == '1';
+    }
 }

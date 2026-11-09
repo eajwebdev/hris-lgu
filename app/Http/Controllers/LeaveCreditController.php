@@ -45,6 +45,13 @@ class LeaveCreditController extends Controller
     
     public function leavesReadEmp(){
         $guard = $this->getGuard();
+
+        // The filing screen is the employee's own. An HR account reaching it
+        // has no employee record of its own (the page died on the missing
+        // employee picker); its leave screen is the credits one.
+        if ($guard === 'web') {
+            return redirect()->route('leavesRead');
+        }
         $empid = auth()->guard($guard)->user()->id;
         $employee = Employee::find($empid);
 

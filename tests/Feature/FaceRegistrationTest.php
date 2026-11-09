@@ -512,7 +512,7 @@ class FaceRegistrationTest extends TestCase
 
         $this->get(route('PDS', $this->employee->id))
             ->assertOk()
-            ->assertSee('PERSONAL INFORMATION')
+            ->assertSee('Personal information')
             ->assertDontSee('FACE RECOGNITION REGISTRATION')
             ->assertDontSee('js/face-engine/face-engine.js');
     }

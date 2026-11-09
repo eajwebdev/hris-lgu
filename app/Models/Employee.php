@@ -66,6 +66,21 @@ class Employee extends Authenticatable
     }
 
     /**
+     * Does this employee sign other people's leave applications: as someone's
+     * immediate supervisor, as head or OIC of an office, or as the Mayor or
+     * Vice Mayor? They need the Leave screens even when they cannot file
+     * leave themselves (an Elective official, for one).
+     */
+    public function signsLeave(): bool
+    {
+        $setting = Setting::first();
+
+        return ($setting && $setting->isApprovingOfficial($this->id))
+            || static::where('supervisor', $this->id)->exists()
+            || $this->isOfficeHead();
+    }
+
+    /**
      * May this employee file leave?
      *
      * Permanent and Casual today; see config/leave.php for which employment

@@ -56,6 +56,21 @@ class LeaveApplication extends Model
         'holiday'
     ];
 
+    /**
+     * Where a new application starts: filed (status 1), not yet checked by
+     * HR (emp_esign 0), not refused (remarks_stat 0), still in progress
+     * (history 1). The leave screens and queues compare these to numbers, so
+     * they must never be left NULL.
+     */
+    protected $attributes = [
+        'status' => '1',
+        'emp_esign' => '0',
+        'remarks_stat' => '0',
+        'holiday' => '0',
+        'day_wpay' => 0,
+        'history' => 1,
+    ];
+
     public function office()
     {
         return $this->belongsTo(Office::class, 'department', 'id');

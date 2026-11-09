@@ -13,19 +13,15 @@ class PdCreateSmokeTest extends TestCase
         $res->assertOk();
 
         $html = $res->getContent();
-        file_put_contents(sys_get_temp_dir().'/pd_create.html', $html);
 
-        // The stylesheet is linked and cache-busted.
-        $this->assertMatchesRegularExpression('/css\/hris-theme\.css\?v=\d+/', $html);
+        // The page is on the redesigned layout (Tailwind build), not the old
+        // hris-theme.css .rec-* classes.
+        $this->assertMatchesRegularExpression('/build\/assets\/[^"]+\.css/', $html);
+        $this->assertStringContainsString('action="' . route('positionDescriptionStore'), $html);
 
-        // Every structural class the page depends on is present.
-        foreach (['rec-page','rec-card','rec-grid','rec-field','rec-rows','rec-sticky','rec-total','rec-btn'] as $c) {
-            $this->assertStringContainsString($c, $html, "missing .$c");
-        }
-
-        // All 23 sections are drawn.
+        // Every numbered section of DBM-CSC Form No. 1 is drawn.
         foreach (['1&ndash;3','4&ndash;8','9&ndash;14','15','16','17','18','19&ndash;20','21','22'] as $n) {
-            $this->assertStringContainsString('<span class="n">'.$n.'</span>', $html, "missing section $n");
+            $this->assertMatchesRegularExpression('/<span class="[^"]*">' . preg_quote($n, '/') . '<\/span>/', $html, "missing section $n");
         }
     }
 }

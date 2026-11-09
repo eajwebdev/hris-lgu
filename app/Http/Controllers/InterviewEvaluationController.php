@@ -141,8 +141,11 @@ class InterviewEvaluationController extends Controller
     {
         $user = auth()->guard('web')->user();
         if (!$user || !in_array($user->role, ['Administrator', 'HR Administrator'], true)) {
-            redirect()->route('dashboard')->with('error1', 'Only administrators can view rankings.')->send();
-            exit;
+            // Thrown, not send() + exit: exiting skipped the session save, so
+            // the message never reached the dashboard.
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                redirect()->route('dashboard')->with('error1', 'Only administrators can view rankings.')
+            );
         }
     }
 

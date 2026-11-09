@@ -17,6 +17,8 @@ Laravel 11 with Tailwind and AdminLTE 3 screens, MySQL.
 - PHP 8.2+ with `pdo_mysql`, `gd`, `mbstring`
 - MySQL 5.7+ / MariaDB
 - Composer
+- [Bun](https://bun.sh) for the front-end assets — the project uses Bun, not npm
+  or pnpm (`bun.lock` is the only lockfile)
 
 ## Setup
 
@@ -43,6 +45,14 @@ php artisan storage:link
 ```
 
 `db:seed` is idempotent — it is safe to re-run.
+
+Build the front-end assets (Vite + Tailwind) with Bun:
+
+```bash
+bun install
+bun run build   # production build into public/build
+bun run dev     # or: Vite dev server with hot reload while developing
+```
 
 ### Seeded accounts
 

@@ -46,8 +46,28 @@
                         $remarks = "Your application for " . strtolower($leaveTypes[$notif->leave_type] ?? '') . " (Application No: #{$notif->transnum}) has been approved.";
                     @endphp
                 @break
+                @case(3)
+                    @php
+                        $remarks = "Your application for " . strtolower($leaveTypes[$notif->leave_type] ?? '') . " (Application No: #{$notif->transnum}) was disapproved. The reason is in your leave history.";
+                    @endphp
+                @break
+                @case(4)
+                    @php
+                        $remarks = "Your " . strtolower($leaveTypes[$notif->leave_type] ?? 'leave') . " (Application No: #{$notif->transnum}) was cancelled by HR and its leave credits given back.";
+                    @endphp
+                @break
+                @case(5)
+                    @php
+                        $remarks = "A " . strtolower($leaveTypes[$notif->leave_type] ?? 'leave') . " application (Application No: #{$notif->transnum}) is waiting on your signature as supervisor.";
+                    @endphp
+                @break
+                @case(6)
+                    @php
+                        $remarks = "A " . strtolower($leaveTypes[$notif->leave_type] ?? 'leave') . " application (Application No: #{$notif->transnum}) is waiting on your final approval.";
+                    @endphp
+                @break
             @endswitch
-            <a data-notification-id="{{ $notif->id }}" href="{{ route('leaveStatus') }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
+            <a data-notification-id="{{ $notif->id }}" href="{{ in_array((int) $notif->category, [2, 3, 4]) ? route('historyRead') : route('leaveStatus') }}" class="dropdown-item d-flex align-items-center flex items-center px-[1rem] py-[.75rem] text-ink transition-colors hover:bg-paper">
                 <div class="mr-3 shrink-0">
                     <span class="notification-initials grid size-10 place-items-center rounded-full bg-forest-100 text-[13px] font-semibold text-forest-800 ring-1 ring-forest-600/20">HR</span>
                 </div>

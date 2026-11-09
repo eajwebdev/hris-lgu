@@ -132,6 +132,10 @@ if (!function_exists('sidebar_menu')) {
         // what the rest of the app will let the person do.
         } elseif ($user->isLeaveEligible()) {
             $time[] = $item('Leave', 'Leave', route('leavesReadEmp'), 'fas fa-calendar-check', $on('leave', 'leave/*'));
+        } elseif ($user->signsLeave()) {
+            // The Mayor, the Vice Mayor (Elective) or a supervisor who cannot
+            // file leave still signs other people's, on the Status screen.
+            $time[] = $item('Leave', 'Leave', route('leaveStatus'), 'fas fa-calendar-check', $on('leave', 'leave/*'));
         }
 
         if ($isStaff) {

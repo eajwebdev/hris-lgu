@@ -24,16 +24,13 @@
         8 => 'Terminal Leave',
     ];
 
-    // Other people's applications: for the OIC or head of an office, the
-    // ones from that office; for the Mayor and the Vice Mayor, everything
-    // waiting for final approval. The employee's own are already above.
+    // Other people's applications that come to this employee (the controller
+    // picks them): the ones they supervise, the ones from an office they head
+    // or are OIC of, and for the Mayor and the Vice Mayor everything waiting
+    // for final approval. The employee's own are already above.
     $isApprover = !$isStaff && $setting->isApprovingOfficial($me->id);
-    $seesOthers = ($oic->oic_id ?? 0) == $me->id || $isOfficeHead || $isApprover;
     $mine = $leavesapp->pluck('id')->all();
-    $others = $seesOthers
-        ? collect($leavesapphead)->filter(fn ($leave) => !in_array($leave->id, $mine)
-            && ($leave->supervisor_emp_dept == $me->emp_dept || $isApprover))
-        : collect();
+    $others = collect($leavesapphead)->reject(fn ($leave) => in_array($leave->id, $mine));
 
     $person = ucwords(strtolower($employee->fname)) . ' ' . ucwords(strtolower($employee->lname));
 @endphp
@@ -93,10 +90,10 @@
         @if($others->isNotEmpty())
             <section aria-labelledby="othersHeading">
                 <h2 id="othersHeading" class="font-display text-xl font-semibold tracking-tight">
-                    {{ $isApprover ? 'For final approval' : 'From your office' }}
+                    {{ $isApprover ? 'For your signature' : 'From your office' }}
                 </h2>
                 <p class="mt-0.5 mb-3 text-ink/60">
-                    {{ $isApprover ? 'Signed by the HRMO and the supervisor, and waiting on the Mayor or the Vice Mayor.' : 'Applications filed by the people you sign for.' }}
+                    {{ $isApprover ? 'Waiting on the Mayor or the Vice Mayor for final approval, and any you sign as supervisor.' : 'Applications filed by the people you sign for.' }}
                 </p>
                 <div class="space-y-4">
                     @foreach($others as $leave)
